@@ -31,14 +31,13 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        isCoreLibraryDesugaringEnabled = true
     }
     buildFeatures { compose = true }
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
 }
 
 dependencies {
-    // Provisional baseline versions. Confirm against official docs before the
-    // first build and pin the selected Readium-compatible toolchain together.
     implementation(platform("androidx.compose:compose-bom:2025.10.01"))
     implementation("androidx.activity:activity-compose:1.10.1")
     implementation("androidx.compose.ui:ui")
@@ -46,13 +45,19 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.2")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.2")
+    implementation("androidx.fragment:fragment-ktx:1.8.9")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     androidTestImplementation(platform("androidx.compose:compose-bom:2025.10.01"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     testImplementation("junit:junit:4.13.2")
-}
 
-// Readium Kotlin, Room, Ktor/OkHttp, Coil, and WorkManager are intentionally
-// deferred until their compatibility is validated in the first implementation
-// spike. Avoid accumulating dependencies before the reader boundary is proven.
+    val readiumVersion = "3.3.0"
+    implementation("org.readium.kotlin-toolkit:readium-shared:$readiumVersion")
+    implementation("org.readium.kotlin-toolkit:readium-streamer:$readiumVersion")
+    implementation("org.readium.kotlin-toolkit:readium-navigator:$readiumVersion")
+
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
+}
