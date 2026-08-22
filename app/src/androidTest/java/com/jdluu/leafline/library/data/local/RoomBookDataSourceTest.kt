@@ -40,7 +40,7 @@ class RoomBookDataSourceTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun `addBook stores book and returns id`() = runTest {
+    fun addBook_stores_book_and_returns_id() = runTest {
         val book = LibraryBook(
             stableId = "test-id",
             title = "Test Book",
@@ -62,7 +62,7 @@ class RoomBookDataSourceTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun `getBookByStableId retrieves book`() = runTest {
+    fun getBookByStableId_retrieves_book() = runTest {
         val book = LibraryBook(
             stableId = "stable-id-1",
             title = "Book One",
@@ -88,7 +88,7 @@ class RoomBookDataSourceTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun `getBookByFileHash retrieves book`() = runTest {
+    fun getBookByFileHash_retrieves_book() = runTest {
         val book = LibraryBook(
             stableId = "hash-id",
             title = "Hash Book",
@@ -113,7 +113,7 @@ class RoomBookDataSourceTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun `getAllBooks returns all books ordered by addedAt descending`() = runTest {
+    fun getAllBooks_returns_all_books_ordered_by_addedAt_descending() = runTest {
         val book1 = LibraryBook(
             stableId = "id1",
             title = "Book 1",
@@ -168,14 +168,14 @@ class RoomBookDataSourceTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun `getAllBooks returns empty list initially`() = runTest {
+    fun getAllBooks_returns_empty_list_initially() = runTest {
         val books = dataSource.getAllBooks().first()
         assertTrue(books.isEmpty())
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun `updateBook modifies existing book`() = runTest {
+    fun updateBook_modifies_existing_book() = runTest {
         val book = LibraryBook(
             stableId = "update-id",
             title = "Original Title",
@@ -200,7 +200,7 @@ class RoomBookDataSourceTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun `deleteBook removes book`() = runTest {
+    fun deleteBook_removes_book() = runTest {
         val book = LibraryBook(
             stableId = "delete-id",
             title = "Book to Delete",
@@ -224,7 +224,7 @@ class RoomBookDataSourceTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun `addBook with same stableId replaces existing book`() = runTest {
+    fun addBook_with_same_stableId_replaces_existing_book() = runTest {
         val book1 = LibraryBook(
             stableId = "replace-id",
             title = "Original",
@@ -262,7 +262,7 @@ class RoomBookDataSourceTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun `persistence round trip preserves all fields`() = runTest {
+    fun persistence_round_trip_preserves_all_fields() = runTest {
         val book = LibraryBook(
             stableId = "roundtrip-id",
             title = "Round Trip Book",
@@ -296,7 +296,7 @@ class RoomBookDataSourceTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun `authors with special characters preserved correctly`() = runTest {
+    fun authors_with_special_characters_preserved_correctly() = runTest {
         val book = LibraryBook(
             stableId = "special-chars-id",
             title = "Special Characters",
@@ -323,7 +323,7 @@ class RoomBookDataSourceTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun `getAllBooks emits updated list on insert`() = runTest {
+    fun getAllBooks_emits_updated_list_on_insert() = runTest {
         val booksBefore = dataSource.getAllBooks().first()
         assertTrue(booksBefore.isEmpty())
 
@@ -349,7 +349,7 @@ class RoomBookDataSourceTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun `getAllBooks emits updated list on delete`() = runTest {
+    fun getAllBooks_emits_updated_list_on_delete() = runTest {
         val book = LibraryBook(
             stableId = "to-delete",
             title = "To Delete",
@@ -374,7 +374,7 @@ class RoomBookDataSourceTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun `getAllBooks emits updated list on update`() = runTest {
+    fun getAllBooks_emits_updated_list_on_update() = runTest {
         val book = LibraryBook(
             stableId = "update-test",
             title = "Original Title",
@@ -400,14 +400,14 @@ class RoomBookDataSourceTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun `getBookByStableId returns null for non-existent id`() = runTest {
+    fun getBookByStableId_returns_null_for_non_existent_id() = runTest {
         val result = dataSource.getBookByStableId("non-existent-id")
         assertNull(result)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun `getBookByFileHash returns null for non-existent hash`() = runTest {
+    fun getBookByFileHash_returns_null_for_non_existent_hash() = runTest {
         val result = dataSource.getBookByFileHash("non-existent-hash")
         assertNull(result)
     }
