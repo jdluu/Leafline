@@ -34,5 +34,8 @@ Thumbs.db
 # OpenCode local project state
 .opencode/
 
+# Local helper copy with credentials resolved at runtime
+scripts/opencode-bws.local
+
 # Test/runtime data
 *.log
