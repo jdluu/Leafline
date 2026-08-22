@@ -31,5 +31,8 @@ output-metadata.json
 Thumbs.db
 .vscode/
 
+# OpenCode local project state
+.opencode/
+
 # Test/runtime data
 *.log
