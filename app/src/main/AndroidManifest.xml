@@ -15,7 +15,7 @@
         </activity>
         <activity
             android:name=".ReaderActivity"
-            android:exported="true"
+            android:exported="false"
             android:theme="@style/Theme.Leafline" />
     </application>
 </manifest>
