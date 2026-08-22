@@ -257,4 +257,141 @@ class LibraryRepositoryTest {
         assertEquals(1, books.size)
         assertEquals("Replaced", books[0].title)
     }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `addBook returns incrementing unique ids`() = runTest {
+        val repository = LibraryRepositoryImpl()
+
+        val book1 = LibraryBook(
+            stableId = "id1",
+            title = "Book 1",
+            authors = emptyList(),
+            language = null,
+            description = null,
+            publisher = null,
+            publishedAtEpochMillis = null,
+            filePath = "/books/book1.epub",
+            fileHash = "hash1",
+            addedAtEpochMillis = 1000L,
+            pageCount = null
+        )
+        val book2 = LibraryBook(
+            stableId = "id2",
+            title = "Book 2",
+            authors = emptyList(),
+            language = null,
+            description = null,
+            publisher = null,
+            publishedAtEpochMillis = null,
+            filePath = "/books/book2.epub",
+            fileHash = "hash2",
+            addedAtEpochMillis = 2000L,
+            pageCount = null
+        )
+        val book3 = LibraryBook(
+            stableId = "id3",
+            title = "Book 3",
+            authors = emptyList(),
+            language = null,
+            description = null,
+            publisher = null,
+            publishedAtEpochMillis = null,
+            filePath = "/books/book3.epub",
+            fileHash = "hash3",
+            addedAtEpochMillis = 3000L,
+            pageCount = null
+        )
+
+        val id1 = repository.addBook(book1)
+        val id2 = repository.addBook(book2)
+        val id3 = repository.addBook(book3)
+
+        assertTrue(id1 >= 0)
+        assertEquals(id1 + 1, id2)
+        assertEquals(id2 + 1, id3)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `getAllBooks emits updated list on insert`() = runTest {
+        val repository = LibraryRepositoryImpl()
+
+        val booksBefore = repository.getAllBooks().first()
+        assertTrue(booksBefore.isEmpty())
+
+        val book = LibraryBook(
+            stableId = "new-id",
+            title = "New Book",
+            authors = emptyList(),
+            language = null,
+            description = null,
+            publisher = null,
+            publishedAtEpochMillis = null,
+            filePath = "/books/new.epub",
+            fileHash = "hash-new",
+            addedAtEpochMillis = 1000L,
+            pageCount = null
+        )
+        repository.addBook(book)
+
+        val booksAfter = repository.getAllBooks().first()
+        assertEquals(1, booksAfter.size)
+        assertEquals("New Book", booksAfter[0].title)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `getAllBooks emits updated list on delete`() = runTest {
+        val repository = LibraryRepositoryImpl()
+
+        val book = LibraryBook(
+            stableId = "to-delete",
+            title = "To Delete",
+            authors = emptyList(),
+            language = null,
+            description = null,
+            publisher = null,
+            publishedAtEpochMillis = null,
+            filePath = "/books/delete.epub",
+            fileHash = "hash-delete",
+            addedAtEpochMillis = 1000L,
+            pageCount = null
+        )
+        repository.addBook(book)
+        assertEquals(1, repository.getAllBooks().first().size)
+
+        repository.deleteBook("to-delete")
+
+        val booksAfter = repository.getAllBooks().first()
+        assertTrue(booksAfter.isEmpty())
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `getAllBooks emits updated list on update`() = runTest {
+        val repository = LibraryRepositoryImpl()
+
+        val book = LibraryBook(
+            stableId = "update-test",
+            title = "Original Title",
+            authors = emptyList(),
+            language = null,
+            description = null,
+            publisher = null,
+            publishedAtEpochMillis = null,
+            filePath = "/books/update.epub",
+            fileHash = "hash-update",
+            addedAtEpochMillis = 1000L,
+            pageCount = null
+        )
+        repository.addBook(book)
+
+        val updatedBook = book.copy(title = "Updated Title")
+        repository.updateBook(updatedBook)
+
+        val books = repository.getAllBooks().first()
+        assertEquals(1, books.size)
+        assertEquals("Updated Title", books[0].title)
+    }
 }
