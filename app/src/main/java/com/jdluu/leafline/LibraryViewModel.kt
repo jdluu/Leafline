@@ -35,6 +35,14 @@ class LibraryViewModel(
             initialValue = emptyList()
         )
 
+    /** Books with saved progress, sorted by last-read time (newest first). */
+    val continueReadingBooks: StateFlow<List<LibraryBook>> = repository.getRecentlyReadBooks()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
     private val _sort = MutableStateFlow(sortStore?.load() ?: LibrarySort.RECENT)
     val sort: StateFlow<LibrarySort> = _sort.asStateFlow()
 

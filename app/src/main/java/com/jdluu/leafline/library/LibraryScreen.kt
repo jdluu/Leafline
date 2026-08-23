@@ -226,6 +226,26 @@ fun LibraryScreen(
             }
         }
 
+        // Continue reading shelf
+        val continueReadingBooks by viewModel.continueReadingBooks.collectAsStateWithLifecycle()
+        if (continueReadingBooks.isNotEmpty()) {
+            Column(modifier = Modifier.padding(top = 8.dp)) {
+                Text(
+                    "Continue reading",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+                androidx.compose.foundation.lazy.LazyRow(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(continueReadingBooks, key = { it.stableId }) { book ->
+                        ContinueReadingTile(book = book, onClick = { onOpenBook(book) })
+                    }
+                }
+            }
+        }
+
         if (books.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -618,6 +638,45 @@ fun rememberCoverBitmap(path: String?): Bitmap? {
             }
         }
     }.value
+}
+
+@Composable
+private fun ContinueReadingTile(book: LibraryBook, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .width(120.dp)
+            .clickable(onClickLabel = "Continue reading", onClick = onClick)
+    ) {
+        Column {
+            val bitmap = rememberCoverBitmap(book.coverPath)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(COVER_ASPECT_RATIO)
+                    .clip(MaterialTheme.shapes.medium)
+            ) {
+                if (bitmap != null) {
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = book.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    CoverPlaceholder(title = book.title)
+                }
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = book.title,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 8.dp)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+    }
 }
 
 private const val COVER_ASPECT_RATIO = 0.7f

@@ -112,5 +112,9 @@ class LibraryRepositoryImpl(
         return dataSource.getBooksByReadingStatus(status)
     }
 
+    override fun getRecentlyReadBooks(limit: Int): Flow<List<LibraryBook>> {
+        return dataSource.getRecentlyReadBooks(limit)
+    }
+
     private fun <T> emptyFlow(): Flow<List<T>> = kotlinx.coroutines.flow.flowOf(emptyList())
 }

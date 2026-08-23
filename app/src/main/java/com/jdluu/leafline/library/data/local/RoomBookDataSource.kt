@@ -16,6 +16,12 @@ class RoomBookDataSource(
         }
     }
 
+    override fun getRecentlyReadBooks(limit: Int): Flow<List<LibraryBook>> {
+        return database.bookDao().getRecentlyReadBooks(limit).map { entities ->
+            entities.map { BookEntity.toLibraryBook(it) }
+        }
+    }
+
     override fun searchBooks(query: String): Flow<List<LibraryBook>> {
         return database.bookDao().searchBooks(query).map { entities ->
             entities.map { BookEntity.toLibraryBook(it) }

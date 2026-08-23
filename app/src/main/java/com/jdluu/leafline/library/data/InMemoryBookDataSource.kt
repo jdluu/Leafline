@@ -109,4 +109,12 @@ class InMemoryBookDataSource : BookDataSource {
             all.filter { it.readingStatus == status }
         }
     }
+
+    override fun getRecentlyReadBooks(limit: Int): Flow<List<LibraryBook>> {
+        return _booksFlow.asStateFlow().map { all ->
+            all.filter { it.lastLocatorJson != null }
+                .sortedByDescending { it.lastReadAtEpochMillis ?: 0L }
+                .take(limit)
+        }
+    }
 }

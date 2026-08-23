@@ -54,4 +54,7 @@ interface BookDao {
 
     @Query("SELECT * FROM books WHERE readingStatus != 'finished' AND lastLocatorJson IS NOT NULL ORDER BY lastReadAtEpochMillis DESC")
     fun getInProgressBooks(): Flow<List<BookEntity>>
+
+    @Query("SELECT * FROM books WHERE lastLocatorJson IS NOT NULL ORDER BY lastReadAtEpochMillis DESC LIMIT :limit")
+    fun getRecentlyReadBooks(limit: Int = 10): Flow<List<BookEntity>>
 }
