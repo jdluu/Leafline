@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.minimumInteractiveComponentSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -1152,11 +1153,13 @@ private fun BrightnessControl(
                 Text(
                     text = "Brightness",
                     style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.clickable(
-                        role = Role.Button,
-                        onClickLabel = "Reset brightness to system default",
-                        onClick = onReset
-                    )
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .clickable(
+                            role = Role.Button,
+                            onClickLabel = "Reset brightness to system default",
+                            onClick = onReset
+                        )
                 )
                 Spacer(modifier = Modifier.weight(1f))
                 Text(
@@ -1581,6 +1584,7 @@ private fun SearchResultRow(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
+            .minimumInteractiveComponentSize()
             .clickable(onClickLabel = "Open search result", onClick = onClick)
     ) {
         Column(
@@ -1912,6 +1916,7 @@ private fun TocItem(link: Link, depth: Int, onClick: () -> Unit) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
+            .minimumInteractiveComponentSize()
             .clickable(onClickLabel = "Open section", onClick = onClick)
     ) {
         Text(
