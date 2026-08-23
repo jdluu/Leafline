@@ -42,6 +42,15 @@ class InMemoryBookDataSource : BookDataSource {
         // No-op for the in-memory interim source; locator persistence is Room-only.
     }
 
+    override suspend fun setCoverPath(stableId: String, coverPath: String?) {
+        mutex.withLock {
+            books[stableId]?.let { current ->
+                books[stableId] = current.copy(coverPath = coverPath)
+                refreshFlow()
+            }
+        }
+    }
+
     override suspend fun insert(book: LibraryBook): Long = mutex.withLock {
         val id = idCounter++
         books[book.stableId] = book

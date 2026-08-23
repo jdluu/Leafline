@@ -9,6 +9,7 @@ interface LibraryRepository {
     suspend fun getBookByFileHash(fileHash: String): LibraryBook?
     suspend fun getBookLocatorByFilePath(filePath: String): Pair<String, String?>?
     suspend fun saveLastLocator(stableId: String, locatorJson: String?)
+    suspend fun setCoverPath(stableId: String, coverPath: String?)
     suspend fun addBook(book: LibraryBook): Long
     suspend fun updateBook(book: LibraryBook)
     suspend fun deleteBook(stableId: String)

@@ -13,21 +13,15 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LibraryBooks
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -40,22 +34,22 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.jdluu.leafline.library.LeaflineDependencyHolder
 import com.jdluu.leafline.library.LibraryBook
-import com.jdluu.leafline.LibraryViewModel
+import com.jdluu.leafline.library.LibraryScreen
+import com.jdluu.leafline.library.LibrarySortStore
 import com.jdluu.leafline.library.LibraryViewModelFactory
+import com.jdluu.leafline.library.cover.EpubCoverLoader
 import com.jdluu.leafline.opds.OpdsBrowseScreen
 import com.jdluu.leafline.opds.OpdsConfigStore
 import com.jdluu.leafline.opds.OpdsServerConfig
@@ -191,7 +185,11 @@ private enum class LeaflineTab(val label: String) {
 fun LeaflineApp(activity: ComponentActivity) {
     val repository = LeaflineDependencyHolder.getRepository(activity)
     val libraryViewModel: LibraryViewModel = viewModel(
-        factory = LibraryViewModelFactory(repository)
+        factory = LibraryViewModelFactory(
+            repository = repository,
+            coverLoader = EpubCoverLoader(activity.applicationContext),
+            sortStore = LibrarySortStore.fromContext(activity)
+        )
     )
     val opdsViewModel: OpdsViewModel = viewModel()
     val scope = rememberCoroutineScope()
@@ -256,7 +254,7 @@ fun LeaflineApp(activity: ComponentActivity) {
         ) { padding ->
             Surface(modifier = Modifier.fillMaxSize().padding(padding)) {
                 when (LeaflineTab.entries.getOrNull(selectedTab)) {
-                    LeaflineTab.Library -> LibraryTab(
+                    LeaflineTab.Library -> LibraryScreen(
                         viewModel = libraryViewModel,
                         onImportEpub = { importEpubLauncher.launch(arrayOf(MainActivity.EPUB_MIME_TYPE)) },
                         onOpenBook = { book ->
@@ -297,44 +295,6 @@ fun LeaflineApp(activity: ComponentActivity) {
                     }
                     LeaflineTab.Settings -> SettingsTab()
                     null -> {}
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun LibraryTab(
-    viewModel: LibraryViewModel,
-    onImportEpub: () -> Unit,
-    onOpenBook: (LibraryBook) -> Unit
-) {
-    val books by viewModel.books.collectAsState(initial = emptyList())
-
-    Column(modifier = Modifier.fillMaxSize()) {
-        TopAppBar(
-            title = { Text("Library") }
-        )
-        Button(
-            onClick = onImportEpub,
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Text("Import EPUB")
-        }
-        if (books.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("No books imported yet")
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize()
-            ) {
-                items(books) { book ->
-                    BookItem(book = book, onClick = { onOpenBook(book) })
                 }
             }
         }
@@ -405,37 +365,6 @@ fun SettingsTab() {
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(top = 16.dp)
             )
-        }
-    }
-}
-
-@Composable
-fun BookItem(book: LibraryBook, onClick: () -> Unit = {}) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp)
-            .clickable { onClick() }
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Text(book.title, style = MaterialTheme.typography.titleMedium)
-            if (book.authors.isNotEmpty()) {
-                Text(
-                    book.authors.joinToString(", "),
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-            }
-            if (book.description != null) {
-                Text(
-                    book.description,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 3,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-            }
         }
     }
 }

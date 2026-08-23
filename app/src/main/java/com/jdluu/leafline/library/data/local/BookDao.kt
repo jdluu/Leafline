@@ -24,6 +24,9 @@ interface BookDao {
     @Query("UPDATE books SET lastLocatorJson = :locatorJson WHERE stableId = :stableId")
     suspend fun updateLastLocator(stableId: String, locatorJson: String?)
 
+    @Query("UPDATE books SET coverPath = :coverPath WHERE stableId = :stableId")
+    suspend fun setCoverPath(stableId: String, coverPath: String?)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(book: BookEntity): Long
 

@@ -30,6 +30,10 @@ class LibraryRepositoryImpl(
         dataSource.saveLastLocator(stableId, locatorJson)
     }
 
+    override suspend fun setCoverPath(stableId: String, coverPath: String?) = withContext(ioDispatcher) {
+        dataSource.setCoverPath(stableId, coverPath)
+    }
+
     override suspend fun addBook(book: LibraryBook): Long = withContext(ioDispatcher) {
         dataSource.insert(book)
     }

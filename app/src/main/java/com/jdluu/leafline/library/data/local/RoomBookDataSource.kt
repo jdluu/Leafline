@@ -31,6 +31,10 @@ class RoomBookDataSource(
         database.bookDao().updateLastLocator(stableId, locatorJson)
     }
 
+    override suspend fun setCoverPath(stableId: String, coverPath: String?) {
+        database.bookDao().setCoverPath(stableId, coverPath)
+    }
+
     override suspend fun insert(book: LibraryBook): Long {
         return database.bookDao().insert(BookEntity.fromLibraryBook(book))
     }
