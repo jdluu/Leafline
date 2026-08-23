@@ -16,7 +16,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         CollectionEntity::class,
         BookCollectionCrossRef::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -104,6 +104,12 @@ abstract class LeaflineDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE books ADD COLUMN readingStatus TEXT NOT NULL DEFAULT 'unread'")
+            }
+        }
+
         fun build(context: Context): LeaflineDatabase {
             return Room.databaseBuilder(
                 context.applicationContext,
@@ -116,7 +122,8 @@ abstract class LeaflineDatabase : RoomDatabase() {
                     MIGRATION_3_4,
                     MIGRATION_4_5,
                     MIGRATION_5_6,
-                    MIGRATION_6_7
+                    MIGRATION_6_7,
+                    MIGRATION_7_8
                 )
                 .build()
         }

@@ -1,6 +1,7 @@
 package com.jdluu.leafline.library.data.local
 
 import com.jdluu.leafline.library.LibraryBook
+import com.jdluu.leafline.library.ReadingStatus
 import com.jdluu.leafline.library.data.BookDataSource
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -55,5 +56,15 @@ class RoomBookDataSource(
 
     override suspend fun delete(stableId: String) {
         database.bookDao().delete(stableId)
+    }
+
+    override suspend fun setReadingStatus(stableId: String, status: ReadingStatus) {
+        database.bookDao().setReadingStatus(stableId, status.dbValue)
+    }
+
+    override fun getBooksByReadingStatus(status: ReadingStatus): Flow<List<LibraryBook>> {
+        return database.bookDao().getBooksByReadingStatus(status.dbValue).map { entities ->
+            entities.map { BookEntity.toLibraryBook(it) }
+        }
     }
 }

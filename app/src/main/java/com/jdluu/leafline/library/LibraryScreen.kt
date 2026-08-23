@@ -73,6 +73,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jdluu.leafline.LibraryViewModel
+import com.jdluu.leafline.library.ReadingStatus
 import com.jdluu.leafline.library.data.Collection
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -90,6 +91,7 @@ fun LibraryScreen(
     val query by viewModel.query.collectAsStateWithLifecycle()
     val collections by viewModel.collections.collectAsStateWithLifecycle()
     val selectedCollection by viewModel.selectedCollection.collectAsStateWithLifecycle()
+    val readingStatusFilter by viewModel.readingStatusFilter.collectAsStateWithLifecycle()
     var searchActive by remember { mutableStateOf(false) }
     var showCollectionSheet by remember { mutableStateOf(false) }
     var showCreateDialog by remember { mutableStateOf(false) }
@@ -193,6 +195,37 @@ fun LibraryScreen(
             }
         }
 
+        // Reading status filter chips
+        androidx.compose.foundation.lazy.LazyRow(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            item {
+                FilterChip(
+                    selected = readingStatusFilter == null,
+                    onClick = { viewModel.setReadingStatusFilter(null) },
+                    label = { Text("All") }
+                )
+            }
+            ReadingStatus.entries.forEach { status ->
+                item {
+                    FilterChip(
+                        selected = readingStatusFilter == status,
+                        onClick = { viewModel.setReadingStatusFilter(status) },
+                        label = {
+                            Text(
+                                when (status) {
+                                    ReadingStatus.UNREAD -> "Unread"
+                                    ReadingStatus.READING -> "Reading"
+                                    ReadingStatus.FINISHED -> "Finished"
+                                }
+                            )
+                        }
+                    )
+                }
+            }
+        }
+
         if (books.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -202,6 +235,8 @@ fun LibraryScreen(
                     Text("No books match")
                 } else if (selectedCollection != null) {
                     Text("No books in this collection")
+                } else if (readingStatusFilter != null) {
+                    Text("No books with this status")
                 } else {
                     Text("No books imported yet")
                 }
@@ -459,6 +494,34 @@ fun BookGridTile(
                     )
                 } else {
                     CoverPlaceholder(title = book.title)
+                }
+            }
+            // Reading status badge
+            if (book.readingStatus != ReadingStatus.UNREAD) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp)
+                        .background(
+                            when (book.readingStatus) {
+                                ReadingStatus.READING -> MaterialTheme.colorScheme.primary
+                                ReadingStatus.FINISHED -> MaterialTheme.colorScheme.secondary
+                                ReadingStatus.UNREAD -> MaterialTheme.colorScheme.surfaceVariant
+                            },
+                            MaterialTheme.shapes.small
+                        )
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = when (book.readingStatus) {
+                            ReadingStatus.READING -> "Reading"
+                            ReadingStatus.FINISHED -> "Finished"
+                            ReadingStatus.UNREAD -> ""
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        maxLines = 1
+                    )
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))

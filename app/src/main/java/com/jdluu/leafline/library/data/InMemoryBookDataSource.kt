@@ -1,6 +1,8 @@
 package com.jdluu.leafline.library.data
 
 import com.jdluu.leafline.library.LibraryBook
+import com.jdluu.leafline.library.ReadingStatus
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -91,5 +93,20 @@ class InMemoryBookDataSource : BookDataSource {
         books.remove(stableId)
         refreshFlow()
         Unit
+    }
+
+    override suspend fun setReadingStatus(stableId: String, status: ReadingStatus) {
+        mutex.withLock {
+            books[stableId]?.let { current ->
+                books[stableId] = current.copy(readingStatus = status)
+                refreshFlow()
+            }
+        }
+    }
+
+    override fun getBooksByReadingStatus(status: ReadingStatus): Flow<List<LibraryBook>> {
+        return _booksFlow.asStateFlow().map { all ->
+            all.filter { it.readingStatus == status }
+        }
     }
 }

@@ -45,4 +45,13 @@ interface BookDao {
 
     @Query("DELETE FROM books WHERE stableId = :stableId")
     suspend fun delete(stableId: String): Int
+
+    @Query("UPDATE books SET readingStatus = :readingStatus WHERE stableId = :stableId")
+    suspend fun setReadingStatus(stableId: String, readingStatus: String)
+
+    @Query("SELECT * FROM books WHERE readingStatus = :readingStatus ORDER BY addedAtEpochMillis DESC")
+    fun getBooksByReadingStatus(readingStatus: String): Flow<List<BookEntity>>
+
+    @Query("SELECT * FROM books WHERE readingStatus != 'finished' AND lastLocatorJson IS NOT NULL ORDER BY lastReadAtEpochMillis DESC")
+    fun getInProgressBooks(): Flow<List<BookEntity>>
 }
