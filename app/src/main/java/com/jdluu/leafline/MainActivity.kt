@@ -60,6 +60,7 @@ import com.jdluu.leafline.opds.OpdsViewModel
 import com.jdluu.leafline.sync.KoreaderSyncClient
 import com.jdluu.leafline.sync.KoreaderSyncConfig
 import com.jdluu.leafline.sync.KoreaderSyncConfigStore
+import com.jdluu.leafline.sync.SyncWorker
 import com.jdluu.leafline.theme.LeaflineTheme
 import com.jdluu.leafline.theme.ThemeMode
 import kotlinx.coroutines.launch
@@ -488,6 +489,11 @@ private fun KoreaderSyncSection(modifier: Modifier = Modifier) {
                         enabled = false
                     )
                     KoreaderSyncConfigStore.config = base.copy(enabled = checked)
+                    if (checked) {
+                        SyncWorker.schedule(context)
+                    } else {
+                        SyncWorker.cancel(context)
+                    }
                 }
             )
         }
