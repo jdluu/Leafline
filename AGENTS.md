@@ -42,10 +42,11 @@ acceptance criteria, and verification command. Review the diff before commit.
 
 ## Current baseline
 
-The scaffold intentionally has no Android module or Readium dependency yet.
-Before adding dependencies, confirm current versions from the official Android,
-Kotlin, Gradle, and Readium documentation. The first implementation milestone
-is a bundled EPUB rendering spike, not Grimmory networking.
+Leafline is a working EPUB reader client: OPDS browsing and download, local
+library with covers, sorting, and search, a full reader (TOC, themes, reading
+positions, bookmarks, in-book search, highlights), and KOReader-compatible
+progress sync. Before adding dependencies, confirm current versions from the
+official Android, Kotlin, Gradle, and Readium documentation.
 
 ## Useful commands
 
