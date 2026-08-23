@@ -171,6 +171,33 @@ class MainActivity : ComponentActivity() {
             return null
         }
     }
+
+    /**
+     * Bulk-import multiple EPUBs from SAF content URIs.
+     *
+     * @return Pair(successCount, failureCount)
+     */
+    fun importMultipleEpub(
+        contentUris: List<Uri>,
+        context: Context,
+        onResult: (LibraryBook) -> Unit,
+        onError: (String) -> Unit
+    ): Pair<Int, Int> {
+        var successCount = 0
+        var failureCount = 0
+        for (uri in contentUris) {
+            val result = importEpub(uri, context) { msg ->
+                Log.w(TAG, "Import failed for $uri: $msg")
+                failureCount++
+                onError(msg)
+            }
+            if (result != null) {
+                successCount++
+                onResult(result)
+            }
+        }
+        return successCount to failureCount
+    }
 }
 
 private fun getFileName(context: Context, uri: Uri): String? {
@@ -226,14 +253,32 @@ fun LeaflineApp(activity: ComponentActivity) {
     }
 
     val importEpubLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri: Uri? ->
-        uri?.let {
-            val result = (activity as MainActivity).importEpub(it, context) { message ->
-                activity.showToast(message)
+        ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris: List<Uri>? ->
+        uris?.let { uriList ->
+            if (uriList.isEmpty()) return@let
+            var successCount = 0
+            var failureCount = 0
+            val imported = mutableListOf<LibraryBook>()
+            for (uri in uriList) {
+                val result = (activity as MainActivity).importEpub(uri, context) { message ->
+                    activity.showToast(message)
+                    failureCount++
+                }
+                if (result != null) {
+                    successCount++
+                    imported.add(result)
+                }
             }
-            if (result != null) {
-                pendingBook = result
+            // Add all successfully imported books to the ViewModel
+            imported.forEach { libraryViewModel.addBook(it) }
+            if (successCount > 0) {
+                val msg = if (failureCount > 0) {
+                    "Imported $successCount book(s), $failureCount failed"
+                } else {
+                    "Imported $successCount book(s)"
+                }
+                activity.showToast(msg)
             }
         }
     }
