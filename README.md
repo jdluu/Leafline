@@ -10,6 +10,8 @@ The project is under active development. The current prototype can:
 
 - Render EPUB 2 and EPUB 3 books with the Readium Kotlin Toolkit
 - Import local EPUB files into a Room-backed library
+- Show library books in a grid with cached cover thumbnails
+- Sort the library by recent, title, or author (choice is remembered)
 - Browse an authenticated OPDS 1.2 catalog
 - Navigate OPDS feeds and acquisition entries
 - Download EPUB acquisitions into the local library
