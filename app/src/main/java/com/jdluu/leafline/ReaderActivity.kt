@@ -99,6 +99,7 @@ import com.jdluu.leafline.library.data.BookmarkRepository
 import com.jdluu.leafline.library.data.BookmarkToggleResult
 import com.jdluu.leafline.library.data.LocatorIdentity
 import com.jdluu.leafline.library.LibrarySortStore
+import com.jdluu.leafline.reader.ReaderPreferencesStore
 import com.jdluu.leafline.reader.search.BookSearchQuery
 import com.jdluu.leafline.reader.search.BookSearchResult
 import com.jdluu.leafline.reader.search.BookSearchState
@@ -144,6 +145,11 @@ import java.io.IOException
 
 private const val SEARCH_DEBOUNCE_MS = 300L
 
+private const val PAGE_MARGINS_DEFAULT = 0.5
+private const val PAGE_MARGINS_MIN = 0.5
+private const val PAGE_MARGINS_MAX = 1.5
+private const val PAGE_MARGINS_STEP = 0.25
+
 @OptIn(ExperimentalReadiumApi::class)
 class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
 
@@ -174,6 +180,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     private var bookStableId: String? = null
     private lateinit var bookmarkRepository: BookmarkRepository
     private lateinit var annotationRepository: AnnotationRepository
+    private lateinit var readerPreferencesStore: ReaderPreferencesStore
     private lateinit var bookSearcher: BookSearcher
     private lateinit var progressSyncer: ProgressSyncer
     private var currentBook: com.jdluu.leafline.library.LibraryBook? = null
@@ -199,6 +206,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             com.jdluu.leafline.library.LeaflineDependencyHolder.getBookmarkRepository(this)
         annotationRepository =
             com.jdluu.leafline.library.LeaflineDependencyHolder.getAnnotationRepository(this)
+        readerPreferencesStore = ReaderPreferencesStore.fromContext(this)
 
         val importedPath = intent?.getStringExtra(EXTRA_FILE_PATH)
         var epubFile: File? = null
@@ -286,9 +294,13 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                 searchFactory = { query -> this@ReaderActivity.publication?.search(query) }
             )
 
+            val savedPreferences = readerPreferencesStore.load()
+            currentPreferences.value = savedPreferences
+
             val navigatorFactory = EpubNavigatorFactory(publication)
             val fragmentFactory = navigatorFactory.createFragmentFactory(
                 initialLocator = initialLocator,
+                initialPreferences = savedPreferences,
                 listener = this,
                 configuration = EpubNavigatorFragment.Configuration(
                     selectionActionModeCallback = annotationSelectionActionMode()
@@ -573,6 +585,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     private fun submitPreferences(prefs: EpubPreferences) {
         currentPreferences.value = prefs
         navigator?.submitPreferences(prefs)
+        readerPreferencesStore.save(prefs)
     }
 
     private fun submitSearch(rawQuery: String) {
@@ -1104,6 +1117,10 @@ private fun BookmarkListSheet(
     }
 }
 
+private fun snappedPageMargin(value: Double): Double {
+    return kotlin.math.round(value / PAGE_MARGINS_STEP) * PAGE_MARGINS_STEP
+}
+
 private fun formatCreatedAt(epochMillis: Long): String {
     val formatter = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
         .withLocale(Locale.getDefault())
@@ -1387,6 +1404,37 @@ private fun ReaderSettingsSheet(
                 }
             }
 
+            Text("Page margins", style = MaterialTheme.typography.labelLarge)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
+            ) {
+                IconButton(onClick = {
+                    val current = preferences.pageMargins ?: PAGE_MARGINS_DEFAULT
+                    if (current > PAGE_MARGINS_MIN) {
+                        onPreferencesChange(
+                            preferences.copy(pageMargins = snappedPageMargin(current - PAGE_MARGINS_STEP))
+                        )
+                    }
+                }) {
+                    Icon(Icons.Default.Remove, contentDescription = "Decrease page margins")
+                }
+                Text(
+                    text = "%.2f".format(preferences.pageMargins ?: PAGE_MARGINS_DEFAULT),
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
+                IconButton(onClick = {
+                    val current = preferences.pageMargins ?: PAGE_MARGINS_DEFAULT
+                    if (current < PAGE_MARGINS_MAX) {
+                        onPreferencesChange(
+                            preferences.copy(pageMargins = snappedPageMargin(current + PAGE_MARGINS_STEP))
+                        )
+                    }
+                }) {
+                    Icon(Icons.Default.Add, contentDescription = "Increase page margins")
+                }
+            }
+
             Text("Line height", style = MaterialTheme.typography.labelLarge)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -1427,6 +1475,23 @@ private fun ReaderSettingsSheet(
                     checked = preferences.publisherStyles ?: true,
                     onCheckedChange = { checked ->
                         onPreferencesChange(preferences.copy(publisherStyles = checked))
+                    }
+                )
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    "Scroll mode",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                Switch(
+                    checked = preferences.scroll ?: false,
+                    onCheckedChange = { checked ->
+                        onPreferencesChange(preferences.copy(scroll = checked))
                     }
                 )
             }
