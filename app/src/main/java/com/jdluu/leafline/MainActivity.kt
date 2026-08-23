@@ -13,6 +13,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -59,6 +60,7 @@ import com.jdluu.leafline.sync.KoreaderSyncClient
 import com.jdluu.leafline.sync.KoreaderSyncConfig
 import com.jdluu.leafline.sync.KoreaderSyncConfigStore
 import com.jdluu.leafline.theme.LeaflineTheme
+import com.jdluu.leafline.theme.ThemeMode
 import kotlinx.coroutines.launch
 import androidx.compose.material3.Switch
 
@@ -234,7 +236,10 @@ fun LeaflineApp(activity: ComponentActivity) {
         }
     }
 
-    LeaflineTheme {
+    LeaflineTheme(
+            mode = ThemeMode.SYSTEM,
+            darkSystem = isSystemInDarkTheme()
+        ) {
         Scaffold(
             bottomBar = {
                 NavigationBar {

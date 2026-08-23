@@ -60,7 +60,46 @@ class LeaflineThemeTest {
         )
     }
 
-    // --- WCAG contrast utilities (mirror of WcagContrast for theme testing) ---
+    @Test
+    fun `oled onSurface contrast on true black passes AA body threshold`() {
+        val ratio = contrastRatio("#E1E3DF", "#000000")
+        assertTrue("OLED onSurface on black: expected >= 4.5, got $ratio", ratio >= 4.5)
+    }
+
+    @Test
+    fun `oled primary on true black passes AA body threshold`() {
+        val ratio = contrastRatio("#9CCCC0", "#000000")
+        assertTrue("OLED primary on black: expected >= 4.5, got $ratio", ratio >= 4.5)
+    }
+
+    @Test
+    fun `eink onSurface on white is maximum contrast`() {
+        val ratio = contrastRatio("#000000", "#FFFFFF")
+        assertTrue("Eink onSurface on white: expected >= 10.0, got $ratio", ratio >= 10.0)
+    }
+
+    @Test
+    fun `eink primary on white passes AA body threshold`() {
+        val ratio = contrastRatio("#1A1A1A", "#FFFFFF")
+        assertTrue("Eink primary on white: expected >= 10.0, got $ratio", ratio >= 10.0)
+    }
+
+    @Test
+    fun `eink onSurfaceVariant on surfaceVariant passes AA body threshold`() {
+        val ratio = contrastRatio("#333333", "#E6E6E6")
+        assertTrue(
+            "Eink onSurfaceVariant on surfaceVariant: expected >= 4.5, got $ratio",
+            ratio >= 4.5
+        )
+    }
+
+    @Test
+    fun `eink outline on white passes AA body threshold`() {
+        val ratio = contrastRatio("#666666", "#FFFFFF")
+        assertTrue("Eink outline on white: expected >= 4.5, got $ratio", ratio >= 4.5)
+    }
+
+    // --- WCAG contrast utilities ---
 
     private fun relativeLuminance(hex: String): Double {
         val (r, g, b) = parseRgb(hex)
