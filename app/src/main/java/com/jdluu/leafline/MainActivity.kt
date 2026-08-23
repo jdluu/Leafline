@@ -14,6 +14,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -75,8 +76,21 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         LeaflineDependencyHolder.initialize(this)
         currentContext = this
+        handleOpdsConfigIntent(intent)
         registerOpdsDebugReceiver()
         setContent { LeaflineApp(this) }
+    }
+
+    private fun handleOpdsConfigIntent(intent: Intent?) {
+        val url = intent?.getStringExtra("opds_url") ?: return
+        val username = intent.getStringExtra("opds_username") ?: ""
+        val password = intent.getStringExtra("opds_password") ?: ""
+        OpdsConfigStore.config = OpdsServerConfig(
+            catalogUrl = url,
+            username = username,
+            password = password
+        )
+        showToast("OPDS config set")
     }
 
     private fun registerOpdsDebugReceiver() {
@@ -222,7 +236,13 @@ fun LeaflineApp(activity: ComponentActivity) {
                 NavigationState.Library -> {
                     LibraryScreen(
                         viewModel = libraryViewModel,
-                        onBack = { navState.value = NavigationState.Main }
+                        onBack = { navState.value = NavigationState.Main },
+                        onOpenBook = { book ->
+                            val activity = context as? MainActivity ?: return@LibraryScreen
+                            activity.startActivity(
+                                ReaderActivity.newIntent(activity, book.filePath)
+                            )
+                        }
                     )
                 }
                 NavigationState.Opds -> {
@@ -306,7 +326,8 @@ fun MainScreenContent(
 @Composable
 fun LibraryScreen(
     viewModel: LibraryViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onOpenBook: (LibraryBook) -> Unit = {}
 ) {
     val books by viewModel.books.collectAsState(initial = emptyList())
 
@@ -332,7 +353,7 @@ fun LibraryScreen(
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(books) { book ->
-                    BookItem(book = book)
+                    BookItem(book = book, onClick = { onOpenBook(book) })
                 }
             }
         }
@@ -340,11 +361,12 @@ fun LibraryScreen(
 }
 
 @Composable
-fun BookItem(book: LibraryBook) {
+fun BookItem(book: LibraryBook, onClick: () -> Unit = {}) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(8.dp)
+            .clickable { onClick() }
     ) {
         Column(
             modifier = Modifier.padding(16.dp)

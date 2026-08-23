@@ -18,6 +18,12 @@ interface BookDao {
     @Query("SELECT * FROM books WHERE fileHash = :fileHash LIMIT 1")
     suspend fun getBookByFileHash(fileHash: String): BookEntity?
 
+    @Query("SELECT * FROM books WHERE filePath = :filePath LIMIT 1")
+    suspend fun getBookByFilePath(filePath: String): BookEntity?
+
+    @Query("UPDATE books SET lastLocatorJson = :locatorJson WHERE stableId = :stableId")
+    suspend fun updateLastLocator(stableId: String, locatorJson: String?)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(book: BookEntity): Long
 

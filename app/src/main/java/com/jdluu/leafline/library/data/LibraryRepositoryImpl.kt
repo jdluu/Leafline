@@ -22,6 +22,14 @@ class LibraryRepositoryImpl(
         dataSource.getBookByFileHash(fileHash)
     }
 
+    override suspend fun getBookLocatorByFilePath(filePath: String): Pair<String, String?>? = withContext(ioDispatcher) {
+        dataSource.getBookLocatorByFilePath(filePath)
+    }
+
+    override suspend fun saveLastLocator(stableId: String, locatorJson: String?) = withContext(ioDispatcher) {
+        dataSource.saveLastLocator(stableId, locatorJson)
+    }
+
     override suspend fun addBook(book: LibraryBook): Long = withContext(ioDispatcher) {
         dataSource.insert(book)
     }

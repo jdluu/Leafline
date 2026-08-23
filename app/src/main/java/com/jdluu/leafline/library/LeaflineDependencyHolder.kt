@@ -28,13 +28,7 @@ object LeaflineDependencyHolder {
     }
     
     private fun buildDatabase(context: Context): LeaflineDatabase {
-        return Room.databaseBuilder(
-            context.applicationContext,
-            LeaflineDatabase::class.java,
-            "leafline-database"
-        )
-            .fallbackToDestructiveMigration()
-            .build()
+        return LeaflineDatabase.build(context)
     }
     
     fun getRepository(context: Context): LibraryRepository {

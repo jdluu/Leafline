@@ -9,6 +9,8 @@ import android.util.Log
 import android.widget.Toast
 import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.commitNow
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
@@ -57,6 +59,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     }
 
     private var navigator: EpubNavigatorFragment? = null
+    private var bookStableId: String? = null
 
     @OptIn(ExperimentalReadiumApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -107,6 +110,36 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             )
         )
 
+        var savedLocatorJson: String? = null
+        if (usedImportedFile) {
+            try {
+                val lookupPath = epubFile!!.absolutePath
+                val bookRecord = runBlocking {
+                    com.jdluu.leafline.library.LeaflineDependencyHolder
+                        .getRepository(this@ReaderActivity)
+                        .getBookLocatorByFilePath(lookupPath)
+                }
+                if (bookRecord == null) {
+                    Log.w(TAG, "No library book found for path: $lookupPath")
+                }
+                savedLocatorJson = bookRecord?.second
+                bookStableId = bookRecord?.first
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not load saved locator", e)
+            }
+        }
+
+        val initialLocator: org.readium.r2.shared.publication.Locator? = savedLocatorJson?.let { json ->
+            try {
+                org.readium.r2.shared.publication.Locator.Companion.fromJSON(
+                    org.json.JSONObject(json)
+                )
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not parse saved locator, starting at beginning", e)
+                null
+            }
+        }
+
         try {
             val publication = runBlocking {
                 val asset = assetRetriever.retrieve(epubFile!!).getOrElse {
@@ -119,7 +152,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
 
             val navigatorFactory = EpubNavigatorFactory(publication)
             val fragmentFactory = navigatorFactory.createFragmentFactory(
-                initialLocator = null,
+                initialLocator = initialLocator,
                 listener = this
             )
 
@@ -132,6 +165,20 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             }
 
             navigator = supportFragmentManager.findFragmentByTag(NAVIGATOR_TAG) as EpubNavigatorFragment
+
+            bookStableId?.let { stableId ->
+                lifecycleScope.launch {
+                    navigator?.currentLocator?.collect { locator ->
+                        try {
+                            com.jdluu.leafline.library.LeaflineDependencyHolder
+                                .getRepository(this@ReaderActivity)
+                                .saveLastLocator(stableId, locator.toJSON().toString())
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Could not save reading position", e)
+                        }
+                    }
+                }
+            }
 
             if (!usedImportedFile) {
                 Toast.makeText(this, "Opened bundled EPUB", Toast.LENGTH_SHORT).show()

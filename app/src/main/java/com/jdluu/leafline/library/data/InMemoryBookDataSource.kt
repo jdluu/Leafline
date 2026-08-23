@@ -33,6 +33,15 @@ class InMemoryBookDataSource : BookDataSource {
         books.values.find { it.fileHash == fileHash }
     }
 
+    override suspend fun getBookLocatorByFilePath(filePath: String): Pair<String, String?>? =
+        mutex.withLock {
+            books.values.find { it.filePath == filePath }?.let { it.stableId to null }
+        }
+
+    override suspend fun saveLastLocator(stableId: String, locatorJson: String?) {
+        // No-op for the in-memory interim source; locator persistence is Room-only.
+    }
+
     override suspend fun insert(book: LibraryBook): Long = mutex.withLock {
         val id = idCounter++
         books[book.stableId] = book
