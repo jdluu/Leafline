@@ -149,10 +149,8 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
 
     companion object {
         private const val TAG = "ReaderActivity"
-        private const val EPUB_FILE_NAME = "leafline-spike.epub"
         private const val NAVIGATOR_TAG = "EpubNavigatorFragment"
         private const val EXTRA_FILE_PATH = "extra_file_path"
-        private const val SEARCH_DEBOUNCE_MS = 300L
         private const val SEARCH_DECORATION_GROUP = "leafline-search"
         private const val MAX_SEARCH_DECORATIONS = 200
         private const val SEARCH_MATCH_TINT = 0x55FFD54F.toInt()
@@ -164,27 +162,9 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         private const val MENU_ITEM_COPY_ID = 2
         private const val KEY_SYNC_DEVICE_ID = "sync_device_id"
 
-        fun newIntent(context: Context): Intent {
-            return Intent(context, ReaderActivity::class.java)
-        }
-
         fun newIntent(context: Context, filePath: String): Intent {
             return Intent(context, ReaderActivity::class.java).apply {
                 putExtra(EXTRA_FILE_PATH, filePath)
-            }
-        }
-
-        private fun copyEpubFromAssets(context: Context, targetFile: File) {
-            if (!targetFile.exists()) {
-                try {
-                    context.assets.open(EPUB_FILE_NAME).use { input ->
-                        targetFile.outputStream().use { output ->
-                            input.copyTo(output)
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to copy bundled EPUB", e)
-                }
             }
         }
     }
@@ -222,7 +202,6 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
 
         val importedPath = intent?.getStringExtra(EXTRA_FILE_PATH)
         var epubFile: File? = null
-        var usedImportedFile = false
 
         if (!importedPath.isNullOrEmpty()) {
             val file = File(importedPath)
@@ -231,21 +210,14 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                 val allowedPath = filesDir.canonicalPath
                 if (canonicalPath.startsWith(allowedPath + File.separator)) {
                     epubFile = file
-                    usedImportedFile = true
                 }
             } catch (e: IOException) {
                 Log.w(TAG, "Cannot resolve imported file canonical path", e)
             }
         }
 
-        if (epubFile == null) {
-            val bundledFile = File(filesDir, EPUB_FILE_NAME)
-            copyEpubFromAssets(this, bundledFile)
-            epubFile = bundledFile
-        }
-
-        if (!epubFile!!.exists()) {
-            Log.e(TAG, "EPUB file does not exist: ${epubFile!!.absolutePath}")
+        if (epubFile == null || !epubFile.exists()) {
+            Log.e(TAG, "EPUB file does not exist: ${epubFile?.absolutePath}")
             Toast.makeText(this, "EPUB file not found", Toast.LENGTH_LONG).show()
             finish()
             return
@@ -267,7 +239,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
 
         var savedLocatorJson: String? = null
         var savedBook: com.jdluu.leafline.library.LibraryBook? = null
-        if (usedImportedFile) {
+        {
             try {
                 val lookupPath = epubFile!!.absolutePath
                 savedBook = runBlocking {
@@ -398,10 +370,6 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             }
 
             addReaderOverlay()
-
-            if (!usedImportedFile) {
-                Toast.makeText(this, "Opened bundled EPUB", Toast.LENGTH_SHORT).show()
-            }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to open publication", e)
             Toast.makeText(this, "Failed to open EPUB: ${e.message}", Toast.LENGTH_LONG).show()

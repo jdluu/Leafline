@@ -15,15 +15,19 @@ The project is under active development. The current prototype can:
 - Import local EPUB files into a Room-backed library
 - Show library books in a grid with cached cover thumbnails
 - Sort the library by recent, title, or author (choice is remembered)
+- Filter the library by title or author as you type
 - Browse an authenticated OPDS 1.2 catalog
 - Navigate OPDS feeds and acquisition entries
 - Download EPUB acquisitions into the local library
 - Open imported books for reading offline
+- Restore your last reading position when reopening a book
 - Bookmark reading positions and jump back to them
-- Search inside the open book and jump to matches
+- Search inside the open book and jump to matches, with match highlighting
+- Highlight selected text; view, revisit, and remove highlights per book
+- Sync reading progress with KOReader-compatible servers such as Grimmory
 
-The reading experience, settings persistence, search, progress synchronization,
-and release packaging are still being developed.
+The reading experience, release packaging, and license selection are still in
+progress.
 
 ## Architecture
 
@@ -70,8 +74,16 @@ read the desired libraries.
 ## Project documentation
 
 - [Architecture notes](docs/architecture.md)
-- [OPDS integration plan](docs/opds-plan.md)
+- [App boundaries: Leafline vs ShelfSync](docs/app-boundaries.md)
+- [Readium spike](docs/readium-spike.md)
 - [Local library plan](docs/local-library-plan.md)
+- [OPDS integration plan](docs/opds-plan.md)
+- [Reading position plan](docs/reading-position-plan.md)
+- [UI and navigation plan](docs/ui-navigation-plan.md)
+- [Bookmarks plan](docs/bookmarks-ui-plan.md)
+- [In-book search plan](docs/inbook-search-plan.md)
+- [Library search plan](docs/library-search-plan.md)
+- [KOReader progress sync plan](docs/koreader-progress-sync-plan.md)
 - [Contributing](CONTRIBUTING.md) (when available)
 
 These documents describe implementation details and may change as the project
