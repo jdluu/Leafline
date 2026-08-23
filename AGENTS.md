@@ -162,6 +162,14 @@ clients or manipulate EPUB archives directly.
 - Reader settings persistence: `ReaderPreferencesStore` keeps Readium
   `EpubPreferences` plus the interaction settings above in one
   SharedPreferences file; unknown stored enum names fall back to defaults.
+- Style modes: the settings sheet offers Publisher vs Custom styles. Publisher
+  mode clears the font, line-height, and margin overrides so Readium renders
+  publisher typography; touching a typography control while in Publisher mode
+  switches to Custom automatically. Font choices come from
+  `READER_FONT_FAMILIES` (Readium selectable stacks including OpenDyslexic,
+  Accessible DfA, iA Writer Duospace). Stored values are normalized on load:
+  unknown font names fall back to original, page margins snap into range, and
+  a stored Publisher selection drops stale custom typography.
 
 ### Open architecture items
 

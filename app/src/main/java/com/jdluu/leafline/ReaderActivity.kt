@@ -20,6 +20,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -105,12 +106,20 @@ import com.jdluu.leafline.library.data.LocatorIdentity
 import com.jdluu.leafline.library.LibrarySortStore
 import com.jdluu.leafline.reader.BRIGHTNESS_MAX
 import com.jdluu.leafline.reader.BRIGHTNESS_MIN
+import com.jdluu.leafline.reader.PAGE_MARGINS_DEFAULT
+import com.jdluu.leafline.reader.PAGE_MARGINS_MAX
+import com.jdluu.leafline.reader.PAGE_MARGINS_MIN
+import com.jdluu.leafline.reader.PAGE_MARGINS_STEP
+import com.jdluu.leafline.reader.READER_FONT_FAMILIES
 import com.jdluu.leafline.reader.PageTurnAnimation
 import com.jdluu.leafline.reader.ReaderPreferencesStore
 import com.jdluu.leafline.reader.ReaderSettings
+import com.jdluu.leafline.reader.StyleMode
 import com.jdluu.leafline.reader.TapZoneAction
 import com.jdluu.leafline.reader.TapZoneMode
 import com.jdluu.leafline.reader.clampBrightness
+import com.jdluu.leafline.reader.snapPageMargins
+import com.jdluu.leafline.reader.styleModeFor
 import com.jdluu.leafline.reader.search.BookSearchQuery
 import com.jdluu.leafline.reader.search.BookSearchResult
 import com.jdluu.leafline.reader.search.BookSearchState
@@ -118,6 +127,7 @@ import com.jdluu.leafline.reader.search.BookSearchStatus
 import com.jdluu.leafline.reader.search.BookSearcher
 import com.jdluu.leafline.reader.tapZoneAction
 import com.jdluu.leafline.reader.tapZoneAt
+import com.jdluu.leafline.reader.withStyleMode
 import com.jdluu.leafline.sync.BookRef
 import com.jdluu.leafline.sync.KoreaderSyncClient
 import com.jdluu.leafline.sync.KoreaderSyncConfigStore
@@ -139,9 +149,9 @@ import org.readium.r2.navigator.Decoration
 import org.readium.r2.navigator.DecorableNavigator
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
+import org.readium.r2.navigator.epub.EpubPreferences
 import org.readium.r2.navigator.input.InputListener
 import org.readium.r2.navigator.input.TapEvent
-import org.readium.r2.navigator.preferences.FontFamily
 import org.readium.r2.navigator.preferences.Theme
 import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.publication.Link
@@ -158,11 +168,6 @@ import java.io.File
 import java.io.IOException
 
 private const val SEARCH_DEBOUNCE_MS = 300L
-
-private const val PAGE_MARGINS_DEFAULT = 0.5
-private const val PAGE_MARGINS_MIN = 0.5
-private const val PAGE_MARGINS_MAX = 1.5
-private const val PAGE_MARGINS_STEP = 0.25
 
 @OptIn(ExperimentalReadiumApi::class)
 class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
@@ -1239,10 +1244,6 @@ private fun BookmarkListSheet(
     }
 }
 
-private fun snappedPageMargin(value: Double): Double {
-    return kotlin.math.round(value / PAGE_MARGINS_STEP) * PAGE_MARGINS_STEP
-}
-
 private fun formatCreatedAt(epochMillis: Long): String {
     val formatter = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
         .withLocale(Locale.getDefault())
@@ -1487,6 +1488,17 @@ private fun ReaderSettingsSheet(
     onDismiss: () -> Unit
 ) {
     val preferences = settings.epub
+    // Typography knobs imply custom styles: touching them while publisher
+    // styles are active switches the mode so the preview matches the choice.
+    val applyCustomPreference: ((EpubPreferences) -> EpubPreferences) -> Unit = { transform ->
+        val base =
+            if (styleModeFor(preferences.publisherStyles) == StyleMode.PUBLISHER) {
+                preferences.withStyleMode(StyleMode.CUSTOM)
+            } else {
+                preferences
+            }
+        onSettingsChange(settings.copy(epub = transform(base)))
+    }
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
             Text(
@@ -1514,18 +1526,12 @@ private fun ReaderSettingsSheet(
             }
 
             Text("Font", style = MaterialTheme.typography.labelLarge)
-            Row(modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)) {
-                listOf(
-                    null to "Original",
-                    FontFamily.SERIF to "Serif",
-                    FontFamily.SANS_SERIF to "Sans"
-                ).forEach { (family, label) ->
+            FlowRow(modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)) {
+                READER_FONT_FAMILIES.forEach { (family, label) ->
                     FilterChip(
                         selected = preferences.fontFamily == family,
                         onClick = {
-                            onSettingsChange(
-                                settings.copy(epub = preferences.copy(fontFamily = family))
-                            )
+                            applyCustomPreference { it.copy(fontFamily = family) }
                         },
                         label = { Text(label) },
                         modifier = Modifier.padding(end = 8.dp)
@@ -1539,15 +1545,15 @@ private fun ReaderSettingsSheet(
                 modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
             ) {
                 IconButton(onClick = {
-                    val current = preferences.pageMargins ?: PAGE_MARGINS_DEFAULT
-                    if (current > PAGE_MARGINS_MIN) {
-                        onSettingsChange(
-                            settings.copy(
-                                epub = preferences.copy(
-                                    pageMargins = snappedPageMargin(current - PAGE_MARGINS_STEP)
-                                )
+                    applyCustomPreference { prefs ->
+                        val current = prefs.pageMargins ?: PAGE_MARGINS_DEFAULT
+                        if (current > PAGE_MARGINS_MIN) {
+                            prefs.copy(
+                                pageMargins = snapPageMargins(current - PAGE_MARGINS_STEP)
                             )
-                        )
+                        } else {
+                            prefs
+                        }
                     }
                 }) {
                     Icon(Icons.Default.Remove, contentDescription = "Decrease page margins")
@@ -1557,15 +1563,15 @@ private fun ReaderSettingsSheet(
                     modifier = Modifier.padding(horizontal = 12.dp)
                 )
                 IconButton(onClick = {
-                    val current = preferences.pageMargins ?: PAGE_MARGINS_DEFAULT
-                    if (current < PAGE_MARGINS_MAX) {
-                        onSettingsChange(
-                            settings.copy(
-                                epub = preferences.copy(
-                                    pageMargins = snappedPageMargin(current + PAGE_MARGINS_STEP)
-                                )
+                    applyCustomPreference { prefs ->
+                        val current = prefs.pageMargins ?: PAGE_MARGINS_DEFAULT
+                        if (current < PAGE_MARGINS_MAX) {
+                            prefs.copy(
+                                pageMargins = snapPageMargins(current + PAGE_MARGINS_STEP)
                             )
-                        )
+                        } else {
+                            prefs
+                        }
                     }
                 }) {
                     Icon(Icons.Default.Add, contentDescription = "Increase page margins")
@@ -1578,11 +1584,13 @@ private fun ReaderSettingsSheet(
                 modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
             ) {
                 IconButton(onClick = {
-                    val current = preferences.lineHeight ?: 1.2
-                    if (current > 1.0) {
-                        onSettingsChange(
-                            settings.copy(epub = preferences.copy(lineHeight = current - 0.2))
-                        )
+                    applyCustomPreference { prefs ->
+                        val current = prefs.lineHeight ?: 1.2
+                        if (current > 1.0) {
+                            prefs.copy(lineHeight = current - 0.2)
+                        } else {
+                            prefs
+                        }
                     }
                 }) {
                     Icon(Icons.Default.Remove, contentDescription = "Decrease line height")
@@ -1592,35 +1600,45 @@ private fun ReaderSettingsSheet(
                     modifier = Modifier.padding(horizontal = 12.dp)
                 )
                 IconButton(onClick = {
-                    val current = preferences.lineHeight ?: 1.2
-                    if (current < 2.5) {
-                        onSettingsChange(
-                            settings.copy(epub = preferences.copy(lineHeight = current + 0.2))
-                        )
+                    applyCustomPreference { prefs ->
+                        val current = prefs.lineHeight ?: 1.2
+                        if (current < 2.5) {
+                            prefs.copy(lineHeight = current + 0.2)
+                        } else {
+                            prefs
+                        }
                     }
                 }) {
                     Icon(Icons.Default.Add, contentDescription = "Increase line height")
                 }
             }
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    "Use publisher styles",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.weight(1f)
-                )
-                Switch(
-                    checked = preferences.publisherStyles ?: true,
-                    onCheckedChange = { checked ->
-                        onSettingsChange(
-                            settings.copy(epub = preferences.copy(publisherStyles = checked))
-                        )
-                    }
-                )
+            Text("Styles", style = MaterialTheme.typography.labelLarge)
+            Row(modifier = Modifier.padding(top = 8.dp)) {
+                listOf(
+                    StyleMode.PUBLISHER to "Publisher",
+                    StyleMode.CUSTOM to "Custom"
+                ).forEach { (mode, label) ->
+                    FilterChip(
+                        selected = styleModeFor(preferences.publisherStyles) == mode,
+                        onClick = {
+                            onSettingsChange(
+                                settings.copy(epub = preferences.withStyleMode(mode))
+                            )
+                        },
+                        label = { Text(label) },
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                }
             }
+            Text(
+                text = when (styleModeFor(preferences.publisherStyles)) {
+                    StyleMode.PUBLISHER -> "The publication's own typography is used."
+                    StyleMode.CUSTOM -> "Your font, line height, and margins are applied."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
+            )
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,

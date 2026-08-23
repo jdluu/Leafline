@@ -3,7 +3,6 @@ package com.jdluu.leafline.reader
 import android.content.Context
 import android.content.SharedPreferences
 import org.readium.r2.navigator.epub.EpubPreferences
-import org.readium.r2.navigator.preferences.FontFamily
 import org.readium.r2.navigator.preferences.Theme
 
 /**
@@ -11,6 +10,10 @@ import org.readium.r2.navigator.preferences.Theme
  * SharedPreferences so they survive activity recreation and app restarts. Only
  * the fields managed by the reader settings sheet are stored; every other
  * EpubPreferences field stays unset so Readium applies its own defaults.
+ * Values loaded from storage are validated against the reader domain rules:
+ * unknown font names fall back to the original font, page margins snap back
+ * into range, and a stored publisher-mode selection clears stale custom
+ * typography overrides.
  */
 class ReaderPreferencesStore(private val preferences: SharedPreferences) {
 
@@ -29,7 +32,7 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
             .putString(KEY_THEME, epub.theme?.name)
             .putString(KEY_FONT_FAMILY, epub.fontFamily?.name)
             .putNullableDouble(KEY_LINE_HEIGHT, epub.lineHeight)
-            .putNullableDouble(KEY_PAGE_MARGINS, epub.pageMargins)
+            .putNullableDouble(KEY_PAGE_MARGINS, epub.pageMargins?.let(::snapPageMargins))
             .putNullableBoolean(KEY_PUBLISHER_STYLES, epub.publisherStyles)
             .putNullableBoolean(KEY_SCROLL, epub.scroll)
             .putString(KEY_TAP_ZONES, settings.tapZones.name)
@@ -39,14 +42,22 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
     }
 
     private fun loadEpubPreferences(): EpubPreferences {
-        return EpubPreferences(
+        val restored = EpubPreferences(
             theme = preferences.getString(KEY_THEME, null)?.let { themeFromName(it) },
-            fontFamily = preferences.getString(KEY_FONT_FAMILY, null)?.let { FontFamily(it) },
+            fontFamily = preferences.getString(KEY_FONT_FAMILY, null)
+                ?.let(::fontFamilyFromStoredName),
             lineHeight = restoreDouble(KEY_LINE_HEIGHT),
-            pageMargins = restoreDouble(KEY_PAGE_MARGINS),
+            pageMargins = restoreDouble(KEY_PAGE_MARGINS)?.let(::snapPageMargins),
             publisherStyles = restoreBoolean(KEY_PUBLISHER_STYLES),
             scroll = restoreBoolean(KEY_SCROLL)
         )
+        // A stored publisher-mode selection drops stale custom typography so a
+        // restart cannot reintroduce overrides the user switched away from.
+        return if (restored.publisherStyles == true) {
+            restored.withStyleMode(StyleMode.PUBLISHER)
+        } else {
+            restored
+        }
     }
 
     private fun restoreDouble(key: String): Double? {
