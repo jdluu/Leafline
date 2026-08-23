@@ -1,6 +1,84 @@
 package com.jdluu.leafline.reader
 
 import org.readium.r2.navigator.epub.EpubPreferences
+import org.readium.r2.navigator.preferences.FontFamily
+
+/**
+ * Selectable EPUB font families offered by the reader settings sheet, backed by
+ * the generic font stacks Readium maps inside publications. A null family keeps
+ * the publisher font untouched ("Original"); the accessible stacks (OpenDyslexic,
+ * Accessible DfA, iA Writer Duospace) are bundled by Readium itself.
+ */
+val READER_FONT_FAMILIES: List<Pair<FontFamily?, String>> = listOf(
+    null to "Original",
+    FontFamily.SERIF to "Serif",
+    FontFamily.SANS_SERIF to "Sans",
+    FontFamily.MONOSPACE to "Monospace",
+    FontFamily.CURSIVE to "Cursive",
+    FontFamily.FANTASY to "Fantasy",
+    FontFamily.OPEN_DYSLEXIC to "OpenDyslexic",
+    FontFamily.ACCESSIBLE_DFA to "Accessible DfA",
+    FontFamily.IA_WRITER_DUOSPACE to "iA Writer Duospace"
+)
+
+/**
+ * Resolves a persisted font family name against [READER_FONT_FAMILIES]. Returns
+ * null for unknown names so stale stored values fall back to the original font.
+ */
+fun fontFamilyFromStoredName(name: String): FontFamily? {
+    return READER_FONT_FAMILIES.firstOrNull { it.first?.name == name }?.first
+}
+
+/** Default page margin fraction applied around the reading surface. */
+const val PAGE_MARGINS_DEFAULT = 0.5
+
+/** Lowest page margin fraction allowed by the reader stepper. */
+const val PAGE_MARGINS_MIN = 0.5
+
+/** Highest page margin fraction allowed by the reader stepper. */
+const val PAGE_MARGINS_MAX = 1.5
+
+/** Increment used by the reader margin stepper. */
+const val PAGE_MARGINS_STEP = 0.25
+
+/** Clamps a page margin into the supported range. */
+fun clampPageMargins(value: Double): Double {
+    return value.coerceIn(PAGE_MARGINS_MIN, PAGE_MARGINS_MAX)
+}
+
+/** Snaps a page margin to the nearest stepper increment inside the supported range. */
+fun snapPageMargins(value: Double): Double {
+    val snapped = kotlin.math.round(value / PAGE_MARGINS_STEP) * PAGE_MARGINS_STEP
+    return clampPageMargins(snapped)
+}
+
+/** Whether a publication renders with its publisher styles or reader overrides. */
+enum class StyleMode {
+    PUBLISHER,
+    CUSTOM
+}
+
+/** Maps the raw publisher-styles flag to its style mode; unset behaves as custom. */
+fun styleModeFor(publisherStyles: Boolean?): StyleMode {
+    return if (publisherStyles == true) StyleMode.PUBLISHER else StyleMode.CUSTOM
+}
+
+/**
+ * Rebuilds these EPUB preferences for [mode]. Publisher mode clears the custom
+ * typography overrides so Readium renders the publication's own styles;
+ * custom mode keeps the reader-controlled values and disables publisher styles.
+ */
+fun EpubPreferences.withStyleMode(mode: StyleMode): EpubPreferences {
+    return when (mode) {
+        StyleMode.PUBLISHER -> copy(
+            fontFamily = null,
+            lineHeight = null,
+            pageMargins = null,
+            publisherStyles = true
+        )
+        StyleMode.CUSTOM -> copy(publisherStyles = false)
+    }
+}
 
 /**
  * Mapping of the three horizontal tap zones over the reading surface. DEFAULT

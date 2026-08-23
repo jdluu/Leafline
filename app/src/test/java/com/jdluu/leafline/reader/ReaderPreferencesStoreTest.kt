@@ -170,4 +170,78 @@ class ReaderPreferencesStoreTest {
             .commit()
         assertEquals(BRIGHTNESS_MIN, store.load().brightness!!)
     }
+
+    @Test
+    fun `unknown stored font family falls back to original`() {
+        val preferences =
+            context.getSharedPreferences(ReaderPreferencesStore.PREFS_NAME, Context.MODE_PRIVATE)
+        preferences.edit()
+            .putString("reader_font_family", "Comic Sans")
+            .commit()
+        val store = ReaderPreferencesStore.fromContext(context)
+
+        assertNull(store.load().epub.fontFamily)
+    }
+
+    @Test
+    fun `stale stored page margins snap back into range on load`() {
+        val preferences =
+            context.getSharedPreferences(ReaderPreferencesStore.PREFS_NAME, Context.MODE_PRIVATE)
+        preferences.edit()
+            .putLong(
+                "reader_page_margins",
+                java.lang.Double.doubleToRawLongBits(9.0)
+            )
+            .commit()
+        val store = ReaderPreferencesStore.fromContext(context)
+
+        assertEquals(1.5, store.load().epub.pageMargins!!, 1e-9)
+
+        preferences.edit()
+            .putLong(
+                "reader_page_margins",
+                java.lang.Double.doubleToRawLongBits(0.6)
+            )
+            .commit()
+
+        assertEquals(0.5, store.load().epub.pageMargins!!, 1e-9)
+    }
+
+    @Test
+    fun `saved page margins snap to stepper increments`() {
+        val store = ReaderPreferencesStore.fromContext(context)
+
+        store.save(
+            ReaderSettings(epub = EpubPreferences(pageMargins = 0.6))
+        )
+
+        assertEquals(0.5, store.load().epub.pageMargins!!, 1e-9)
+    }
+
+    @Test
+    fun `stored publisher mode drops stale custom typography on load`() {
+        val store = ReaderPreferencesStore.fromContext(context)
+
+        store.save(
+            ReaderSettings(
+                epub = EpubPreferences(
+                    theme = Theme.SEPIA,
+                    fontFamily = FontFamily.SERIF,
+                    lineHeight = 1.8,
+                    pageMargins = 1.25,
+                    scroll = true,
+                    publisherStyles = true
+                )
+            )
+        )
+
+        val loaded = store.load().epub
+
+        assertEquals(true, loaded.publisherStyles)
+        assertNull(loaded.fontFamily)
+        assertNull(loaded.lineHeight)
+        assertNull(loaded.pageMargins)
+        assertEquals(Theme.SEPIA, loaded.theme)
+        assertEquals(true, loaded.scroll)
+    }
 }
