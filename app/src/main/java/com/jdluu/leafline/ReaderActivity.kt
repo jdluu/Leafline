@@ -85,7 +85,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -137,12 +141,16 @@ import com.jdluu.leafline.sync.KoreaderSyncConfigStore
 import com.jdluu.leafline.sync.ProgressSyncer
 import com.jdluu.leafline.sync.PullOutcome
 import com.jdluu.leafline.sync.PushOutcome
+import com.jdluu.leafline.sync.ReadingProgressMath
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
 import java.util.UUID
+import kotlin.math.abs
+import kotlin.math.roundToInt
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -189,6 +197,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         private const val MENU_ITEM_HIGHLIGHT_ID = 1
         private const val MENU_ITEM_COPY_ID = 2
         private const val KEY_SYNC_DEVICE_ID = "sync_device_id"
+        private const val PAGE_TURN_ANNOUNCE_DEBOUNCE_MS = 300L
 
         fun newIntent(context: Context, filePath: String): Intent {
             return Intent(context, ReaderActivity::class.java).apply {
@@ -220,6 +229,11 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     @Volatile
     private var activeSearchResultId: Int? = null
     private val snackbarHostState = SnackbarHostState()
+    private val pageTurnAnnouncement = mutableStateOf<String?>(null)
+    private var pageTurnAnnounceJob: Job? = null
+    private var pageTurnAnnouncePrimed = false
+    private var lastAnnouncedHref: String? = null
+    private var lastAnnouncedPercent = -1
 
     /**
      * Turns taps reported by the Readium navigator into tap zone actions. The
@@ -269,6 +283,40 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             1f
         )
         return pageTurnIsAnimated(settings.pageTurnAnimation, animatorScale)
+    }
+
+    /**
+     * Announces page turns to TalkBack through a state-backed Compose text
+     * node carrying a polite live region, rendered by the reader overlay.
+     * The first locator emission primes the tracker silently; later
+     * emissions announce when the resource changes or the reading percentage
+     * moves by at least one point. Rapid successive updates, such as
+     * continuous scrolling, collapse into one announcement through a short
+     * debounce.
+     */
+    private fun onReadingPositionChanged(locator: Locator) {
+        val percent = try {
+            ReadingProgressMath.percentageFromLocator(locator.toJSON().toString())
+        } catch (e: Exception) {
+            null
+        }?.roundToInt() ?: return
+        val href = locator.href.toString()
+        if (!pageTurnAnnouncePrimed) {
+            pageTurnAnnouncePrimed = true
+            lastAnnouncedHref = href
+            lastAnnouncedPercent = percent
+            return
+        }
+        val changedResource = href != lastAnnouncedHref
+        val changedPage = abs(percent - lastAnnouncedPercent) >= 1
+        if (!changedResource && !changedPage) return
+        lastAnnouncedHref = href
+        lastAnnouncedPercent = percent
+        pageTurnAnnounceJob?.cancel()
+        pageTurnAnnounceJob = lifecycleScope.launch {
+            delay(PAGE_TURN_ANNOUNCE_DEBOUNCE_MS)
+            pageTurnAnnouncement.value = "Page $percent%"
+        }
     }
 
     @OptIn(ExperimentalReadiumApi::class)
@@ -390,6 +438,11 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
 
             navigator = supportFragmentManager.findFragmentByTag(NAVIGATOR_TAG) as EpubNavigatorFragment
             navigator?.addInputListener(readerInputListener)
+            lifecycleScope.launch {
+                navigator?.currentLocator?.collect { locator ->
+                    onReadingPositionChanged(locator)
+                }
+            }
 
             bookStableId?.let { stableId ->
                 lifecycleScope.launch {
@@ -780,6 +833,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     highlightsSheetVisible = highlightsSheetVisible.value,
                     searchSheetVisible = searchSheetVisible.value,
                     searchState = searchState,
+                    pageAnnouncement = pageTurnAnnouncement.value,
                     snackbarHostState = snackbarHostState,
                     onBack = { finish() },
                     onOpenToc = { scope.launch { drawerState.open() } },
@@ -935,6 +989,7 @@ private fun ReaderOverlay(
     highlightsSheetVisible: Boolean,
     searchSheetVisible: Boolean,
     searchState: BookSearchState,
+    pageAnnouncement: String?,
     snackbarHostState: SnackbarHostState,
     onBack: () -> Unit,
     onOpenToc: () -> Unit,
@@ -1053,6 +1108,17 @@ private fun ReaderOverlay(
                 )
             }
 
+            pageAnnouncement?.let { announcement ->
+                Text(
+                    text = announcement,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0f),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .semantics { liveRegion = LiveRegionMode.Polite }
+                )
+            }
+
             SnackbarHost(
                 hostState = snackbarHostState,
                 modifier = Modifier.align(Alignment.BottomCenter)
@@ -1101,7 +1167,9 @@ private fun BrightnessControl(
                 value = brightness ?: BRIGHTNESS_MAX,
                 onValueChange = { onBrightnessChange(clampBrightness(it)) },
                 valueRange = BRIGHTNESS_MIN..BRIGHTNESS_MAX,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics { contentDescription = "Brightness" }
             )
         }
     }
@@ -1282,7 +1350,10 @@ private fun BookmarkListSheet(
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable(onClick = { onBookmarkClick(bookmark) })
+                                .clickable(
+                                    onClickLabel = "Open bookmark",
+                                    onClick = { onBookmarkClick(bookmark) }
+                                )
                         ) {
                             Column(
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
@@ -1353,7 +1424,10 @@ private fun AnnotationListSheet(
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable(onClick = { onAnnotationClick(annotation) })
+                            .clickable(
+                                onClickLabel = "Open highlight",
+                                onClick = { onAnnotationClick(annotation) }
+                            )
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -1418,7 +1492,8 @@ private fun BookSearchSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp)
-                    .focusRequester(focusRequester),
+                    .focusRequester(focusRequester)
+                    .semantics { contentDescription = "Search in book" },
                 singleLine = true,
                 placeholder = { Text("Find in this book") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
@@ -1473,6 +1548,7 @@ private fun SearchStatusText(state: BookSearchState, modifier: Modifier = Modifi
                 modifier = Modifier
                     .weight(1f)
                     .heightIn(min = 2.dp)
+                    .semantics { contentDescription = "Searching" }
             )
         }
         is BookSearchStatus.Completed -> Text(
@@ -1503,7 +1579,7 @@ private fun SearchResultRow(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable(onClickLabel = "Open search result", onClick = onClick)
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
@@ -1708,7 +1784,15 @@ private fun ReaderSettingsSheet(
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(
+                        value = preferences.scroll ?: false,
+                        role = Role.Switch,
+                        onValueChange = { checked ->
+                            onSettingsChange(settings.copy(epub = preferences.copy(scroll = checked)))
+                        }
+                    )
             ) {
                 Text(
                     "Scroll mode",
@@ -1717,9 +1801,7 @@ private fun ReaderSettingsSheet(
                 )
                 Switch(
                     checked = preferences.scroll ?: false,
-                    onCheckedChange = { checked ->
-                        onSettingsChange(settings.copy(epub = preferences.copy(scroll = checked)))
-                    }
+                    onCheckedChange = null
                 )
             }
             Text(
@@ -1823,7 +1905,7 @@ private fun TocItem(link: Link, depth: Int, onClick: () -> Unit) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable(onClickLabel = "Open section", onClick = onClick)
     ) {
         Text(
             text = link.title ?: link.href.toString(),

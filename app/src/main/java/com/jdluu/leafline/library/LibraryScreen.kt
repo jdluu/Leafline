@@ -189,7 +189,7 @@ fun BookGridTile(book: LibraryBook, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable(onClickLabel = "Open book", onClick = onClick)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             val bitmap = rememberCoverBitmap(book.coverPath)
