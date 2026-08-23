@@ -15,4 +15,14 @@ interface LibraryRepository {
     suspend fun addBook(book: LibraryBook): Long
     suspend fun updateBook(book: LibraryBook)
     suspend fun deleteBook(stableId: String)
+
+    // -- Collections --
+    fun getAllCollections(): Flow<List<Collection>>
+    suspend fun createCollection(name: String): Long
+    suspend fun deleteCollection(id: Long)
+    suspend fun renameCollection(id: Long, name: String)
+    suspend fun addBookToCollection(collectionId: Long, bookStableId: String)
+    suspend fun removeBookFromCollection(collectionId: Long, bookStableId: String)
+    fun getCollectionsForBook(bookStableId: String): Flow<List<Collection>>
+    suspend fun getBookIdsForCollection(collectionId: Long): List<String>
 }

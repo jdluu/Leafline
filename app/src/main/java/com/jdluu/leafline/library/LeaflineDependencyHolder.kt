@@ -49,7 +49,7 @@ object LeaflineDependencyHolder {
     
     private fun buildRepository(context: Context): LibraryRepository {
         val dataSource: BookDataSource = RoomBookDataSource(getDatabase(context))
-        return LibraryRepositoryImpl(dataSource)
+        return LibraryRepositoryImpl(dataSource, getDatabase(context).collectionDao())
     }
 
     fun getBookmarkRepository(context: Context): BookmarkRepository {

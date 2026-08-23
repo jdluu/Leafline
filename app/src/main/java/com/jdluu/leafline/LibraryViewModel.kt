@@ -6,6 +6,7 @@ import com.jdluu.leafline.library.LibraryBook
 import com.jdluu.leafline.library.LibrarySort
 import com.jdluu.leafline.library.LibrarySortStore
 import com.jdluu.leafline.library.cover.CoverLoader
+import com.jdluu.leafline.library.data.Collection
 import com.jdluu.leafline.library.data.LibraryRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -14,7 +15,9 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -42,17 +45,61 @@ class LibraryViewModel(
         if (query.isBlank()) repository.getAllBooks() else repository.searchBooks(query.trim())
     }
 
-    val sortedBooks: StateFlow<List<LibraryBook>> =
-        combine(searchedBooks, _sort) { books, sort -> sort.sorted(books) }
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000),
-                initialValue = emptyList()
-            )
+    /** Collections available in the library. */
+    val collections: StateFlow<List<Collection>> = repository.getAllCollections()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
 
-    private val attemptedCoverIds = mutableSetOf<String>()
+    /** Currently selected collection filter (null = show all). */
+    private val _selectedCollection = MutableStateFlow<Long?>(null)
+    val selectedCollection: StateFlow<Long?> = _selectedCollection.asStateFlow()
+
+    /** Book stableIds that belong to the currently selected collection. */
+    private val _collectionBookIds = MutableStateFlow<Set<String>?>(null)
+
+    val sortedBooks: StateFlow<List<LibraryBook>> =
+        combine(
+            searchedBooks,
+            _sort,
+            _selectedCollection,
+            _collectionBookIds
+        ) { books, sort, collectionId, bookIds ->
+            val filtered = if (collectionId == null || bookIds == null) {
+                books
+            } else {
+                books.filter { it.stableId in bookIds }
+            }
+            sort.sorted(filtered)
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
 
     init {
+        // When selected collection changes, load its book IDs
+        viewModelScope.launch {
+            _selectedCollection.collect { collectionId ->
+                if (collectionId == null) {
+                    _collectionBookIds.value = null
+                } else {
+                    val ids = repository.getBookIdsForCollection(collectionId)
+                    _collectionBookIds.value = ids.toSet()
+                }
+            }
+        }
+        // Refresh book IDs when collections data changes (new book added to collection, etc.)
+        viewModelScope.launch {
+            collections.collect {
+                val sel = _selectedCollection.value ?: return@collect
+                val ids = repository.getBookIdsForCollection(sel)
+                _collectionBookIds.value = ids.toSet()
+            }
+        }
+        // Cover loading (existing logic)
         viewModelScope.launch {
             books.collect { list ->
                 for (book in list) {
@@ -71,6 +118,8 @@ class LibraryViewModel(
         }
     }
 
+    private val attemptedCoverIds = mutableSetOf<String>()
+
     fun setSort(sort: LibrarySort) {
         if (_sort.value == sort) return
         _sort.value = sort
@@ -84,6 +133,43 @@ class LibraryViewModel(
     fun addBook(book: LibraryBook) {
         viewModelScope.launch {
             repository.addBook(book)
+        }
+    }
+
+    // -- Collection operations --
+
+    fun selectCollection(id: Long?) {
+        _selectedCollection.value = id
+    }
+
+    fun createCollection(name: String) {
+        viewModelScope.launch {
+            repository.createCollection(name)
+        }
+    }
+
+    fun deleteCollection(id: Long) {
+        viewModelScope.launch {
+            repository.deleteCollection(id)
+            if (_selectedCollection.value == id) _selectedCollection.value = null
+        }
+    }
+
+    fun renameCollection(id: Long, name: String) {
+        viewModelScope.launch {
+            repository.renameCollection(id, name)
+        }
+    }
+
+    fun addBookToCollection(bookStableId: String, collectionId: Long) {
+        viewModelScope.launch {
+            repository.addBookToCollection(collectionId, bookStableId)
+        }
+    }
+
+    fun removeBookFromCollection(bookStableId: String, collectionId: Long) {
+        viewModelScope.launch {
+            repository.removeBookFromCollection(collectionId, bookStableId)
         }
     }
 }
