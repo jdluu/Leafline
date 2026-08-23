@@ -155,6 +155,12 @@ class LibraryViewModel(
         }
     }
 
+    fun deleteBook(stableId: String) {
+        viewModelScope.launch {
+            repository.deleteBook(stableId)
+        }
+    }
+
     // -- Reading status filter --
 
     fun setReadingStatusFilter(status: ReadingStatus?) {
