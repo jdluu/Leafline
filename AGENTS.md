@@ -21,9 +21,9 @@ hosting outside this repository.
 - Keep documentation current when changing architecture, dependencies, or
   user-visible behavior.
 
-## Git conventions
+## Git and workflow conventions
 
-Use conventional commits with no emojis or emdashes, for example:
+- Use conventional commits with no emojis or emdashes, for example:
 
 ```text
 feat: open bundled epub with readium
@@ -31,8 +31,152 @@ fix: restore locator after process restart
 docs: document opds authentication boundary
 ```
 
-Do not commit generated APKs, build directories, credentials, or machine-local
-configuration.
+- Do not commit generated APKs, build directories, credentials, or machine-local
+  configuration.
+- Never commit directly to `main`. Create a feature branch
+  (`feat/...`, `fix/...`, `chore/...`, `docs/...`), open a pull request, and
+  merge it after checks pass. Squash-merge small slices; keep PR titles in the
+  conventional-commit form.
+- Work is tracked on the GitHub Project board ("Leafline Development"). Pick an
+  issue from the board, reference its number in commits (`feat: ... (#12)`),
+  and let "Closes #N" in the PR description close it automatically.
+- Roadmap items live as GitHub Issues labeled by phase
+  (`phase-1-reading-polish` ... `phase-7-distribution`). Do not keep roadmap or
+  planning documents inside the repository.
+
+## App boundaries
+
+Leafline and ShelfSync are two separate apps with strictly separated concerns.
+
+| | Leafline | ShelfSync |
+|---|---|---|
+| Purpose | EPUB reading app | Grimmory/Calibre-compatible sync client |
+| Platform | Native Android (Kotlin, Jetpack Compose) | Tauri (React frontend, Rust backend) |
+| Rendering | Readium Kotlin Toolkit (EPUB rendering) | None. Never renders or opens books for reading |
+| Catalog | OPDS browse + download into local library (client role only) | OPDS browse, authenticated download, offline reconciliation (primary domain) |
+| Local data | Room DB: library metadata, reading position, bookmarks, highlights, covers | SQLite (rusqlite): provider-scoped publications, acquisitions, file revisions, download jobs |
+| Sync/progress | Reads locally; pushes/pulls KOReader-compatible progress | Future: library reconciliation against the Grimmory server |
+| Calibre | Out of scope entirely | Legacy compatibility layer exists; new work uses OPDS instead |
+
+Leafline owns:
+
+- Reading experience: paginated/scrolled EPUB rendering, themes, fonts, tap zones
+- Reader features: bookmarks, highlights/annotations, in-book search
+- Local reading state: last-read locator, per-book preferences
+- Its own small on-device library of imported/downloaded EPUBs
+
+Leafline must never do:
+
+- Host a server, act as a Calibre replacement, or mutate a Calibre `metadata.db`
+- Implement OPDS server logic (it is an OPDS *client* only)
+- Duplicate ShelfSync's download-job/persistence model beyond what reading needs
+
+ShelfSync owns catalog connection/authentication/browsing, safe verified
+downloads, download-centric persistence, offline library states, and remote
+reconciliation. ShelfSync must never render EPUBs, identify books by filename
+or path alone, or delete user content automatically.
+
+Handoff boundary: ShelfSync downloads and verifies a file on disk. Leafline (or
+any reader app) opens that file for reading. The only shared artifact between
+the apps is the EPUB file itself plus standard KOReader-style progress records.
+There is no shared database, no shared process, and no embedded web view
+coupling between the two apps.
+
+## Architecture notes
+
+### Package layout
+
+```text
+app/src/main/java/com/jdluu/leafline/
+├── library/            # Library screen, ViewModels, settings, DI holder
+│   └── data/           # Book models, repositories, Room DAOs/entities
+├── opds/               # OPDS client: catalog browsing, download coordination
+├── sync/               # KOReader-compatible progress sync (pure Kotlin)
+└── reader/             # In-book search support; ReaderActivity hosts Readium
+```
+
+`ReaderActivity.kt` lives at the package root and hosts the Readium navigator,
+reader UI, bookmarks, highlights, and search wiring. UI code does not call HTTP
+clients or manipulate EPUB archives directly.
+
+### Technology stack
+
+- Kotlin, Jetpack Compose, Material 3
+- Readium Kotlin Toolkit 3.3.0 for EPUB parsing, rendering, search, and the
+  Decorator API used for highlight and match decorations
+- Room for durable local state (library, bookmarks, annotations, reading
+  positions), with explicit migrations per schema change
+- OkHttp for OPDS and progress-sync networking
+- Kotlin coroutines and Flow for asynchronous work
+
+### Progress sync decisions
+
+- Transport: OkHttp with HTTP Basic auth on every call
+  (`GET /users/auth`, `GET /syncs/progress/{bookHash}`,
+  `PUT /syncs/progress`). The client lives in `com.jdluu.leafline.sync` and
+  has no Android dependencies, so it is covered by JVM unit tests against
+  MockWebServer.
+- Book identity: the KOReader partial MD5 convention implemented in
+  `FileHashUtil.koreaderHash`. Files larger than 1024 bytes hash the
+  concatenation of the first and last 1024 bytes; smaller files (including
+  empty ones) use the full-file MD5. The value is stored in the
+  `books.koreaderHash` column (Room migration 5 to 6, which also adds
+  `books.lastReadAtEpochMillis`). The pre-existing `fileHash` column keeps its
+  SHA-256 meaning for stable identity and dedup.
+- Percentage: 0-100 floats, derived from the locator's
+  `locations.totalProgression` with `locations.progression` as fallback.
+- Timestamps: remote timestamps are normalized from seconds or milliseconds
+  before comparison against the locally stamped last-read time; when a server
+  omits the timestamp the comparison falls back to percentages.
+- Credentials: `KoreaderSyncConfig` mirrors `OpdsServerConfig`. Values live
+  only in the session-scoped config stores and are never written to disk, git,
+  or logs.
+- Reader integration: opening a book pulls remote progress and offers a jump
+  when the remote timestamp is newer; leaving the reader pushes the current
+  locator. Success is silent, failures surface as toasts.
+- Note: current KOReader master uses an exponential-sampling partial MD5 rather
+  than the first+last-1024 scheme above. If real KOReader devices hash
+  differently against a server, `FileHashUtil.koreaderHash` is the single
+  place to adjust.
+
+### Reader interaction decisions
+
+- Tap zones: taps are received from the Readium navigator through
+  `VisualNavigator.addInputListener` (`InputListener.onTap`), not by an overlay
+  view, so taps on links and other interactive content still reach the EPUB
+  webview. The screen is split into thirds: left and right turn pages, the
+  center toggles the toolbar. The "reversed" tap zone setting swaps the side
+  zones for left-handed use or right-to-left publications; Readium 3.3.0 has no
+  tap-zone direction configuration to reuse.
+- Page-turn animation: Readium 3.3.0 exposes no page transition preference in
+  `EpubPreferences` or the navigator configuration. The only supported lever is
+  the `animated` flag of `goForward`/`goBackward`, so the none/slide setting
+  applies to tap-zone navigation (slide animates the turn, none snaps
+  instantly). Swipe-driven turns are handled by Readium's internal pager and
+  always animate; changing that would require reimplementing the paginator,
+  which is out of scope.
+- Reader settings persistence: `ReaderPreferencesStore` keeps Readium
+  `EpubPreferences` plus the interaction settings above in one
+  SharedPreferences file; unknown stored enum names fall back to defaults.
+
+### Open architecture items
+
+- release license and distribution channel;
+- minimum Android version after testing on target e-ink devices;
+- optional follow-ups on top of highlights: note editing UI, per-color tints,
+  swipe-to-delete in the highlights sheet.
+
+### Quality gates
+
+Every change should include:
+
+- unit tests for domain and parser behavior;
+- fixture-based EPUB tests for reader behavior where practical;
+- `git diff --check`;
+- applicable Gradle test, lint, and debug build commands.
+
+A build cannot be reported as verified until the command has actually run on a
+machine with the Android toolchain installed.
 
 ## OpenCode
 
@@ -70,4 +214,6 @@ scope and side effects.
 ## Documentation style
 
 Use portable paths and generic server descriptions. Never document private
-hostnames, IP addresses, local filesystem layouts, or secrets.
+hostnames, IP addresses, local filesystem layouts, or secrets. README.md stays
+user-facing; engineering notes belong here in AGENTS.md, never in committed
+planning documents.

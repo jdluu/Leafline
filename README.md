@@ -1,106 +1,55 @@
 # Leafline
 
-Leafline is an Android-first EPUB reader with local library support and OPDS
-integration. It is designed for focused reading on Android and e-ink devices,
-with Grimmory as the first supported OPDS catalog.
+Leafline is an Android EPUB reader built for focused reading on phones,
+tablets, and e-ink devices. It keeps your books and reading progress on your
+device, and connects to any OPDS-compatible library server to browse and
+download books.
 
-For the strict division of responsibility between Leafline (reader) and
-ShelfSync (Grimmory sync client), see docs/app-boundaries.md.
+## Features
 
-## Current status
+- Render EPUB 2 and EPUB 3 books with a paginated reader from the Readium
+  Kotlin Toolkit
+- Import local EPUB files into an on-device library with cover thumbnails
+- Sort by recent, title, or author; filter as you type
+- Browse authenticated OPDS 1.2 catalogs and download books into the library
+- Table of contents, adjustable fonts, themes, margins, and line height
+- Reading position is remembered and restored when you reopen a book
+- Bookmarks, highlights, and in-book search
+- Configurable tap zones and page-turn animation
+- Sync reading progress across devices with KOReader-compatible servers
 
-The project is under active development. The current prototype can:
+Leafline pairs naturally with self-hosted library software such as
+[Grimmory](https://grimmory.org/), but works fully offline once books are on
+the device.
 
-- Render EPUB 2 and EPUB 3 books with the Readium Kotlin Toolkit
-- Import local EPUB files into a Room-backed library
-- Show library books in a grid with cached cover thumbnails
-- Sort the library by recent, title, or author (choice is remembered)
-- Filter the library by title or author as you type
-- Browse an authenticated OPDS 1.2 catalog
-- Navigate OPDS feeds and acquisition entries
-- Download EPUB acquisitions into the local library
-- Open imported books for reading offline
-- Restore your last reading position when reopening a book
-- Bookmark reading positions and jump back to them
-- Search inside the open book and jump to matches, with match highlighting
-- Highlight selected text; view, revisit, and remove highlights per book
-- Sync reading progress with KOReader-compatible servers such as Grimmory
+## Requirements
 
-The reading experience, release packaging, and license selection are still in
-progress.
+- Android 8.0 (API 26) or newer
 
-## Architecture
+## Building from source
 
-Leafline is a native Kotlin Android application using:
-
-- Jetpack Compose and Material 3 for the interface
-- Readium Kotlin Toolkit for EPUB handling and rendering
-- Room for local metadata and library state
-- OPDS 1.2 as the library integration boundary
-- Kotlin coroutines and Flow for asynchronous work
-
-The app keeps the reading experience and local library on-device. Grimmory and
-other compatible services remain external catalog/library providers.
-
-## Building
-
-Requirements:
-
-- Android SDK
-- JDK 17 or newer
-- Gradle (the repository includes a wrapper)
-
-Run the standard checks from the repository root:
+Requirements: JDK 17+, Android SDK.
 
 ```bash
-./gradlew test
-./gradlew lint
-./gradlew assembleDebug
+./gradlew assembleDebug   # build debug APK
+./gradlew test            # run unit tests
+./gradlew lint            # run lint checks
 ```
 
-Do not commit `local.properties`, signing material, generated APKs, credentials,
-or other machine-specific files.
+The debug APK is written to `app/build/outputs/apk/debug/`.
 
-## OPDS configuration
+## OPDS setup
 
-Leafline accepts an OPDS catalog URL and HTTP Basic Authentication credentials
-through the app interface. Credentials are held in memory in the current
-prototype and are not committed to this repository.
+Open the app, add your catalog URL, and sign in with HTTP Basic credentials.
+Credentials are held in memory for the session only and never leave the
+device. The catalog server must expose OPDS access for your account.
 
-For Grimmory, use the OPDS endpoint exposed by your own server installation.
-The server must have OPDS access enabled and the account must have permission to
-read the desired libraries.
+## Status
 
-## Project documentation
-
-- [Architecture notes](docs/architecture.md)
-- [App boundaries: Leafline vs ShelfSync](docs/app-boundaries.md)
-- [Readium spike](docs/readium-spike.md)
-- [Local library plan](docs/local-library-plan.md)
-- [OPDS integration plan](docs/opds-plan.md)
-- [Reading position plan](docs/reading-position-plan.md)
-- [UI and navigation plan](docs/ui-navigation-plan.md)
-- [Bookmarks plan](docs/bookmarks-ui-plan.md)
-- [In-book search plan](docs/inbook-search-plan.md)
-- [Library search plan](docs/library-search-plan.md)
-- [KOReader progress sync plan](docs/koreader-progress-sync-plan.md)
-- [Contributing](CONTRIBUTING.md) (when available)
-
-These documents describe implementation details and may change as the project
-matures.
-
-## License
-
-No license has been selected yet. Until a license is added, all rights remain
-reserved.
+Leafline is under active development and not yet published. There is no
+release license yet; until one is added, all rights are reserved.
 
 ## Name
 
 Leafline refers to both the leaves of a book and a continuous reading line
 across devices.
-
-## References
-
-- [Readium Kotlin Toolkit](https://readium.org/kotlin-toolkit)
-- [Grimmory](https://grimmory.org/)
-- [OPDS specification](https://specs.opds.io/)
