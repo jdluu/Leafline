@@ -18,6 +18,7 @@ import android.view.WindowManager
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -34,6 +35,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -132,6 +134,9 @@ import com.jdluu.leafline.reader.styleModeFor
 import com.jdluu.leafline.reader.pageTurnIsAnimated
 import com.jdluu.leafline.reader.toggleSepia
 import com.jdluu.leafline.reader.search.BookSearchQuery
+import com.jdluu.leafline.theme.DEFAULT_HIGHLIGHT_TINT
+import com.jdluu.leafline.theme.HIGHLIGHT_TINTS
+import com.jdluu.leafline.theme.HighlightTint
 import com.jdluu.leafline.reader.search.BookSearchResult
 import com.jdluu.leafline.reader.search.BookSearchState
 import com.jdluu.leafline.reader.search.BookSearchStatus
@@ -196,7 +201,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         private const val SEARCH_ACTIVE_TINT = 0xCCFF8F00.toInt()
         private const val ANNOTATION_DECORATION_GROUP = "leafline-annotations"
         private const val ANNOTATION_DECORATION_PREFIX = "annotation-"
-        private const val DEFAULT_ANNOTATION_TINT = 0x55FFF59F.toInt()
+        private const val DEFAULT_ANNOTATION_TINT = 0x55E65100.toInt()
         private const val MENU_ITEM_HIGHLIGHT_ID = 1
         private const val MENU_ITEM_COPY_ID = 2
         private const val KEY_SYNC_DEVICE_ID = "sync_device_id"
@@ -217,9 +222,16 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     private lateinit var readerPreferencesStore: ReaderPreferencesStore
     private lateinit var bookSearcher: BookSearcher
     private lateinit var progressSyncer: ProgressSyncer
+
+    /** Locator JSON captured when the user selects text and taps Highlight, pending tint selection. */
+    private var pendingHighlightLocator: String? = null
+
+    /** Currently selected highlight tint shown in the picker sheet. */
+    private var selectedHighlightTint: HighlightTint = DEFAULT_HIGHLIGHT_TINT
     private var currentBook: com.jdluu.leafline.library.LibraryBook? = null
     private var toolbarVisible = mutableStateOf(false)
     private var settingsSheetVisible = mutableStateOf(false)
+    private var highlightTintSheetVisible = mutableStateOf(false)
     private var bookmarkSheetVisible = mutableStateOf(false)
     private var highlightsSheetVisible = mutableStateOf(false)
     private var searchSheetVisible = mutableStateOf(false)
@@ -628,11 +640,31 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                         .show()
                     return@launch
                 }
+                // Capture the locator, clear selection, then show the tint picker
+                pendingHighlightLocator = selection.locator.toJSON().toString()
+                navigator?.clearSelection()
+                selectedHighlightTint = DEFAULT_HIGHLIGHT_TINT
+                highlightTintSheetVisible.value = true
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not prepare highlight", e)
+                runCatching { navigator?.clearSelection() }
+                Toast.makeText(this@ReaderActivity, "Could not create highlight", Toast.LENGTH_SHORT)
+                    .show()
+            }
+        }
+    }
+
+    private fun saveHighlightWithTint(tint: HighlightTint) {
+        val stableId = bookStableId ?: return
+        val locatorJson = pendingHighlightLocator ?: return
+        lifecycleScope.launch {
+            try {
                 annotationRepository.addAnnotation(
                     bookId = stableId,
-                    locatorJson = selection.locator.toJSON().toString()
+                    locatorJson = locatorJson,
+                    colorHex = tint.hex
                 )
-                navigator?.clearSelection()
+                pendingHighlightLocator = null
                 snackbarHostState.showSnackbar("Highlight added")
             } catch (e: Exception) {
                 Log.w(TAG, "Could not save highlight", e)
@@ -868,7 +900,12 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     onDismissSearch = { searchSheetVisible.value = false },
                     onSubmitSearch = { query -> submitSearch(query) },
                     onClearSearch = { clearSearch() },
-                    onSearchResultClick = { result -> onSearchResultClicked(result) }
+                    onSearchResultClick = { result -> onSearchResultClicked(result) },
+                    highlightTintSheetVisible = highlightTintSheetVisible.value,
+                    onHighlightTintSelected = { tint ->
+                        highlightTintSheetVisible.value = false
+                        saveHighlightWithTint(tint)
+                    }
                 )
             }
         }
@@ -1021,7 +1058,9 @@ private fun ReaderOverlay(
     onDismissSearch: () -> Unit,
     onSubmitSearch: (String) -> Unit,
     onClearSearch: () -> Unit,
-    onSearchResultClick: (BookSearchResult) -> Unit
+    onSearchResultClick: (BookSearchResult) -> Unit,
+    highlightTintSheetVisible: Boolean,
+    onHighlightTintSelected: (HighlightTint) -> Unit
 ) {
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -1113,6 +1152,13 @@ private fun ReaderOverlay(
                     onSubmitSearch = onSubmitSearch,
                     onClearSearch = onClearSearch,
                     onResultClick = onSearchResultClick
+                )
+            }
+
+            if (highlightTintSheetVisible) {
+                HighlightTintPickerSheet(
+                    onDismiss = { onHighlightTintSelected(DEFAULT_HIGHLIGHT_TINT) },
+                    onTintSelected = onHighlightTintSelected
                 )
             }
 
@@ -1954,5 +2000,44 @@ private fun TocItem(link: Link, depth: Int, onClick: () -> Unit) {
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HighlightTintPickerSheet(
+    onDismiss: () -> Unit,
+    onTintSelected: (HighlightTint) -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                "Choose highlight color",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                HIGHLIGHT_TINTS.forEach { tint ->
+                    FilterChip(
+                        selected = false,
+                        onClick = { onTintSelected(tint) },
+                        label = { Text(tint.label) },
+                        leadingIcon = {
+                            Box(
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .background(
+                                        tint.swatchColor,
+                                        RoundedCornerShape(4.dp)
+                                    )
+                            )
+                        }
+                    )
+                }
+            }
+        }
     }
 }
