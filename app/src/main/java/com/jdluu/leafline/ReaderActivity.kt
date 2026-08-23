@@ -99,12 +99,18 @@ import com.jdluu.leafline.library.data.BookmarkRepository
 import com.jdluu.leafline.library.data.BookmarkToggleResult
 import com.jdluu.leafline.library.data.LocatorIdentity
 import com.jdluu.leafline.library.LibrarySortStore
+import com.jdluu.leafline.reader.PageTurnAnimation
 import com.jdluu.leafline.reader.ReaderPreferencesStore
+import com.jdluu.leafline.reader.ReaderSettings
+import com.jdluu.leafline.reader.TapZoneAction
+import com.jdluu.leafline.reader.TapZoneMode
 import com.jdluu.leafline.reader.search.BookSearchQuery
 import com.jdluu.leafline.reader.search.BookSearchResult
 import com.jdluu.leafline.reader.search.BookSearchState
 import com.jdluu.leafline.reader.search.BookSearchStatus
 import com.jdluu.leafline.reader.search.BookSearcher
+import com.jdluu.leafline.reader.tapZoneAction
+import com.jdluu.leafline.reader.tapZoneAt
 import com.jdluu.leafline.sync.BookRef
 import com.jdluu.leafline.sync.KoreaderSyncClient
 import com.jdluu.leafline.sync.KoreaderSyncConfigStore
@@ -126,7 +132,8 @@ import org.readium.r2.navigator.Decoration
 import org.readium.r2.navigator.DecorableNavigator
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
-import org.readium.r2.navigator.epub.EpubPreferences
+import org.readium.r2.navigator.input.InputListener
+import org.readium.r2.navigator.input.TapEvent
 import org.readium.r2.navigator.preferences.FontFamily
 import org.readium.r2.navigator.preferences.Theme
 import org.readium.r2.shared.ExperimentalReadiumApi
@@ -191,13 +198,39 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     private var searchSheetVisible = mutableStateOf(false)
     private var bookTitle = mutableStateOf("")
     private var tocLinks = mutableStateOf<List<Pair<Link, Int>>>(emptyList())
-    private var currentPreferences = mutableStateOf(EpubPreferences())
+    private var currentSettings = mutableStateOf(ReaderSettings())
     private var bookmarks = mutableStateOf<List<Bookmark>>(emptyList())
     private var annotations = mutableStateOf<List<Annotation>>(emptyList())
     private var currentLocation = mutableStateOf<Locator?>(null)
     @Volatile
     private var activeSearchResultId: Int? = null
     private val snackbarHostState = SnackbarHostState()
+
+    /**
+     * Turns taps reported by the Readium navigator into tap zone actions. The
+     * listener consumes every tap so the webview does not act on it as well.
+     */
+    private val readerInputListener = object : InputListener {
+        override fun onTap(event: TapEvent): Boolean {
+            val width = navigator?.publicationView?.width ?: return false
+            if (width <= 0) return false
+            val settings = currentSettings.value
+            return when (tapZoneAction(tapZoneAt(event.point.x / width), settings.tapZones)) {
+                TapZoneAction.TOGGLE_MENU -> {
+                    toolbarVisible.value = !toolbarVisible.value
+                    true
+                }
+                TapZoneAction.NEXT_PAGE -> {
+                    navigator?.goForward(settings.pageTurnAnimation.animated)
+                    true
+                }
+                TapZoneAction.PREVIOUS_PAGE -> {
+                    navigator?.goBackward(settings.pageTurnAnimation.animated)
+                    true
+                }
+            }
+        }
+    }
 
     @OptIn(ExperimentalReadiumApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -294,13 +327,13 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                 searchFactory = { query -> this@ReaderActivity.publication?.search(query) }
             )
 
-            val savedPreferences = readerPreferencesStore.load()
-            currentPreferences.value = savedPreferences
+            val savedSettings = readerPreferencesStore.load()
+            currentSettings.value = savedSettings
 
             val navigatorFactory = EpubNavigatorFactory(publication)
             val fragmentFactory = navigatorFactory.createFragmentFactory(
                 initialLocator = initialLocator,
-                initialPreferences = savedPreferences,
+                initialPreferences = savedSettings.epub,
                 listener = this,
                 configuration = EpubNavigatorFragment.Configuration(
                     selectionActionModeCallback = annotationSelectionActionMode()
@@ -316,6 +349,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             }
 
             navigator = supportFragmentManager.findFragmentByTag(NAVIGATOR_TAG) as EpubNavigatorFragment
+            navigator?.addInputListener(readerInputListener)
 
             bookStableId?.let { stableId ->
                 lifecycleScope.launch {
@@ -582,10 +616,15 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         }
     }
 
-    private fun submitPreferences(prefs: EpubPreferences) {
-        currentPreferences.value = prefs
-        navigator?.submitPreferences(prefs)
-        readerPreferencesStore.save(prefs)
+    private fun submitSettings(settings: ReaderSettings) {
+        currentSettings.value = settings
+        navigator?.submitPreferences(settings.epub)
+        readerPreferencesStore.save(settings)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        navigator?.removeInputListener(readerInputListener)
     }
 
     private fun submitSearch(rawQuery: String) {
@@ -671,7 +710,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     title = bookTitle.value,
                     toolbarVisible = toolbarVisible.value,
                     tocLinks = tocLinks.value,
-                    currentPreferences = currentPreferences.value,
+                    currentSettings = currentSettings.value,
                     drawerState = drawerState,
                     settingsSheetVisible = settingsSheetVisible.value,
                     bookmarks = bookmarks.value,
@@ -683,7 +722,6 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     searchSheetVisible = searchSheetVisible.value,
                     searchState = searchState,
                     snackbarHostState = snackbarHostState,
-                    onToggleToolbar = { toolbarVisible.value = !toolbarVisible.value },
                     onBack = { finish() },
                     onOpenToc = { scope.launch { drawerState.open() } },
                     onOpenSettings = { settingsSheetVisible.value = true },
@@ -701,7 +739,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                         navigateToTocLink(link)
                         scope.launch { drawerState.close() }
                     },
-                    onPreferencesChange = { prefs -> submitPreferences(prefs) },
+                    onSettingsChange = { settings -> submitSettings(settings) },
                     onOpenSearch = { searchSheetVisible.value = true },
                     onDismissSearch = { searchSheetVisible.value = false },
                     onSubmitSearch = { query -> submitSearch(query) },
@@ -824,7 +862,7 @@ private fun ReaderOverlay(
     title: String,
     toolbarVisible: Boolean,
     tocLinks: List<Pair<Link, Int>>,
-    currentPreferences: EpubPreferences,
+    currentSettings: ReaderSettings,
     drawerState: DrawerState,
     settingsSheetVisible: Boolean,
     bookmarks: List<Bookmark>,
@@ -836,7 +874,6 @@ private fun ReaderOverlay(
     searchSheetVisible: Boolean,
     searchState: BookSearchState,
     snackbarHostState: SnackbarHostState,
-    onToggleToolbar: () -> Unit,
     onBack: () -> Unit,
     onOpenToc: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -851,7 +888,7 @@ private fun ReaderOverlay(
     onAnnotationClick: (Annotation) -> Unit,
     onDeleteAnnotation: (Annotation) -> Unit,
     onTocClick: (Link) -> Unit,
-    onPreferencesChange: (EpubPreferences) -> Unit,
+    onSettingsChange: (ReaderSettings) -> Unit,
     onOpenSearch: () -> Unit,
     onDismissSearch: () -> Unit,
     onSubmitSearch: (String) -> Unit,
@@ -877,7 +914,6 @@ private fun ReaderOverlay(
         }
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            InvisibleTapZone(onToggleToolbar)
             if (toolbarVisible) {
                 Surface(
                     modifier = Modifier
@@ -905,8 +941,8 @@ private fun ReaderOverlay(
 
             if (settingsSheetVisible) {
                 ReaderSettingsSheet(
-                    preferences = currentPreferences,
-                    onPreferencesChange = onPreferencesChange,
+                    settings = currentSettings,
+                    onSettingsChange = onSettingsChange,
                     onDismiss = onDismissSettings
                 )
             }
@@ -1360,10 +1396,11 @@ private fun searchExcerpt(result: BookSearchResult): AnnotatedString {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ReaderSettingsSheet(
-    preferences: EpubPreferences,
-    onPreferencesChange: (EpubPreferences) -> Unit,
+    settings: ReaderSettings,
+    onSettingsChange: (ReaderSettings) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val preferences = settings.epub
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
             Text(
@@ -1381,7 +1418,9 @@ private fun ReaderSettingsSheet(
                 ).forEach { (theme, label) ->
                     FilterChip(
                         selected = preferences.theme == theme,
-                        onClick = { onPreferencesChange(preferences.copy(theme = theme)) },
+                        onClick = {
+                            onSettingsChange(settings.copy(epub = preferences.copy(theme = theme)))
+                        },
                         label = { Text(label) },
                         modifier = Modifier.padding(end = 8.dp)
                     )
@@ -1397,7 +1436,11 @@ private fun ReaderSettingsSheet(
                 ).forEach { (family, label) ->
                     FilterChip(
                         selected = preferences.fontFamily == family,
-                        onClick = { onPreferencesChange(preferences.copy(fontFamily = family)) },
+                        onClick = {
+                            onSettingsChange(
+                                settings.copy(epub = preferences.copy(fontFamily = family))
+                            )
+                        },
                         label = { Text(label) },
                         modifier = Modifier.padding(end = 8.dp)
                     )
@@ -1412,8 +1455,12 @@ private fun ReaderSettingsSheet(
                 IconButton(onClick = {
                     val current = preferences.pageMargins ?: PAGE_MARGINS_DEFAULT
                     if (current > PAGE_MARGINS_MIN) {
-                        onPreferencesChange(
-                            preferences.copy(pageMargins = snappedPageMargin(current - PAGE_MARGINS_STEP))
+                        onSettingsChange(
+                            settings.copy(
+                                epub = preferences.copy(
+                                    pageMargins = snappedPageMargin(current - PAGE_MARGINS_STEP)
+                                )
+                            )
                         )
                     }
                 }) {
@@ -1426,8 +1473,12 @@ private fun ReaderSettingsSheet(
                 IconButton(onClick = {
                     val current = preferences.pageMargins ?: PAGE_MARGINS_DEFAULT
                     if (current < PAGE_MARGINS_MAX) {
-                        onPreferencesChange(
-                            preferences.copy(pageMargins = snappedPageMargin(current + PAGE_MARGINS_STEP))
+                        onSettingsChange(
+                            settings.copy(
+                                epub = preferences.copy(
+                                    pageMargins = snappedPageMargin(current + PAGE_MARGINS_STEP)
+                                )
+                            )
                         )
                     }
                 }) {
@@ -1443,7 +1494,9 @@ private fun ReaderSettingsSheet(
                 IconButton(onClick = {
                     val current = preferences.lineHeight ?: 1.2
                     if (current > 1.0) {
-                        onPreferencesChange(preferences.copy(lineHeight = current - 0.2))
+                        onSettingsChange(
+                            settings.copy(epub = preferences.copy(lineHeight = current - 0.2))
+                        )
                     }
                 }) {
                     Icon(Icons.Default.Remove, contentDescription = "Decrease line height")
@@ -1455,7 +1508,9 @@ private fun ReaderSettingsSheet(
                 IconButton(onClick = {
                     val current = preferences.lineHeight ?: 1.2
                     if (current < 2.5) {
-                        onPreferencesChange(preferences.copy(lineHeight = current + 0.2))
+                        onSettingsChange(
+                            settings.copy(epub = preferences.copy(lineHeight = current + 0.2))
+                        )
                     }
                 }) {
                     Icon(Icons.Default.Add, contentDescription = "Increase line height")
@@ -1474,7 +1529,9 @@ private fun ReaderSettingsSheet(
                 Switch(
                     checked = preferences.publisherStyles ?: true,
                     onCheckedChange = { checked ->
-                        onPreferencesChange(preferences.copy(publisherStyles = checked))
+                        onSettingsChange(
+                            settings.copy(epub = preferences.copy(publisherStyles = checked))
+                        )
                     }
                 )
             }
@@ -1491,9 +1548,39 @@ private fun ReaderSettingsSheet(
                 Switch(
                     checked = preferences.scroll ?: false,
                     onCheckedChange = { checked ->
-                        onPreferencesChange(preferences.copy(scroll = checked))
+                        onSettingsChange(settings.copy(epub = preferences.copy(scroll = checked)))
                     }
                 )
+            }
+
+            Text("Tap zones", style = MaterialTheme.typography.labelLarge)
+            Row(modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)) {
+                listOf(
+                    TapZoneMode.DEFAULT to "Default",
+                    TapZoneMode.REVERSED to "Reversed"
+                ).forEach { (mode, label) ->
+                    FilterChip(
+                        selected = settings.tapZones == mode,
+                        onClick = { onSettingsChange(settings.copy(tapZones = mode)) },
+                        label = { Text(label) },
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                }
+            }
+
+            Text("Page turn animation", style = MaterialTheme.typography.labelLarge)
+            Row(modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)) {
+                listOf(
+                    PageTurnAnimation.SLIDE to "Slide",
+                    PageTurnAnimation.NONE to "None"
+                ).forEach { (animation, label) ->
+                    FilterChip(
+                        selected = settings.pageTurnAnimation == animation,
+                        onClick = { onSettingsChange(settings.copy(pageTurnAnimation = animation)) },
+                        label = { Text(label) },
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -1517,13 +1604,4 @@ private fun TocItem(link: Link, depth: Int, onClick: () -> Unit) {
             overflow = TextOverflow.Ellipsis
         )
     }
-}
-
-@Composable
-private fun InvisibleTapZone(onTap: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .clickable(onClick = onTap)
-    )
 }

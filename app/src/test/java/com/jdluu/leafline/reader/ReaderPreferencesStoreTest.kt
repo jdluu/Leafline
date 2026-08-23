@@ -34,12 +34,14 @@ class ReaderPreferencesStoreTest {
 
         val loaded = store.load()
 
-        assertNull(loaded.theme)
-        assertNull(loaded.fontFamily)
-        assertNull(loaded.lineHeight)
-        assertNull(loaded.pageMargins)
-        assertNull(loaded.publisherStyles)
-        assertNull(loaded.scroll)
+        assertNull(loaded.epub.theme)
+        assertNull(loaded.epub.fontFamily)
+        assertNull(loaded.epub.lineHeight)
+        assertNull(loaded.epub.pageMargins)
+        assertNull(loaded.epub.publisherStyles)
+        assertNull(loaded.epub.scroll)
+        assertEquals(TapZoneMode.DEFAULT, loaded.tapZones)
+        assertEquals(PageTurnAnimation.SLIDE, loaded.pageTurnAnimation)
     }
 
     @Test
@@ -47,24 +49,30 @@ class ReaderPreferencesStoreTest {
         val store = ReaderPreferencesStore.fromContext(context)
 
         store.save(
-            EpubPreferences(
-                theme = Theme.SEPIA,
-                fontFamily = FontFamily.SERIF,
-                lineHeight = 1.6,
-                pageMargins = 0.75,
-                publisherStyles = false,
-                scroll = true
+            ReaderSettings(
+                epub = EpubPreferences(
+                    theme = Theme.SEPIA,
+                    fontFamily = FontFamily.SERIF,
+                    lineHeight = 1.6,
+                    pageMargins = 0.75,
+                    publisherStyles = false,
+                    scroll = true
+                ),
+                tapZones = TapZoneMode.REVERSED,
+                pageTurnAnimation = PageTurnAnimation.NONE
             )
         )
 
         val loaded = store.load()
 
-        assertEquals(Theme.SEPIA, loaded.theme)
-        assertEquals(FontFamily.SERIF, loaded.fontFamily)
-        assertEquals(1.6, loaded.lineHeight!!, 1e-9)
-        assertEquals(0.75, loaded.pageMargins!!, 1e-9)
-        assertEquals(false, loaded.publisherStyles)
-        assertEquals(true, loaded.scroll)
+        assertEquals(Theme.SEPIA, loaded.epub.theme)
+        assertEquals(FontFamily.SERIF, loaded.epub.fontFamily)
+        assertEquals(1.6, loaded.epub.lineHeight!!, 1e-9)
+        assertEquals(0.75, loaded.epub.pageMargins!!, 1e-9)
+        assertEquals(false, loaded.epub.publisherStyles)
+        assertEquals(true, loaded.epub.scroll)
+        assertEquals(TapZoneMode.REVERSED, loaded.tapZones)
+        assertEquals(PageTurnAnimation.NONE, loaded.pageTurnAnimation)
     }
 
     @Test
@@ -72,37 +80,73 @@ class ReaderPreferencesStoreTest {
         val store = ReaderPreferencesStore.fromContext(context)
 
         store.save(
-            EpubPreferences(
-                theme = Theme.DARK,
-                fontFamily = FontFamily.SANS_SERIF,
-                lineHeight = 1.4,
-                pageMargins = 1.0,
-                publisherStyles = false,
-                scroll = true
+            ReaderSettings(
+                epub = EpubPreferences(
+                    theme = Theme.DARK,
+                    fontFamily = FontFamily.SANS_SERIF,
+                    lineHeight = 1.4,
+                    pageMargins = 1.0,
+                    publisherStyles = false,
+                    scroll = true
+                ),
+                tapZones = TapZoneMode.REVERSED,
+                pageTurnAnimation = PageTurnAnimation.NONE
             )
         )
-        store.save(EpubPreferences())
+        store.save(ReaderSettings())
 
         val loaded = store.load()
 
-        assertNull(loaded.theme)
-        assertNull(loaded.fontFamily)
-        assertNull(loaded.lineHeight)
-        assertNull(loaded.pageMargins)
-        assertNull(loaded.publisherStyles)
-        assertNull(loaded.scroll)
+        assertNull(loaded.epub.theme)
+        assertNull(loaded.epub.fontFamily)
+        assertNull(loaded.epub.lineHeight)
+        assertNull(loaded.epub.pageMargins)
+        assertNull(loaded.epub.publisherStyles)
+        assertNull(loaded.epub.scroll)
+        assertEquals(TapZoneMode.DEFAULT, loaded.tapZones)
+        assertEquals(PageTurnAnimation.SLIDE, loaded.pageTurnAnimation)
     }
 
     @Test
     fun `second save overwrites the first choice`() {
         val store = ReaderPreferencesStore.fromContext(context)
 
-        store.save(EpubPreferences(theme = Theme.LIGHT, lineHeight = 1.0))
-        store.save(EpubPreferences(theme = Theme.DARK, lineHeight = 2.0))
+        store.save(
+            ReaderSettings(
+                epub = EpubPreferences(theme = Theme.LIGHT, lineHeight = 1.0),
+                tapZones = TapZoneMode.REVERSED,
+                pageTurnAnimation = PageTurnAnimation.NONE
+            )
+        )
+        store.save(
+            ReaderSettings(
+                epub = EpubPreferences(theme = Theme.DARK, lineHeight = 2.0),
+                tapZones = TapZoneMode.DEFAULT,
+                pageTurnAnimation = PageTurnAnimation.SLIDE
+            )
+        )
 
         val loaded = store.load()
 
-        assertEquals(Theme.DARK, loaded.theme)
-        assertEquals(2.0, loaded.lineHeight!!, 1e-9)
+        assertEquals(Theme.DARK, loaded.epub.theme)
+        assertEquals(2.0, loaded.epub.lineHeight!!, 1e-9)
+        assertEquals(TapZoneMode.DEFAULT, loaded.tapZones)
+        assertEquals(PageTurnAnimation.SLIDE, loaded.pageTurnAnimation)
+    }
+
+    @Test
+    fun `unknown stored enum names fall back to defaults`() {
+        val preferences =
+            context.getSharedPreferences(ReaderPreferencesStore.PREFS_NAME, Context.MODE_PRIVATE)
+        preferences.edit()
+            .putString("reader_tap_zones", "LEFT_HANDED")
+            .putString("reader_page_turn_animation", "FADE")
+            .commit()
+        val store = ReaderPreferencesStore.fromContext(context)
+
+        val loaded = store.load()
+
+        assertEquals(TapZoneMode.DEFAULT, loaded.tapZones)
+        assertEquals(PageTurnAnimation.SLIDE, loaded.pageTurnAnimation)
     }
 }

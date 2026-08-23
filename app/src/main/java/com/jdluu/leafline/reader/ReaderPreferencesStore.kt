@@ -7,14 +7,36 @@ import org.readium.r2.navigator.preferences.FontFamily
 import org.readium.r2.navigator.preferences.Theme
 
 /**
- * Persists reader display preferences in app-private SharedPreferences so they
- * survive activity recreation and app restarts. Only the fields managed by the
- * reader settings sheet are stored; every other EpubPreferences field stays
- * unset so Readium applies its own defaults.
+ * Persists reader display and interaction settings in app-private
+ * SharedPreferences so they survive activity recreation and app restarts. Only
+ * the fields managed by the reader settings sheet are stored; every other
+ * EpubPreferences field stays unset so Readium applies its own defaults.
  */
 class ReaderPreferencesStore(private val preferences: SharedPreferences) {
 
-    fun load(): EpubPreferences {
+    fun load(): ReaderSettings {
+        return ReaderSettings(
+            epub = loadEpubPreferences(),
+            tapZones = enumFromName(KEY_TAP_ZONES, TapZoneMode.DEFAULT),
+            pageTurnAnimation = enumFromName(KEY_PAGE_TURN_ANIMATION, PageTurnAnimation.SLIDE)
+        )
+    }
+
+    fun save(settings: ReaderSettings) {
+        val epub = settings.epub
+        preferences.edit()
+            .putString(KEY_THEME, epub.theme?.name)
+            .putString(KEY_FONT_FAMILY, epub.fontFamily?.name)
+            .putNullableDouble(KEY_LINE_HEIGHT, epub.lineHeight)
+            .putNullableDouble(KEY_PAGE_MARGINS, epub.pageMargins)
+            .putNullableBoolean(KEY_PUBLISHER_STYLES, epub.publisherStyles)
+            .putNullableBoolean(KEY_SCROLL, epub.scroll)
+            .putString(KEY_TAP_ZONES, settings.tapZones.name)
+            .putString(KEY_PAGE_TURN_ANIMATION, settings.pageTurnAnimation.name)
+            .apply()
+    }
+
+    private fun loadEpubPreferences(): EpubPreferences {
         return EpubPreferences(
             theme = preferences.getString(KEY_THEME, null)?.let { themeFromName(it) },
             fontFamily = preferences.getString(KEY_FONT_FAMILY, null)?.let { FontFamily(it) },
@@ -23,17 +45,6 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
             publisherStyles = restoreBoolean(KEY_PUBLISHER_STYLES),
             scroll = restoreBoolean(KEY_SCROLL)
         )
-    }
-
-    fun save(prefs: EpubPreferences) {
-        preferences.edit()
-            .putString(KEY_THEME, prefs.theme?.name)
-            .putString(KEY_FONT_FAMILY, prefs.fontFamily?.name)
-            .putNullableDouble(KEY_LINE_HEIGHT, prefs.lineHeight)
-            .putNullableDouble(KEY_PAGE_MARGINS, prefs.pageMargins)
-            .putNullableBoolean(KEY_PUBLISHER_STYLES, prefs.publisherStyles)
-            .putNullableBoolean(KEY_SCROLL, prefs.scroll)
-            .apply()
     }
 
     private fun restoreDouble(key: String): Double? {
@@ -52,6 +63,15 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
             Theme.valueOf(name)
         } catch (_: IllegalArgumentException) {
             null
+        }
+    }
+
+    private inline fun <reified T : Enum<T>> enumFromName(key: String, fallback: T): T {
+        val name = preferences.getString(key, null) ?: return fallback
+        return try {
+            enumValueOf<T>(name)
+        } catch (_: IllegalArgumentException) {
+            fallback
         }
     }
 
@@ -84,6 +104,8 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
         private const val KEY_PAGE_MARGINS = "reader_page_margins"
         private const val KEY_PUBLISHER_STYLES = "reader_publisher_styles"
         private const val KEY_SCROLL = "reader_scroll"
+        private const val KEY_TAP_ZONES = "reader_tap_zones"
+        private const val KEY_PAGE_TURN_ANIMATION = "reader_page_turn_animation"
         internal const val PREFS_NAME = "leafline_reader_prefs"
 
         fun fromContext(context: Context): ReaderPreferencesStore {

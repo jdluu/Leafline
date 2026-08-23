@@ -38,7 +38,8 @@ clients or manipulate EPUB archives directly.
   the local library; credentials are session-scoped in memory only
 - **Reader**: TOC drawer, font/theme/line-height preferences, reading-position
   persistence and restore, bookmarks, in-book search via the Readium search
-  service, text-selection highlights backed by the `annotations` table
+  service, text-selection highlights backed by the `annotations` table,
+  configurable tap zones, and page-turn animation preference
 - **Progress sync**: KOReader-compatible sync against Grimmory's
   `/api/koreader` endpoints
 
@@ -71,6 +72,26 @@ clients or manipulate EPUB archives directly.
   than the first+last-1024 scheme above. If real KOReader devices hash
   differently against a server, `FileHashUtil.koreaderHash` is the single
   place to adjust.
+
+## Reader interaction decisions
+
+- Tap zones: taps are received from the Readium navigator through
+  `VisualNavigator.addInputListener` (`InputListener.onTap`), not by an overlay
+  view, so taps on links and other interactive content still reach the EPUB
+  webview. The screen is split into thirds: left and right turn pages, the
+  center toggles the toolbar. The "reversed" tap zone setting swaps the side
+  zones for left-handed use or right-to-left publications; Readium 3.3.0 has no
+  tap-zone direction configuration to reuse.
+- Page-turn animation: Readium 3.3.0 exposes no page transition preference in
+  `EpubPreferences` or the navigator configuration. The only supported lever is
+  the `animated` flag of `goForward`/`goBackward`, so the none/slide setting
+  applies to tap-zone navigation (slide animates the turn, none snaps
+  instantly). Swipe-driven turns are handled by Readium's internal pager and
+  always animate; changing that would require reimplementing the paginator,
+  which is out of scope.
+- Reader settings persistence: `ReaderPreferencesStore` keeps Readium
+  `EpubPreferences` plus the interaction settings above in one
+  SharedPreferences file; unknown stored enum names fall back to defaults.
 
 ## Open items
 
