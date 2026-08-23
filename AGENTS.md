@@ -145,6 +145,15 @@ clients or manipulate EPUB archives directly.
 
 ### Reader interaction decisions
 
+- Sepia quick control: the reader toolbar overlay hosts a sepia chip next to
+  the brightness slider (`toggleSepia` in `ReaderSettings.kt`) for one-tap
+  warmth switching. Engaging it sets `EpubPreferences.theme` to SEPIA and
+  records the previous theme in `ReaderSettings.preSepiaTheme`, persisted in
+  `ReaderPreferencesStore` (`reader_pre_sepia_theme`); disengaging restores
+  that theme, including an unset one. Theme picks in the settings sheet stay
+  authoritative: they become the new restore target at the next engage, so a
+  memory is never stale for more than one toggle. Unknown stored names and a
+  stored sepia restore target fall back to unset on load.
 - Tap zones: taps are received from the Readium navigator through
   `VisualNavigator.addInputListener` (`InputListener.onTap`), not by an overlay
   view, so taps on links and other interactive content still reach the EPUB
