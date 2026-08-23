@@ -14,13 +14,16 @@ import org.readium.r2.navigator.preferences.Theme
  * unknown font names fall back to the original font, page margins snap back
  * into range, and a stored publisher-mode selection clears stale custom
  * typography overrides.
+ * Tap zones are stored per zone with per-zone fallbacks for unknown names.
+ * The superseded single-key tap zone preset ([KEY_TAP_ZONES]) migrates on
+ * load until the first save replaces it with per-zone keys.
  */
 class ReaderPreferencesStore(private val preferences: SharedPreferences) {
 
     fun load(): ReaderSettings {
         return ReaderSettings(
             epub = loadEpubPreferences(),
-            tapZones = enumFromName(KEY_TAP_ZONES, TapZoneMode.DEFAULT),
+            tapZoneConfig = loadTapZoneConfig(),
             pageTurnAnimation = enumFromName(KEY_PAGE_TURN_ANIMATION, PageTurnAnimation.SLIDE),
             brightness = restoreBrightness()
         )
@@ -35,7 +38,10 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
             .putNullableDouble(KEY_PAGE_MARGINS, epub.pageMargins?.let(::snapPageMargins))
             .putNullableBoolean(KEY_PUBLISHER_STYLES, epub.publisherStyles)
             .putNullableBoolean(KEY_SCROLL, epub.scroll)
-            .putString(KEY_TAP_ZONES, settings.tapZones.name)
+            .putString(KEY_TAP_ZONE_LEFT, settings.tapZoneConfig.leftZone.name)
+            .putString(KEY_TAP_ZONE_CENTER, settings.tapZoneConfig.centerZone.name)
+            .putString(KEY_TAP_ZONE_RIGHT, settings.tapZoneConfig.rightZone.name)
+            .remove(KEY_TAP_ZONES)
             .putString(KEY_PAGE_TURN_ANIMATION, settings.pageTurnAnimation.name)
             .putNullableFloat(KEY_BRIGHTNESS, settings.brightness)
             .apply()
@@ -69,6 +75,30 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
     private fun restoreBoolean(key: String): Boolean? {
         if (!preferences.contains(key)) return null
         return preferences.getBoolean(key, false)
+    }
+
+    /**
+     * Restores the per-zone tap actions. Unknown stored names fall back to
+     * that zone's default. Until per-zone keys exist, the superseded
+     * [KEY_TAP_ZONES] preset migrates: a stored REVERSED preset becomes the
+     * swapped side zones, anything else keeps the conventional defaults.
+     */
+    private fun loadTapZoneConfig(): TapZoneConfig {
+        val hasPerZoneKeys = preferences.contains(KEY_TAP_ZONE_LEFT) ||
+            preferences.contains(KEY_TAP_ZONE_CENTER) ||
+            preferences.contains(KEY_TAP_ZONE_RIGHT)
+        if (!hasPerZoneKeys) {
+            return if (preferences.getString(KEY_TAP_ZONES, null) == LEGACY_TAP_ZONES_REVERSED) {
+                TapZoneConfig.REVERSED
+            } else {
+                TapZoneConfig.DEFAULT
+            }
+        }
+        return TapZoneConfig(
+            leftZone = enumFromName(KEY_TAP_ZONE_LEFT, TapZoneConfig.DEFAULT.leftZone),
+            centerZone = enumFromName(KEY_TAP_ZONE_CENTER, TapZoneConfig.DEFAULT.centerZone),
+            rightZone = enumFromName(KEY_TAP_ZONE_RIGHT, TapZoneConfig.DEFAULT.rightZone)
+        )
     }
 
     /** Returns null when unset and clamps stale out-of-range values. */
@@ -134,7 +164,13 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
         private const val KEY_PAGE_MARGINS = "reader_page_margins"
         private const val KEY_PUBLISHER_STYLES = "reader_publisher_styles"
         private const val KEY_SCROLL = "reader_scroll"
+        private const val KEY_TAP_ZONE_LEFT = "reader_tap_zone_left"
+        private const val KEY_TAP_ZONE_CENTER = "reader_tap_zone_center"
+        private const val KEY_TAP_ZONE_RIGHT = "reader_tap_zone_right"
+
+        /** Superseded single-key tap zone preset, migrated on load. */
         private const val KEY_TAP_ZONES = "reader_tap_zones"
+        private const val LEGACY_TAP_ZONES_REVERSED = "REVERSED"
         private const val KEY_PAGE_TURN_ANIMATION = "reader_page_turn_animation"
         private const val KEY_BRIGHTNESS = "reader_brightness"
         internal const val PREFS_NAME = "leafline_reader_prefs"

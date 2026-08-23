@@ -116,7 +116,7 @@ import com.jdluu.leafline.reader.ReaderPreferencesStore
 import com.jdluu.leafline.reader.ReaderSettings
 import com.jdluu.leafline.reader.StyleMode
 import com.jdluu.leafline.reader.TapZoneAction
-import com.jdluu.leafline.reader.TapZoneMode
+import com.jdluu.leafline.reader.TapZoneConfig
 import com.jdluu.leafline.reader.clampBrightness
 import com.jdluu.leafline.reader.snapPageMargins
 import com.jdluu.leafline.reader.styleModeFor
@@ -220,14 +220,18 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
 
     /**
      * Turns taps reported by the Readium navigator into tap zone actions. The
-     * listener consumes every tap so the webview does not act on it as well.
+     * listener consumes every tap except zones configured as none, which are
+     * left unconsumed so the publication webview keeps default handling.
      */
     private val readerInputListener = object : InputListener {
         override fun onTap(event: TapEvent): Boolean {
             val width = navigator?.publicationView?.width ?: return false
             if (width <= 0) return false
             val settings = currentSettings.value
-            return when (tapZoneAction(tapZoneAt(event.point.x / width), settings.tapZones)) {
+            return when (
+                tapZoneAction(tapZoneAt(event.point.x / width), settings.tapZoneConfig)
+            ) {
+                TapZoneAction.NONE -> false
                 TapZoneAction.TOGGLE_MENU -> {
                     toolbarVisible.value = !toolbarVisible.value
                     true
@@ -1658,19 +1662,40 @@ private fun ReaderSettingsSheet(
             }
 
             Text("Tap zones", style = MaterialTheme.typography.labelLarge)
-            Row(modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)) {
-                listOf(
-                    TapZoneMode.DEFAULT to "Default",
-                    TapZoneMode.REVERSED to "Reversed"
-                ).forEach { (mode, label) ->
-                    FilterChip(
-                        selected = settings.tapZones == mode,
-                        onClick = { onSettingsChange(settings.copy(tapZones = mode)) },
-                        label = { Text(label) },
-                        modifier = Modifier.padding(end = 8.dp)
+            TapZoneActionRow(
+                label = "Left zone",
+                selected = settings.tapZoneConfig.leftZone,
+                onSelect = { action ->
+                    onSettingsChange(
+                        settings.copy(
+                            tapZoneConfig = settings.tapZoneConfig.copy(leftZone = action)
+                        )
                     )
                 }
-            }
+            )
+            TapZoneActionRow(
+                label = "Center zone",
+                selected = settings.tapZoneConfig.centerZone,
+                onSelect = { action ->
+                    onSettingsChange(
+                        settings.copy(
+                            tapZoneConfig = settings.tapZoneConfig.copy(centerZone = action)
+                        )
+                    )
+                }
+            )
+            TapZoneActionRow(
+                label = "Right zone",
+                selected = settings.tapZoneConfig.rightZone,
+                onSelect = { action ->
+                    onSettingsChange(
+                        settings.copy(
+                            tapZoneConfig = settings.tapZoneConfig.copy(rightZone = action)
+                        )
+                    )
+                }
+            )
+            Spacer(modifier = Modifier.height(16.dp))
 
             Text("Page turn animation", style = MaterialTheme.typography.labelLarge)
             Row(modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)) {
@@ -1688,6 +1713,35 @@ private fun ReaderSettingsSheet(
             }
 
             Spacer(modifier = Modifier.height(32.dp))
+        }
+    }
+}
+
+/** Offered actions for a configurable tap zone in the settings sheet. */
+private val TAP_ZONE_ACTION_OPTIONS: List<Pair<TapZoneAction, String>> = listOf(
+    TapZoneAction.PREVIOUS_PAGE to "Previous page",
+    TapZoneAction.NEXT_PAGE to "Next page",
+    TapZoneAction.TOGGLE_MENU to "Toggle menu",
+    TapZoneAction.NONE to "None"
+)
+
+@Composable
+private fun TapZoneActionRow(
+    label: String,
+    selected: TapZoneAction,
+    onSelect: (TapZoneAction) -> Unit
+) {
+    Column(modifier = Modifier.padding(top = 8.dp)) {
+        Text(label, style = MaterialTheme.typography.bodyMedium)
+        FlowRow(modifier = Modifier.padding(top = 4.dp)) {
+            TAP_ZONE_ACTION_OPTIONS.forEach { (action, optionLabel) ->
+                FilterChip(
+                    selected = selected == action,
+                    onClick = { onSelect(action) },
+                    label = { Text(optionLabel) },
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+            }
         }
     }
 }

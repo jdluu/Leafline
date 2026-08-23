@@ -148,10 +148,17 @@ clients or manipulate EPUB archives directly.
 - Tap zones: taps are received from the Readium navigator through
   `VisualNavigator.addInputListener` (`InputListener.onTap`), not by an overlay
   view, so taps on links and other interactive content still reach the EPUB
-  webview. The screen is split into thirds: left and right turn pages, the
-  center toggles the toolbar. The "reversed" tap zone setting swaps the side
-  zones for left-handed use or right-to-left publications; Readium 3.3.0 has no
-  tap-zone direction configuration to reuse.
+  webview. The screen is split into thirds and each zone maps to a
+  user-chosen `TapZoneAction` (previous page, next page, toggle menu, none)
+  held in `TapZoneConfig` on `ReaderSettings`; the defaults mirror the
+  conventional left-back/right-forward layout and the center toggles the
+  toolbar. The former `TapZoneMode` default/reversed setting is superseded by
+  per-zone configuration: the old `reader_tap_zones` preference migrates on
+  load (a stored REVERSED preset becomes swapped side zones), per-zone keys
+  take precedence once present, unknown stored action names fall back to that
+  zone's default, and saving drops the legacy key. A zone set to none leaves
+  its tap unconsumed so the publication webview keeps default handling.
+  Readium 3.3.0 has no tap-zone direction configuration to reuse.
 - Page-turn animation: Readium 3.3.0 exposes no page transition preference in
   `EpubPreferences` or the navigator configuration. The only supported lever is
   the `animated` flag of `goForward`/`goBackward`, so the none/slide setting
