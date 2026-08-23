@@ -42,11 +42,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.jdluu.leafline.library.LeaflineDependencyHolder
 import com.jdluu.leafline.library.LibraryBook
 import com.jdluu.leafline.library.LibraryViewModelFactory
+import com.jdluu.leafline.opds.OpdsBrowseScreen
+import com.jdluu.leafline.opds.OpdsViewModel
+
 
 private const val TAG = "MainActivity"
 
 enum class NavigationState {
-    Main, Library
+    Main, Library, Opds
 }
 
 class MainActivity : ComponentActivity() {
@@ -140,6 +143,7 @@ fun LeaflineApp(activity: ComponentActivity) {
     val libraryViewModel: LibraryViewModel = viewModel(
         factory = LibraryViewModelFactory(repository)
     )
+    val opdsViewModel: OpdsViewModel = viewModel()
 
     val navState = remember { mutableStateOf(NavigationState.Main) }
     val context = LocalContext.current
@@ -177,12 +181,19 @@ fun LeaflineApp(activity: ComponentActivity) {
                             activity.startActivity(ReaderActivity.newIntent(context))
                         },
                         onLibraryClick = { navState.value = NavigationState.Library },
+                        onOpdsClick = { navState.value = NavigationState.Opds },
                         books = libraryViewModel.books.collectAsState(initial = emptyList()).value
                     )
                 }
                 NavigationState.Library -> {
                     LibraryScreen(
                         viewModel = libraryViewModel,
+                        onBack = { navState.value = NavigationState.Main }
+                    )
+                }
+                NavigationState.Opds -> {
+                    OpdsBrowseScreen(
+                        viewModel = opdsViewModel,
                         onBack = { navState.value = NavigationState.Main }
                     )
                 }
@@ -196,6 +207,7 @@ fun MainScreenContent(
     onImportEpub: () -> Unit,
     onReaderClick: () -> Unit,
     onLibraryClick: () -> Unit,
+    onOpdsClick: () -> Unit,
     books: List<LibraryBook>
 ) {
     Column(
@@ -225,6 +237,12 @@ fun MainScreenContent(
             modifier = Modifier.padding(top = 16.dp),
         ) {
             Text("View Library")
+        }
+        Button(
+            onClick = { onOpdsClick() },
+            modifier = Modifier.padding(top = 16.dp),
+        ) {
+            Text("OPDS Catalog")
         }
     }
 }
