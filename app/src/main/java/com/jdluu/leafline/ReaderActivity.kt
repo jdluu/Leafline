@@ -16,10 +16,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
@@ -29,6 +32,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -36,12 +40,14 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -53,6 +59,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -60,8 +68,16 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.commitNow
@@ -70,13 +86,20 @@ import com.jdluu.leafline.library.data.Bookmark
 import com.jdluu.leafline.library.data.BookmarkRepository
 import com.jdluu.leafline.library.data.BookmarkToggleResult
 import com.jdluu.leafline.library.data.LocatorIdentity
+import com.jdluu.leafline.reader.search.BookSearchQuery
+import com.jdluu.leafline.reader.search.BookSearchResult
+import com.jdluu.leafline.reader.search.BookSearchState
+import com.jdluu.leafline.reader.search.BookSearchStatus
+import com.jdluu.leafline.reader.search.BookSearcher
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import org.readium.r2.navigator.Decoration
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.navigator.epub.EpubPreferences
@@ -85,6 +108,8 @@ import org.readium.r2.navigator.preferences.Theme
 import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.publication.Link
 import org.readium.r2.shared.publication.Locator
+import org.readium.r2.shared.publication.Publication
+import org.readium.r2.shared.publication.services.search.search
 import org.readium.r2.shared.util.AbsoluteUrl
 import org.readium.r2.shared.util.asset.AssetRetriever
 import org.readium.r2.shared.util.getOrElse
@@ -94,6 +119,8 @@ import org.readium.r2.streamer.parser.DefaultPublicationParser
 import java.io.File
 import java.io.IOException
 
+private const val SEARCH_DEBOUNCE_MS = 300L
+
 @OptIn(ExperimentalReadiumApi::class)
 class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
 
@@ -102,6 +129,11 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         private const val EPUB_FILE_NAME = "leafline-spike.epub"
         private const val NAVIGATOR_TAG = "EpubNavigatorFragment"
         private const val EXTRA_FILE_PATH = "extra_file_path"
+        private const val SEARCH_DEBOUNCE_MS = 300L
+        private const val SEARCH_DECORATION_GROUP = "leafline-search"
+        private const val MAX_SEARCH_DECORATIONS = 200
+        private const val SEARCH_MATCH_TINT = 0x55FFD54F.toInt()
+        private const val SEARCH_ACTIVE_TINT = 0xCCFF8F00.toInt()
 
         fun newIntent(context: Context): Intent {
             return Intent(context, ReaderActivity::class.java)
@@ -129,16 +161,21 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     }
 
     private var navigator: EpubNavigatorFragment? = null
+    private var publication: Publication? = null
     private var bookStableId: String? = null
     private lateinit var bookmarkRepository: BookmarkRepository
+    private lateinit var bookSearcher: BookSearcher
     private var toolbarVisible = mutableStateOf(false)
     private var settingsSheetVisible = mutableStateOf(false)
     private var bookmarkSheetVisible = mutableStateOf(false)
+    private var searchSheetVisible = mutableStateOf(false)
     private var bookTitle = mutableStateOf("")
     private var tocLinks = mutableStateOf<List<Pair<Link, Int>>>(emptyList())
     private var currentPreferences = mutableStateOf(EpubPreferences())
     private var bookmarks = mutableStateOf<List<Bookmark>>(emptyList())
     private var currentLocation = mutableStateOf<Locator?>(null)
+    @Volatile
+    private var activeSearchResultId: Int? = null
     private val snackbarHostState = SnackbarHostState()
 
     @OptIn(ExperimentalReadiumApi::class)
@@ -232,6 +269,11 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
 
             bookTitle.value = publication.metadata.title ?: "Reading"
             tocLinks.value = flattenToc(publication.tableOfContents)
+            this@ReaderActivity.publication = publication
+            bookSearcher = BookSearcher(
+                scope = lifecycleScope,
+                searchFactory = { query -> this@ReaderActivity.publication?.search(query) }
+            )
 
             val navigatorFactory = EpubNavigatorFactory(publication)
             val fragmentFactory = navigatorFactory.createFragmentFactory(
@@ -270,6 +312,14 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                         }
                     } catch (e: Exception) {
                         Log.w(TAG, "Could not observe bookmarks", e)
+                    }
+                }
+            }
+
+            lifecycleScope.launch {
+                bookSearcher.state.collect { state ->
+                    if (state.status is BookSearchStatus.Completed) {
+                        applySearchDecorations()
                     }
                 }
             }
@@ -350,11 +400,85 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         navigator?.submitPreferences(prefs)
     }
 
+    private fun submitSearch(rawQuery: String) {
+        activeSearchResultId = null
+        clearSearchDecorations()
+        bookSearcher.start(rawQuery)
+    }
+
+    private fun clearSearch() {
+        activeSearchResultId = null
+        clearSearchDecorations()
+        bookSearcher.reset()
+    }
+
+    private fun onSearchResultClicked(result: BookSearchResult) {
+        val locator = bookSearcher.locatorFor(result.id) ?: parseLocator(result.locatorJson)
+        if (locator == null) {
+            Toast.makeText(this, "Could not open this result", Toast.LENGTH_SHORT).show()
+            return
+        }
+        activeSearchResultId = result.id
+        applySearchDecorations()
+        navigator?.go(locator, false)
+        searchSheetVisible.value = false
+        toolbarVisible.value = false
+    }
+
+    private fun parseLocator(json: String): Locator? {
+        return try {
+            Locator.fromJSON(org.json.JSONObject(json))
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not parse search result locator", e)
+            null
+        }
+    }
+
+    private fun applySearchDecorations() {
+        val navigator = this.navigator ?: return
+        if (!navigator.supportsDecorationStyle(Decoration.Style.Highlight::class)) return
+        lifecycleScope.launch {
+            try {
+                val state = bookSearcher.state.value
+                val decorations = state.results
+                    .take(MAX_SEARCH_DECORATIONS)
+                    .mapNotNull { result ->
+                        val locator = bookSearcher.locatorFor(result.id) ?: return@mapNotNull null
+                        val active = result.id == activeSearchResultId
+                        Decoration(
+                            id = "search-${result.id}",
+                            locator = locator,
+                            style = Decoration.Style.Highlight(
+                                tint = if (active) SEARCH_ACTIVE_TINT else SEARCH_MATCH_TINT,
+                                isActive = active
+                            )
+                        )
+                    }
+                navigator.applyDecorations(decorations, SEARCH_DECORATION_GROUP)
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not apply search decorations", e)
+            }
+        }
+    }
+
+    private fun clearSearchDecorations() {
+        val navigator = this.navigator ?: return
+        if (!navigator.supportsDecorationStyle(Decoration.Style.Highlight::class)) return
+        lifecycleScope.launch {
+            try {
+                navigator.applyDecorations(emptyList(), SEARCH_DECORATION_GROUP)
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not clear search decorations", e)
+            }
+        }
+    }
+
     private fun addReaderOverlay() {
         val composeView = ComposeView(this).apply {
             setContent {
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
+                val searchState by bookSearcher.state.collectAsState()
                 ReaderOverlay(
                     title = bookTitle.value,
                     toolbarVisible = toolbarVisible.value,
@@ -366,6 +490,8 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     bookmarkActionsEnabled = bookStableId != null,
                     currentLocatorJson = currentLocation.value?.toJSON()?.toString(),
                     bookmarkSheetVisible = bookmarkSheetVisible.value,
+                    searchSheetVisible = searchSheetVisible.value,
+                    searchState = searchState,
                     snackbarHostState = snackbarHostState,
                     onToggleToolbar = { toolbarVisible.value = !toolbarVisible.value },
                     onBack = { finish() },
@@ -381,7 +507,12 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                         navigateToTocLink(link)
                         scope.launch { drawerState.close() }
                     },
-                    onPreferencesChange = { prefs -> submitPreferences(prefs) }
+                    onPreferencesChange = { prefs -> submitPreferences(prefs) },
+                    onOpenSearch = { searchSheetVisible.value = true },
+                    onDismissSearch = { searchSheetVisible.value = false },
+                    onSubmitSearch = { query -> submitSearch(query) },
+                    onClearSearch = { clearSearch() },
+                    onSearchResultClick = { result -> onSearchResultClicked(result) }
                 )
             }
         }
@@ -417,6 +548,8 @@ private fun ReaderOverlay(
     bookmarkActionsEnabled: Boolean,
     currentLocatorJson: String?,
     bookmarkSheetVisible: Boolean,
+    searchSheetVisible: Boolean,
+    searchState: BookSearchState,
     snackbarHostState: SnackbarHostState,
     onToggleToolbar: () -> Unit,
     onBack: () -> Unit,
@@ -429,7 +562,12 @@ private fun ReaderOverlay(
     onBookmarkClick: (Bookmark) -> Unit,
     onDeleteBookmark: (Bookmark) -> Unit,
     onTocClick: (Link) -> Unit,
-    onPreferencesChange: (EpubPreferences) -> Unit
+    onPreferencesChange: (EpubPreferences) -> Unit,
+    onOpenSearch: () -> Unit,
+    onDismissSearch: () -> Unit,
+    onSubmitSearch: (String) -> Unit,
+    onClearSearch: () -> Unit,
+    onSearchResultClick: (BookSearchResult) -> Unit
 ) {
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -467,6 +605,7 @@ private fun ReaderOverlay(
                         currentLocatorJson = currentLocatorJson,
                         onBack = onBack,
                         onOpenToc = onOpenToc,
+                        onOpenSearch = onOpenSearch,
                         onOpenSettings = onOpenSettings,
                         onToggleBookmark = onToggleBookmark,
                         onOpenBookmarks = onOpenBookmarks
@@ -491,6 +630,16 @@ private fun ReaderOverlay(
                 )
             }
 
+            if (searchSheetVisible) {
+                BookSearchSheet(
+                    state = searchState,
+                    onDismiss = onDismissSearch,
+                    onSubmitSearch = onSubmitSearch,
+                    onClearSearch = onClearSearch,
+                    onResultClick = onSearchResultClick
+                )
+            }
+
             SnackbarHost(
                 hostState = snackbarHostState,
                 modifier = Modifier.align(Alignment.BottomCenter)
@@ -508,6 +657,7 @@ private fun ReaderTopBar(
     currentLocatorJson: String?,
     onBack: () -> Unit,
     onOpenToc: () -> Unit,
+    onOpenSearch: () -> Unit,
     onOpenSettings: () -> Unit,
     onToggleBookmark: () -> Unit,
     onOpenBookmarks: () -> Unit
@@ -529,6 +679,9 @@ private fun ReaderTopBar(
         actions = {
             IconButton(onClick = onOpenToc) {
                 Icon(Icons.Default.Menu, contentDescription = "Contents")
+            }
+            IconButton(onClick = onOpenSearch) {
+                Icon(Icons.Default.Search, contentDescription = "Search in book")
             }
             IconButton(onClick = onOpenSettings) {
                 Icon(Icons.Default.Settings, contentDescription = "Reader settings")
@@ -657,6 +810,163 @@ private fun formatCreatedAt(epochMillis: Long): String {
     val formatter = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
         .withLocale(Locale.getDefault())
     return formatter.format(Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()))
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BookSearchSheet(
+    state: BookSearchState,
+    onDismiss: () -> Unit,
+    onSubmitSearch: (String) -> Unit,
+    onClearSearch: () -> Unit,
+    onResultClick: (BookSearchResult) -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        var query by remember { mutableStateOf(state.query.orEmpty()) }
+        var lastSubmitted by remember { mutableStateOf(state.query) }
+        val focusRequester = remember { FocusRequester() }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+        ) {
+            Text(
+                "Search in book",
+                style = MaterialTheme.typography.titleMedium
+            )
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+                    .focusRequester(focusRequester),
+                singleLine = true,
+                placeholder = { Text("Find in this book") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search)
+            )
+            LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
+            // Debounced auto search: restarting this effect on each keystroke
+            // cancels the pending submission until typing settles.
+            LaunchedEffect(query) {
+                val normalized = BookSearchQuery.normalize(query)
+                when {
+                    normalized == null -> {
+                        lastSubmitted = null
+                        onClearSearch()
+                    }
+                    normalized == lastSubmitted -> Unit
+                    else -> {
+                        delay(SEARCH_DEBOUNCE_MS)
+                        lastSubmitted = normalized
+                        onSubmitSearch(normalized)
+                    }
+                }
+            }
+
+            SearchStatusText(state, Modifier.padding(top = 12.dp, bottom = 4.dp))
+        }
+
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 420.dp)
+        ) {
+            items(state.results, key = { it.id }) { result ->
+                SearchResultRow(result = result, onClick = { onResultClick(result) })
+            }
+        }
+        Spacer(modifier = Modifier.navigationBarsPadding())
+        Spacer(modifier = Modifier.height(16.dp))
+    }
+}
+
+@Composable
+private fun SearchStatusText(state: BookSearchState, modifier: Modifier = Modifier) {
+    when (val status = state.status) {
+        is BookSearchStatus.Idle -> Unit
+        is BookSearchStatus.Searching -> Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = modifier.fillMaxWidth()
+        ) {
+            LinearProgressIndicator(
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 2.dp)
+            )
+        }
+        is BookSearchStatus.Completed -> Text(
+            text = if (status.resultCount == 0) "No matches found" else matchCountLabel(status.resultCount),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = modifier
+        )
+        is BookSearchStatus.Failed -> Text(
+            text = status.message,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+            modifier = modifier
+        )
+    }
+}
+
+private fun matchCountLabel(count: Int): String {
+    val total = count.toString()
+    return if (count == 1) "$total match" else "$total matches"
+}
+
+@Composable
+private fun SearchResultRow(
+    result: BookSearchResult,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+        ) {
+            if (!result.sectionTitle.isNullOrBlank()) {
+                Text(
+                    text = result.sectionTitle,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Text(
+                text = searchExcerpt(result),
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun searchExcerpt(result: BookSearchResult): AnnotatedString {
+    return buildAnnotatedString {
+        append(result.excerptBefore)
+        if (result.excerptMatch.isNotEmpty()) {
+            withStyle(
+                SpanStyle(
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            ) {
+                append(result.excerptMatch)
+            }
+        }
+        append(result.excerptAfter)
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

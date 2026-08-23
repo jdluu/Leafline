@@ -17,6 +17,7 @@ The project is under active development. The current prototype can:
 - Download EPUB acquisitions into the local library
 - Open imported books for reading offline
 - Bookmark reading positions and jump back to them
+- Search inside the open book and jump to matches
 
 The reading experience, settings persistence, search, progress synchronization,
 and release packaging are still being developed.
