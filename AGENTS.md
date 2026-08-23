@@ -37,9 +37,13 @@ docs: document opds authentication boundary
   (`feat/...`, `fix/...`, `chore/...`, `docs/...`), open a pull request, and
   merge it after checks pass. Squash-merge small slices; keep PR titles in the
   conventional-commit form.
-- Work is tracked on the GitHub Project board ("Leafline Development"). Pick an
-  issue from the board, reference its number in commits (`feat: ... (#12)`),
-  and let "Closes #N" in the PR description close it automatically.
+- Work is tracked on the GitHub Project board "Leafline Development"
+  (https://github.com/users/jdluu/projects/7). Pick a Todo item from the board,
+  move it to In Progress when starting, reference its number in commits
+  (`feat: ... (#12)`), and let "Closes #N" in the PR description close it
+  automatically. Branch protection on `main` is not enabled because private
+  repos require GitHub Pro for that feature; discipline is convention-based:
+  never push directly to `main`.
 - Roadmap items live as GitHub Issues labeled by phase
   (`phase-1-reading-polish` ... `phase-7-distribution`). Do not keep roadmap or
   planning documents inside the repository.
