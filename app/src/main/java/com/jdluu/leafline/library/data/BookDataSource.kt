@@ -18,4 +18,5 @@ interface BookDataSource {
     suspend fun delete(stableId: String)
     suspend fun setReadingStatus(stableId: String, status: ReadingStatus)
     fun getBooksByReadingStatus(status: ReadingStatus): Flow<List<LibraryBook>>
+    fun getRecentlyReadBooks(limit: Int = 10): Flow<List<LibraryBook>>
 }
