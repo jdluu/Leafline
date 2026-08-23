@@ -224,6 +224,21 @@ clients or manipulate EPUB archives directly.
   result lists already scroll through LazyColumn; the framework progress-sync
   dialog scrolls its message internally.
 
+### Color contrast and accessibility decisions
+
+- WCAG AA contrast is verified by `WcagContrast.kt` (pure Kotlin, JVM-tested
+  in `WcagContrastTest.kt`). It computes the WCAG 2.1 contrast ratio between
+  two hex colors and exposes `meetsBodyText` (4.5:1) and `meetsLargeOrUi`
+  (3.0:1) thresholds.
+- Material 3 default light and dark themes meet body-text contrast
+  (onSurface/surface ratios of 16.71 and 13.27); no custom overrides needed.
+- The default highlight tint was `#55FFF59F` (light amber, contrast 1.12 on
+  white) which failed the 3:1 UI threshold. It is now `#55E65100` (deep
+  amber, 3.79 on white, 3.22 on sepia, 4.52 on dark) which meets 3:1 on all
+  three theme backgrounds.
+- `scripts/check_touch_targets.sh` and `scripts/check_dynamic_type.sh` guard
+  against regressions in touch target sizing and font-scale compliance.
+
 ### Open architecture items
 
 - release license and distribution channel;

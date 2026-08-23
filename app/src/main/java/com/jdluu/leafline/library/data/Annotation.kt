@@ -9,6 +9,6 @@ data class Annotation(
     val createdAt: Long
 ) {
     companion object {
-        const val DEFAULT_COLOR_HEX = "#55FFF59F"
+        const val DEFAULT_COLOR_HEX = "#55E65100"
     }
 }

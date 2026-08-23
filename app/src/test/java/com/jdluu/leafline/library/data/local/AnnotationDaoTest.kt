@@ -40,7 +40,7 @@ class AnnotationDaoTest {
         id: Long = 0,
         bookId: String = "book-1",
         createdAt: Long = 1000L,
-        colorHex: String = "#55FFF59F",
+        colorHex: String = "#55E65100",
         note: String? = null
     ): AnnotationEntity {
         return AnnotationEntity(
