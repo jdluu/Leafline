@@ -1,13 +1,33 @@
 package com.jdluu.leafline.theme
 
+import android.os.Build
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.ui.platform.LocalContext
 
 /**
- * Light Material 3 color scheme based on the Leafline brand palette.
+ * App-level theme selection mode. This controls the Leafline *app UI* color
+ * scheme (navigation bars, settings sheets, etc.) independently from the
+ * Readium EPUB rendering theme.
  */
+enum class ThemeMode {
+    /** Light color scheme (always). */
+    LIGHT,
+    /** Standard dark gray color scheme. */
+    DARK,
+    /** Pure-black OLED-optimized dark surface. */
+    OLED,
+    /** High-contrast monochrome palette for e-ink displays. */
+    E_INK,
+    /** Follow the system dark/light setting. */
+    SYSTEM
+}
+
+// -- Light scheme --
 private val LightColorScheme = lightColorScheme(
     primary = LeaflineColors.LightPrimary,
     onPrimary = LeaflineColors.LightOnPrimary,
@@ -35,9 +55,7 @@ private val LightColorScheme = lightColorScheme(
     outlineVariant = LeaflineColors.LightOutlineVariant
 )
 
-/**
- * Dark Material 3 color scheme based on the Leafline brand palette.
- */
+// -- Standard dark scheme --
 private val DarkColorScheme = darkColorScheme(
     primary = LeaflineColors.DarkPrimary,
     onPrimary = LeaflineColors.DarkOnPrimary,
@@ -65,24 +83,100 @@ private val DarkColorScheme = darkColorScheme(
     outlineVariant = LeaflineColors.DarkOutlineVariant
 )
 
+// -- OLED (pure black) scheme -- same as dark but with true black surfaces
+private val OledColorScheme = darkColorScheme(
+    primary = LeaflineColors.DarkPrimary,
+    onPrimary = LeaflineColors.DarkOnPrimary,
+    primaryContainer = LeaflineColors.DarkPrimaryContainer,
+    onPrimaryContainer = LeaflineColors.DarkOnPrimaryContainer,
+    secondary = LeaflineColors.DarkSecondary,
+    onSecondary = LeaflineColors.DarkOnSecondary,
+    secondaryContainer = LeaflineColors.DarkSecondaryContainer,
+    onSecondaryContainer = LeaflineColors.DarkOnSecondaryContainer,
+    tertiary = LeaflineColors.DarkTertiary,
+    onTertiary = LeaflineColors.DarkOnTertiary,
+    tertiaryContainer = LeaflineColors.DarkTertiaryContainer,
+    onTertiaryContainer = LeaflineColors.DarkOnTertiaryContainer,
+    error = LeaflineColors.DarkError,
+    onError = LeaflineColors.DarkOnError,
+    errorContainer = LeaflineColors.DarkErrorContainer,
+    onErrorContainer = LeaflineColors.DarkOnErrorContainer,
+    background = LeaflineColors.OledBackground,
+    onBackground = LeaflineColors.OledOnBackground,
+    surface = LeaflineColors.OledSurface,
+    onSurface = LeaflineColors.OledOnSurface,
+    surfaceVariant = LeaflineColors.OledSurfaceVariant,
+    onSurfaceVariant = LeaflineColors.OledOnSurfaceVariant,
+    outline = LeaflineColors.DarkOutline,
+    outlineVariant = LeaflineColors.DarkOutlineVariant
+)
+
+// -- E-ink high-contrast scheme (light mode, monochrome) --
+private val EinkColorScheme = lightColorScheme(
+    primary = LeaflineColors.EinkPrimary,
+    onPrimary = LeaflineColors.EinkOnPrimary,
+    primaryContainer = LeaflineColors.EinkPrimaryContainer,
+    onPrimaryContainer = LeaflineColors.EinkOnPrimaryContainer,
+    secondary = LeaflineColors.EinkSecondary,
+    onSecondary = LeaflineColors.EinkOnSecondary,
+    secondaryContainer = LeaflineColors.EinkSecondaryContainer,
+    onSecondaryContainer = LeaflineColors.EinkOnSecondaryContainer,
+    tertiary = LeaflineColors.EinkTertiary,
+    onTertiary = LeaflineColors.EinkOnTertiary,
+    tertiaryContainer = LeaflineColors.EinkTertiaryContainer,
+    onTertiaryContainer = LeaflineColors.EinkOnTertiaryContainer,
+    error = LeaflineColors.EinkError,
+    onError = LeaflineColors.EinkOnError,
+    errorContainer = LeaflineColors.EinkErrorContainer,
+    onErrorContainer = LeaflineColors.EinkOnErrorContainer,
+    background = LeaflineColors.EinkBackground,
+    onBackground = LeaflineColors.EinkOnBackground,
+    surface = LeaflineColors.EinkSurface,
+    onSurface = LeaflineColors.EinkOnSurface,
+    surfaceVariant = LeaflineColors.EinkSurfaceVariant,
+    onSurfaceVariant = LeaflineColors.EinkOnSurfaceVariant,
+    outline = LeaflineColors.EinkOutline,
+    outlineVariant = LeaflineColors.EinkOutlineVariant
+)
+
+/**
+ * Resolves the color scheme from [mode], with dynamic color on Android 12+
+ * when [ThemeMode.SYSTEM] is selected.
+ */
+@Composable
+private fun themeScheme(mode: ThemeMode, darkSystem: Boolean) = when {
+    mode == ThemeMode.LIGHT -> LightColorScheme
+    mode == ThemeMode.DARK -> DarkColorScheme
+    mode == ThemeMode.OLED -> OledColorScheme
+    mode == ThemeMode.E_INK -> EinkColorScheme
+    // SYSTEM: use dynamic color on Android 12+, else follow system dark
+    mode == ThemeMode.SYSTEM -> {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (darkSystem) dynamicDarkColorScheme(LocalContext.current)
+            else dynamicLightColorScheme(LocalContext.current)
+        } else if (darkSystem) DarkColorScheme else LightColorScheme
+    }
+    else -> if (darkSystem) DarkColorScheme else LightColorScheme
+}
+
 /**
  * Top-level Leafline theme composable. Wraps MaterialTheme with the brand
- * color schemes, typography, and shapes. Replace bare `MaterialTheme { }`
- * invocations with `LeaflineTheme { }` to pick up the brand palette.
+ * color schemes, typography, and shapes.
  *
- * @param darkTheme Whether to apply the dark color scheme. Defaults to
- *   [isSystemInDarkTheme] so the theme follows the system setting.
+ * @param mode The [ThemeMode] to apply. Pass [ThemeMode.SYSTEM] to follow
+ *   the system dark/light preference with dynamic color on Android 12+.
+ * @param darkSystem Whether the system is in dark mode (only used when
+ *   [mode] is [ThemeMode.SYSTEM] or when an explicit theme is unselected).
  * @param content The composable content tree.
  */
 @Composable
 fun LeaflineTheme(
-    darkTheme: Boolean = false, // system detection deferred to caller
+    mode: ThemeMode = ThemeMode.LIGHT,
+    darkSystem: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
-
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = themeScheme(mode, darkSystem),
         typography = LeaflineTypography,
         shapes = LeaflineShapes,
         content = content
