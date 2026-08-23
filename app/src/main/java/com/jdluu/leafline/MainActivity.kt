@@ -58,6 +58,7 @@ import com.jdluu.leafline.opds.OpdsViewModel
 import com.jdluu.leafline.sync.KoreaderSyncClient
 import com.jdluu.leafline.sync.KoreaderSyncConfig
 import com.jdluu.leafline.sync.KoreaderSyncConfigStore
+import com.jdluu.leafline.theme.LeaflineTheme
 import kotlinx.coroutines.launch
 import androidx.compose.material3.Switch
 
@@ -233,7 +234,7 @@ fun LeaflineApp(activity: ComponentActivity) {
         }
     }
 
-    MaterialTheme {
+    LeaflineTheme {
         Scaffold(
             bottomBar = {
                 NavigationBar {
