@@ -4,6 +4,9 @@ Leafline is an Android-first EPUB reader with local library support and OPDS
 integration. It is designed for focused reading on Android and e-ink devices,
 with Grimmory as the first supported OPDS catalog.
 
+For the strict division of responsibility between Leafline (reader) and
+ShelfSync (Grimmory sync client), see docs/app-boundaries.md.
+
 ## Current status
 
 The project is under active development. The current prototype can:
