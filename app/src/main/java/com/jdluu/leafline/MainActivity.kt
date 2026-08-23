@@ -1,7 +1,9 @@
 package com.jdluu.leafline
 
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
@@ -32,7 +34,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
-import com.jdluu.leafline.opds.OpdsConfigStore
 import com.jdluu.leafline.opds.OpdsFeedEntry
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +48,8 @@ import com.jdluu.leafline.library.LeaflineDependencyHolder
 import com.jdluu.leafline.library.LibraryBook
 import com.jdluu.leafline.library.LibraryViewModelFactory
 import com.jdluu.leafline.opds.OpdsBrowseScreen
+import com.jdluu.leafline.opds.OpdsConfigStore
+import com.jdluu.leafline.opds.OpdsServerConfig
 import com.jdluu.leafline.opds.OpdsViewModel
 
 
@@ -72,7 +75,25 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         LeaflineDependencyHolder.initialize(this)
         currentContext = this
+        registerOpdsDebugReceiver()
         setContent { LeaflineApp(this) }
+    }
+
+    private fun registerOpdsDebugReceiver() {
+        val filter = IntentFilter("com.jdluu.leafline.OPDS_CONFIG")
+        registerReceiver(object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                val url = intent.getStringExtra("url") ?: return
+                val username = intent.getStringExtra("username") ?: ""
+                val password = intent.getStringExtra("password") ?: ""
+                OpdsConfigStore.config = OpdsServerConfig(
+                    catalogUrl = url,
+                    username = username,
+                    password = password
+                )
+                showToast("OPDS config set via debug broadcast")
+            }
+        }, filter, Context.RECEIVER_EXPORTED)
     }
 
     override fun onNewIntent(intent: Intent) {
