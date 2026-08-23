@@ -9,28 +9,44 @@ import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material3.DismissibleDrawerSheet
+import androidx.compose.material3.DismissibleNavigationDrawer
+import androidx.compose.material3.DrawerState
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.commitNow
@@ -39,7 +55,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
+import org.readium.r2.navigator.preferences.Configurable
+import org.readium.r2.navigator.preferences.FontFamily
+import org.readium.r2.navigator.preferences.Theme
+import org.readium.r2.navigator.epub.EpubPreferences
 import org.readium.r2.shared.ExperimentalReadiumApi
+import org.readium.r2.shared.publication.Link
+import org.readium.r2.shared.publication.Locator
+import org.readium.r2.shared.publication.Publication
 import org.readium.r2.shared.util.AbsoluteUrl
 import org.readium.r2.shared.util.asset.AssetRetriever
 import org.readium.r2.shared.util.getOrElse
@@ -87,6 +110,8 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     private var bookStableId: String? = null
     private var toolbarVisible = mutableStateOf(false)
     private var bookTitle = mutableStateOf("")
+    private var tocLinks = mutableStateOf<List<Pair<Link, Int>>>(emptyList())
+    private var currentPreferences = mutableStateOf(EpubPreferences())
 
     @OptIn(ExperimentalReadiumApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -156,11 +181,9 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             }
         }
 
-        val initialLocator: org.readium.r2.shared.publication.Locator? = savedLocatorJson?.let { json ->
+        val initialLocator: Locator? = savedLocatorJson?.let { json ->
             try {
-                org.readium.r2.shared.publication.Locator.Companion.fromJSON(
-                    org.json.JSONObject(json)
-                )
+                Locator.Companion.fromJSON(org.json.JSONObject(json))
             } catch (e: Exception) {
                 Log.w(TAG, "Could not parse saved locator, starting at beginning", e)
                 null
@@ -178,6 +201,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             }
 
             bookTitle.value = publication.metadata.title ?: "Reading"
+            tocLinks.value = flattenToc(publication.tableOfContents)
 
             val navigatorFactory = EpubNavigatorFactory(publication)
             val fragmentFactory = navigatorFactory.createFragmentFactory(
@@ -221,14 +245,46 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         }
     }
 
+    private fun flattenToc(links: List<Link>, depth: Int = 0): List<Pair<Link, Int>> {
+        val result = mutableListOf<Pair<Link, Int>>()
+        for (link in links) {
+            result.add(link to depth)
+            if (link.children.isNotEmpty()) {
+                result.addAll(flattenToc(link.children, depth + 1))
+            }
+        }
+        return result
+    }
+
+    private fun navigateToTocLink(link: Link) {
+        navigator?.go(link, false)
+        toolbarVisible.value = false
+    }
+
+    private fun submitPreferences(prefs: EpubPreferences) {
+        currentPreferences.value = prefs
+        navigator?.submitPreferences(prefs)
+    }
+
     private fun addReaderOverlay() {
         val composeView = ComposeView(this).apply {
             setContent {
+                val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+                val scope = rememberCoroutineScope()
                 ReaderOverlay(
                     title = bookTitle.value,
                     toolbarVisible = toolbarVisible.value,
+                    tocLinks = tocLinks.value,
+                    currentPreferences = currentPreferences.value,
+                    drawerState = drawerState,
                     onToggleToolbar = { toolbarVisible.value = !toolbarVisible.value },
-                    onBack = { finish() }
+                    onBack = { finish() },
+                    onOpenToc = { scope.launch { drawerState.open() } },
+                    onTocClick = { link ->
+                        navigateToTocLink(link)
+                        scope.launch { drawerState.close() }
+                    },
+                    onPreferencesChange = { prefs -> submitPreferences(prefs) }
                 )
             }
         }
@@ -256,30 +312,87 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
 private fun ReaderOverlay(
     title: String,
     toolbarVisible: Boolean,
+    tocLinks: List<Pair<Link, Int>>,
+    currentPreferences: EpubPreferences,
+    drawerState: DrawerState,
     onToggleToolbar: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onOpenToc: () -> Unit,
+    onTocClick: (Link) -> Unit,
+    onPreferencesChange: (EpubPreferences) -> Unit
 ) {
-    Box(modifier = Modifier.fillMaxSize()) {
-        InvisibleTapZone(onToggleToolbar)
-        if (toolbarVisible) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.TopCenter)
-                    .statusBarsPadding(),
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
-                tonalElevation = 6.dp
-            ) {
-                TopAppBar(
-                    title = { Text(title, maxLines = 1) },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                        }
-                    }
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet {
+                Text(
+                    "Contents",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(16.dp)
                 )
+                Spacer(modifier = Modifier.height(4.dp))
+                LazyColumn {
+                    items(tocLinks) { (link, depth) ->
+                        TocItem(link = link, depth = depth, onClick = { onTocClick(link) })
+                    }
+                }
             }
         }
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            InvisibleTapZone(onToggleToolbar)
+            if (toolbarVisible) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.TopCenter)
+                        .statusBarsPadding(),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+                    tonalElevation = 6.dp
+                ) {
+                    TopAppBar(
+                        title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        navigationIcon = {
+                            IconButton(onClick = onBack) {
+                                Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                            }
+                        },
+                        actions = {
+                            IconButton(onClick = onOpenToc) {
+                                Icon(Icons.Default.Menu, contentDescription = "Contents")
+                            }
+                            IconButton(onClick = {
+                                onPreferencesChange(
+                                    currentPreferences.copy(
+                                        fontSize = (currentPreferences.fontSize ?: 1.0) + 0.25
+                                    )
+                                )
+                            }) {
+                                Icon(Icons.Default.TextFields, contentDescription = "Font size")
+                            }
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TocItem(link: Link, depth: Int, onClick: () -> Unit) {
+    val indent = (depth * 16).dp
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+    ) {
+        Text(
+            text = link.title ?: link.href.toString(),
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(start = indent + 16.dp, top = 12.dp, bottom = 12.dp, end = 16.dp),
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
