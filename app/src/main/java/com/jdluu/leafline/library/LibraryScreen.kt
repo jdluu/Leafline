@@ -3,9 +3,10 @@ package com.jdluu.leafline.library
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -97,6 +98,8 @@ fun LibraryScreen(
     var showCreateDialog by remember { mutableStateOf(false) }
     var newCollectionName by remember { mutableStateOf("") }
     var collectionMenuExpanded by remember { mutableStateOf(false) }
+    var detailSheetBook by remember { mutableStateOf<LibraryBook?>(null) }
+    var showDeleteConfirm by remember { mutableStateOf<LibraryBook?>(null) }
 
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
@@ -273,6 +276,7 @@ fun LibraryScreen(
                     BookGridTile(
                         book = book,
                         onClick = { onOpenBook(book) },
+                        onLongClick = { detailSheetBook = book },
                         collections = collections,
                         bookCollections = emptyList(), // simplified: collection state per book
                         onAddToCollection = { collectionId ->
@@ -324,6 +328,48 @@ fun LibraryScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showCreateDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    // Book detail sheet (long-press)
+    detailSheetBook?.let { book ->
+        BookDetailSheet(
+            book = book,
+            collections = collections,
+            onDismiss = { detailSheetBook = null },
+            onDelete = {
+                detailSheetBook = null
+                showDeleteConfirm = book
+            },
+            onSetReadingStatus = { status -> viewModel.setBookReadingStatus(book.stableId, status) },
+            onAddToCollection = { id -> viewModel.addBookToCollection(book.stableId, id) },
+            onRemoveFromCollection = { id -> viewModel.removeBookFromCollection(book.stableId, id) },
+            onOpen = {
+                detailSheetBook = null
+                onOpenBook(book)
+            }
+        )
+    }
+
+    // Delete confirmation dialog
+    showDeleteConfirm?.let { book ->
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = null },
+            title = { Text("Delete book?") },
+            text = { Text("Remove \"${book.title}\" from your library? This cannot be undone.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteBook(book.stableId)
+                        showDeleteConfirm = null
+                    }
+                ) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = null }) { Text("Cancel") }
             }
         )
     }
@@ -482,10 +528,12 @@ fun rememberLibraryGridColumns(): Int {
     return if (configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) 3 else 2
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun BookGridTile(
     book: LibraryBook,
     onClick: () -> Unit,
+    onLongClick: () -> Unit = {},
     collections: List<Collection> = emptyList(),
     bookCollections: List<Collection> = emptyList(),
     onAddToCollection: (Long) -> Unit = {},
@@ -495,7 +543,12 @@ fun BookGridTile(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClickLabel = "Open book", onClick = onClick)
+            .combinedClickable(
+                onClickLabel = "Open book",
+                onClick = onClick,
+                onLongClickLabel = "Book details",
+                onLongClick = onLongClick
+            )
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             val bitmap = rememberCoverBitmap(book.coverPath)
@@ -677,6 +730,197 @@ private fun ContinueReadingTile(book: LibraryBook, onClick: () -> Unit) {
             Spacer(modifier = Modifier.height(4.dp))
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BookDetailSheet(
+    book: LibraryBook,
+    collections: List<Collection>,
+    onDismiss: () -> Unit,
+    onDelete: () -> Unit,
+    onSetReadingStatus: (ReadingStatus) -> Unit,
+    onAddToCollection: (Long) -> Unit,
+    onRemoveFromCollection: (Long) -> Unit,
+    onOpen: () -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            // Cover + title
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top
+            ) {
+                val bitmap = rememberCoverBitmap(book.coverPath)
+                Box(
+                    modifier = Modifier
+                        .width(100.dp)
+                        .aspectRatio(COVER_ASPECT_RATIO)
+                        .clip(MaterialTheme.shapes.medium)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    if (bitmap != null) {
+                        Image(
+                            bitmap = bitmap.asImageBitmap(),
+                            contentDescription = book.title,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.MenuBook,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(book.title, style = MaterialTheme.typography.titleLarge)
+                    if (book.authors.isNotEmpty()) {
+                        Text(
+                            book.authors.joinToString(", "),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Button(onClick = onOpen) { Text("Open book") }
+                }
+            }
+
+            Spacer(Modifier.height(20.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(12.dp))
+
+            // Metadata section
+            Text("Metadata", style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.height(8.dp))
+            MetadataRow("Status", when (book.readingStatus) {
+                ReadingStatus.UNREAD -> "Unread"
+                ReadingStatus.READING -> "Reading"
+                ReadingStatus.FINISHED -> "Finished"
+            })
+            book.publisher?.let { MetadataRow("Publisher", it) }
+            book.pageCount?.let { MetadataRow("Pages", it.toString()) }
+            book.language?.let { MetadataRow("Language", it) }
+            book.publishedAtEpochMillis?.let { millis ->
+                MetadataRow("Published", formatEpochMillis(millis))
+            }
+            book.addedAtEpochMillis?.let { millis ->
+                MetadataRow("Added", formatEpochMillis(millis))
+            }
+            book.lastReadAtEpochMillis?.let { millis ->
+                MetadataRow("Last read", formatEpochMillis(millis))
+            }
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(12.dp))
+
+            // File info section
+            Text("File info", style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.height(8.dp))
+            MetadataRow("Path", book.filePath)
+            MetadataRow("Hash", book.fileHash.take(12) + "…")
+            book.koreaderHash?.let { MetadataRow("KOReader hash", it.take(12) + "…") }
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(12.dp))
+
+            // Actions section
+            Text("Actions", style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.height(8.dp))
+
+            // Reading status buttons
+            Text("Mark as:", style = MaterialTheme.typography.labelMedium)
+            Row(
+                modifier = Modifier.padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ReadingStatus.entries.forEach { status ->
+                    FilterChip(
+                        selected = book.readingStatus == status,
+                        onClick = { onSetReadingStatus(status) },
+                        label = {
+                            Text(when (status) {
+                                ReadingStatus.UNREAD -> "Unread"
+                                ReadingStatus.READING -> "Reading"
+                                ReadingStatus.FINISHED -> "Finished"
+                            })
+                        }
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // Collection management
+            if (collections.isNotEmpty()) {
+                Text("Collections:", style = MaterialTheme.typography.labelMedium)
+                Spacer(Modifier.height(4.dp))
+                // Simple toggle row for each collection
+                collections.forEach { collection ->
+                    FilterChip(
+                        selected = false, // simplified: no per-book collection tracking here
+                        onClick = { onAddToCollection(collection.id) },
+                        label = { Text(collection.name) },
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(20.dp))
+
+            // Delete button
+            TextButton(
+                onClick = onDelete,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                Spacer(Modifier.width(4.dp))
+                Text("Delete from library", color = MaterialTheme.colorScheme.error)
+            }
+
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun MetadataRow(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp)
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(80.dp)
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+private fun formatEpochMillis(millis: Long): String {
+    val sdf = java.text.SimpleDateFormat("MMM d, yyyy", java.util.Locale.US)
+    return sdf.format(java.util.Date(millis))
 }
 
 private const val COVER_ASPECT_RATIO = 0.7f
