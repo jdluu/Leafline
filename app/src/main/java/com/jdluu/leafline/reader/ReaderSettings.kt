@@ -118,12 +118,15 @@ enum class PageTurnAnimation(val animated: Boolean) {
  * while the OS runs animations: when the system removes them (animator
  * duration scale zeroed out, e.g. via the Remove Animations accessibility
  * toggle or developer options), page turns snap instantly regardless of the
- * preference. Any nonzero scale keeps animations available.
+ * preference. Any nonzero scale keeps animations available. A user-facing
+ * reduce-motion setting forces instant turns regardless of the OS setting.
  */
 fun pageTurnIsAnimated(
     animation: PageTurnAnimation,
-    systemAnimatorDurationScale: Float
+    systemAnimatorDurationScale: Float,
+    reduceMotion: Boolean = false
 ): Boolean {
+    if (reduceMotion) return false
     return animation.animated && systemAnimatorDurationScale != 0f
 }
 
@@ -185,7 +188,14 @@ data class ReaderSettings(
      * Theme restored by the sepia quick control on disengage, or null to
      * restore an unset theme. Only meaningful while the EPUB theme is sepia.
      */
-    val preSepiaTheme: Theme? = null
+    val preSepiaTheme: Theme? = null,
+    /**
+     * When true, page-turn animations are disabled and nonessential reader
+     * animations are suppressed regardless of the OS animator scale. Defaults
+     * to false; the initial value from a cold start is determined by the
+     * system remove-animations accessibility setting.
+     */
+    val reduceMotion: Boolean = false
 )
 
 /** Horizontal tap zones spanning the reader screen from left to right. */

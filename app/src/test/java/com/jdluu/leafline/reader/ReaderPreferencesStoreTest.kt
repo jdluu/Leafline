@@ -3,7 +3,9 @@ package com.jdluu.leafline.reader
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -344,5 +346,38 @@ class ReaderPreferencesStoreTest {
         val store = ReaderPreferencesStore.fromContext(context)
 
         assertNull(store.load().preSepiaTheme)
+    }
+
+    @Test
+    fun `reduce motion defaults to initialReduceMotion on first load`() {
+        val store = ReaderPreferencesStore.fromContext(context)
+        assertTrue(store.load(initialReduceMotion = true).reduceMotion)
+    }
+
+    @Test
+    fun `stored reduce motion overrides initialReduceMotion`() {
+        val preferences =
+            context.getSharedPreferences(ReaderPreferencesStore.PREFS_NAME, Context.MODE_PRIVATE)
+        preferences.edit().putBoolean("reader_reduce_motion", true).commit()
+        val store = ReaderPreferencesStore.fromContext(context)
+        assertTrue(store.load(initialReduceMotion = false).reduceMotion)
+    }
+
+    @Test
+    fun `stored reduce motion false is returned even when initial is true`() {
+        val preferences =
+            context.getSharedPreferences(ReaderPreferencesStore.PREFS_NAME, Context.MODE_PRIVATE)
+        preferences.edit().putBoolean("reader_reduce_motion", false).commit()
+        val store = ReaderPreferencesStore.fromContext(context)
+        assertFalse(store.load(initialReduceMotion = true).reduceMotion)
+    }
+
+    @Test
+    fun `save and reload reduce motion round-trips`() {
+        val store = ReaderPreferencesStore.fromContext(context)
+        store.save(ReaderSettings(reduceMotion = true))
+        assertTrue(store.load().reduceMotion)
+        store.save(ReaderSettings(reduceMotion = false))
+        assertFalse(store.load().reduceMotion)
     }
 }

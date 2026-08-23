@@ -285,7 +285,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
             1f
         )
-        return pageTurnIsAnimated(settings.pageTurnAnimation, animatorScale)
+        return pageTurnIsAnimated(settings.pageTurnAnimation, animatorScale, settings.reduceMotion)
     }
 
     /**
@@ -417,7 +417,12 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                 searchFactory = { query -> this@ReaderActivity.publication?.search(query) }
             )
 
-            val savedSettings = readerPreferencesStore.load()
+            val animatorScale = android.provider.Settings.Global.getFloat(
+                contentResolver,
+                android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+                1f
+            )
+            val savedSettings = readerPreferencesStore.load(initialReduceMotion = animatorScale == 0f)
             currentSettings.value = savedSettings
             applyBrightnessToWindow(savedSettings.brightness)
 
@@ -1875,6 +1880,29 @@ private fun ReaderSettingsSheet(
                     )
                 }
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Reduce motion",
+                    style = MaterialTheme.typography.labelLarge
+                )
+                Switch(
+                    checked = settings.reduceMotion,
+                    onCheckedChange = { reduce ->
+                        onSettingsChange(settings.copy(reduceMotion = reduce))
+                    }
+                )
+            }
+            Text(
+                "Disable page-turn animations and sheet transitions",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
 
             Spacer(modifier = Modifier.height(32.dp))
         }
