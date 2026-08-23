@@ -46,6 +46,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.DropdownMenu
@@ -122,6 +123,7 @@ import com.jdluu.leafline.reader.effectiveTapZoneAction
 import com.jdluu.leafline.reader.snapPageMargins
 import com.jdluu.leafline.reader.styleModeFor
 import com.jdluu.leafline.reader.pageTurnIsAnimated
+import com.jdluu.leafline.reader.toggleSepia
 import com.jdluu.leafline.reader.search.BookSearchQuery
 import com.jdluu.leafline.reader.search.BookSearchResult
 import com.jdluu.leafline.reader.search.BookSearchState
@@ -799,6 +801,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     onSettingsChange = { settings -> submitSettings(settings) },
                     onBrightnessChange = { value -> submitBrightness(value) },
                     onBrightnessReset = { submitBrightness(null) },
+                    onToggleSepia = { submitSettings(toggleSepia(currentSettings.value)) },
                     onOpenSearch = { searchSheetVisible.value = true },
                     onDismissSearch = { searchSheetVisible.value = false },
                     onSubmitSearch = { query -> submitSearch(query) },
@@ -950,6 +953,7 @@ private fun ReaderOverlay(
     onSettingsChange: (ReaderSettings) -> Unit,
     onBrightnessChange: (Float) -> Unit,
     onBrightnessReset: () -> Unit,
+    onToggleSepia: () -> Unit,
     onOpenSearch: () -> Unit,
     onDismissSearch: () -> Unit,
     onSubmitSearch: (String) -> Unit,
@@ -1005,6 +1009,10 @@ private fun ReaderOverlay(
                         brightness = currentSettings.brightness,
                         onBrightnessChange = onBrightnessChange,
                         onReset = onBrightnessReset
+                    )
+                    SepiaQuickControl(
+                        selected = currentSettings.epub.theme == Theme.SEPIA,
+                        onToggle = onToggleSepia
                     )
                 }
             }
@@ -1094,6 +1102,39 @@ private fun BrightnessControl(
                 onValueChange = { onBrightnessChange(clampBrightness(it)) },
                 valueRange = BRIGHTNESS_MIN..BRIGHTNESS_MAX,
                 modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+/**
+ * Warm/sepia quick control shown next to the brightness slider in the reader
+ * overlay. Selected means the publication renders with the sepia theme;
+ * toggling swaps between sepia and the previously active theme, persisted by
+ * [ReaderPreferencesStore] across restarts. The full light, sepia, and dark
+ * choice stays in the settings sheet.
+ */
+@Composable
+private fun SepiaQuickControl(
+    selected: Boolean,
+    onToggle: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+        tonalElevation = 6.dp
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            FilterChip(
+                selected = selected,
+                onClick = onToggle,
+                label = { Text("Sepia") },
+                leadingIcon = {
+                    Icon(Icons.Default.WbSunny, contentDescription = null)
+                }
             )
         }
     }

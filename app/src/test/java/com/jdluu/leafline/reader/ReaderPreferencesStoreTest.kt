@@ -43,6 +43,7 @@ class ReaderPreferencesStoreTest {
         assertEquals(TapZoneConfig.DEFAULT, loaded.tapZoneConfig)
         assertEquals(PageTurnAnimation.SLIDE, loaded.pageTurnAnimation)
         assertNull(loaded.brightness)
+        assertNull(loaded.preSepiaTheme)
     }
 
     @Test
@@ -65,7 +66,8 @@ class ReaderPreferencesStoreTest {
                     rightZone = TapZoneAction.TOGGLE_MENU
                 ),
                 pageTurnAnimation = PageTurnAnimation.NONE,
-                brightness = 0.42f
+                brightness = 0.42f,
+                preSepiaTheme = Theme.LIGHT
             )
         )
 
@@ -82,6 +84,7 @@ class ReaderPreferencesStoreTest {
         assertEquals(TapZoneAction.TOGGLE_MENU, loaded.tapZoneConfig.rightZone)
         assertEquals(PageTurnAnimation.NONE, loaded.pageTurnAnimation)
         assertEquals(0.42f, loaded.brightness!!)
+        assertEquals(Theme.LIGHT, loaded.preSepiaTheme)
     }
 
     @Test
@@ -116,6 +119,7 @@ class ReaderPreferencesStoreTest {
         assertEquals(TapZoneConfig.DEFAULT, loaded.tapZoneConfig)
         assertEquals(PageTurnAnimation.SLIDE, loaded.pageTurnAnimation)
         assertNull(loaded.brightness)
+        assertNull(loaded.preSepiaTheme)
     }
 
     @Test
@@ -316,5 +320,29 @@ class ReaderPreferencesStoreTest {
         assertNull(loaded.pageMargins)
         assertEquals(Theme.SEPIA, loaded.theme)
         assertEquals(true, loaded.scroll)
+    }
+
+    @Test
+    fun `stored sepia restore theme of sepia falls back to unset`() {
+        val preferences =
+            context.getSharedPreferences(ReaderPreferencesStore.PREFS_NAME, Context.MODE_PRIVATE)
+        preferences.edit()
+            .putString("reader_pre_sepia_theme", "SEPIA")
+            .commit()
+        val store = ReaderPreferencesStore.fromContext(context)
+
+        assertNull(store.load().preSepiaTheme)
+    }
+
+    @Test
+    fun `unknown stored sepia restore theme falls back to unset`() {
+        val preferences =
+            context.getSharedPreferences(ReaderPreferencesStore.PREFS_NAME, Context.MODE_PRIVATE)
+        preferences.edit()
+            .putString("reader_pre_sepia_theme", "AMBER")
+            .commit()
+        val store = ReaderPreferencesStore.fromContext(context)
+
+        assertNull(store.load().preSepiaTheme)
     }
 }

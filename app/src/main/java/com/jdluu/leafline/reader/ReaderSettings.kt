@@ -2,6 +2,7 @@ package com.jdluu.leafline.reader
 
 import org.readium.r2.navigator.epub.EpubPreferences
 import org.readium.r2.navigator.preferences.FontFamily
+import org.readium.r2.navigator.preferences.Theme
 
 /**
  * Selectable EPUB font families offered by the reader settings sheet, backed by
@@ -142,6 +143,32 @@ fun clampBrightness(value: Float): Float {
 }
 
 /**
+ * Toggles the sepia quick control shown next to the brightness slider in the
+ * reader overlay. Engaging it switches the EPUB theme to sepia and records
+ * the current theme so disengaging restores exactly what the user had,
+ * including an unset theme. Picking a theme in the settings sheet stays
+ * authoritative; it becomes the new restore target on the next engage. A
+ * remembered sepia restore target is ignored so a corrupt store cannot wedge
+ * the toggle in sepia.
+ */
+fun toggleSepia(settings: ReaderSettings): ReaderSettings {
+    val current = settings.epub.theme
+    return if (current == Theme.SEPIA) {
+        settings.copy(
+            epub = settings.epub.copy(
+                theme = settings.preSepiaTheme.takeUnless { it == Theme.SEPIA }
+            ),
+            preSepiaTheme = null
+        )
+    } else {
+        settings.copy(
+            epub = settings.epub.copy(theme = Theme.SEPIA),
+            preSepiaTheme = current
+        )
+    }
+}
+
+/**
  * Everything persisted by [ReaderPreferencesStore]: the Readium EPUB
  * preferences plus the Leafline-specific interaction settings.
  */
@@ -153,7 +180,12 @@ data class ReaderSettings(
      * Per-app window brightness override in [BRIGHTNESS_MIN]..[BRIGHTNESS_MAX],
      * or null to follow the system brightness setting.
      */
-    val brightness: Float? = null
+    val brightness: Float? = null,
+    /**
+     * Theme restored by the sepia quick control on disengage, or null to
+     * restore an unset theme. Only meaningful while the EPUB theme is sepia.
+     */
+    val preSepiaTheme: Theme? = null
 )
 
 /** Horizontal tap zones spanning the reader screen from left to right. */

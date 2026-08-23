@@ -17,6 +17,9 @@ import org.readium.r2.navigator.preferences.Theme
  * Tap zones are stored per zone with per-zone fallbacks for unknown names.
  * The superseded single-key tap zone preset ([KEY_TAP_ZONES]) migrates on
  * load until the first save replaces it with per-zone keys.
+ * The sepia quick control's restore target ([ReaderSettings.preSepiaTheme])
+ * is stored alongside; unknown names and a stored sepia value fall back to
+ * unset so the toggle can never restore sepia.
  */
 class ReaderPreferencesStore(private val preferences: SharedPreferences) {
 
@@ -25,7 +28,8 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
             epub = loadEpubPreferences(),
             tapZoneConfig = loadTapZoneConfig(),
             pageTurnAnimation = enumFromName(KEY_PAGE_TURN_ANIMATION, PageTurnAnimation.SLIDE),
-            brightness = restoreBrightness()
+            brightness = restoreBrightness(),
+            preSepiaTheme = restorePreSepiaTheme()
         )
     }
 
@@ -44,6 +48,7 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
             .remove(KEY_TAP_ZONES)
             .putString(KEY_PAGE_TURN_ANIMATION, settings.pageTurnAnimation.name)
             .putNullableFloat(KEY_BRIGHTNESS, settings.brightness)
+            .putString(KEY_PRE_SEPIA_THEME, settings.preSepiaTheme?.name)
             .apply()
     }
 
@@ -105,6 +110,18 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
     private fun restoreBrightness(): Float? {
         if (!preferences.contains(KEY_BRIGHTNESS)) return null
         return clampBrightness(preferences.getFloat(KEY_BRIGHTNESS, BRIGHTNESS_MAX))
+    }
+
+    /**
+     * Restores the theme remembered by the sepia quick control for
+     * [ReaderSettings.preSepiaTheme]. Unknown names fall back to unset via
+     * [themeFromName]; a stored sepia value is likewise treated as unset so a
+     * corrupt store cannot make disengaging restore sepia.
+     */
+    private fun restorePreSepiaTheme(): Theme? {
+        return preferences.getString(KEY_PRE_SEPIA_THEME, null)
+            ?.let(::themeFromName)
+            ?.takeUnless { it == Theme.SEPIA }
     }
 
     private fun themeFromName(name: String): Theme? {
@@ -173,6 +190,7 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
         private const val LEGACY_TAP_ZONES_REVERSED = "REVERSED"
         private const val KEY_PAGE_TURN_ANIMATION = "reader_page_turn_animation"
         private const val KEY_BRIGHTNESS = "reader_brightness"
+        private const val KEY_PRE_SEPIA_THEME = "reader_pre_sepia_theme"
         internal const val PREFS_NAME = "leafline_reader_prefs"
 
         fun fromContext(context: Context): ReaderPreferencesStore {
