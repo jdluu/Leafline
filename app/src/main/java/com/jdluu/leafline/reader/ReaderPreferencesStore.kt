@@ -18,7 +18,8 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
         return ReaderSettings(
             epub = loadEpubPreferences(),
             tapZones = enumFromName(KEY_TAP_ZONES, TapZoneMode.DEFAULT),
-            pageTurnAnimation = enumFromName(KEY_PAGE_TURN_ANIMATION, PageTurnAnimation.SLIDE)
+            pageTurnAnimation = enumFromName(KEY_PAGE_TURN_ANIMATION, PageTurnAnimation.SLIDE),
+            brightness = restoreBrightness()
         )
     }
 
@@ -33,6 +34,7 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
             .putNullableBoolean(KEY_SCROLL, epub.scroll)
             .putString(KEY_TAP_ZONES, settings.tapZones.name)
             .putString(KEY_PAGE_TURN_ANIMATION, settings.pageTurnAnimation.name)
+            .putNullableFloat(KEY_BRIGHTNESS, settings.brightness)
             .apply()
     }
 
@@ -56,6 +58,12 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
     private fun restoreBoolean(key: String): Boolean? {
         if (!preferences.contains(key)) return null
         return preferences.getBoolean(key, false)
+    }
+
+    /** Returns null when unset and clamps stale out-of-range values. */
+    private fun restoreBrightness(): Float? {
+        if (!preferences.contains(KEY_BRIGHTNESS)) return null
+        return clampBrightness(preferences.getFloat(KEY_BRIGHTNESS, BRIGHTNESS_MAX))
     }
 
     private fun themeFromName(name: String): Theme? {
@@ -97,6 +105,17 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
         }
     }
 
+    private fun SharedPreferences.Editor.putNullableFloat(
+        key: String,
+        value: Float?
+    ): SharedPreferences.Editor {
+        return if (value == null) {
+            remove(key)
+        } else {
+            putFloat(key, clampBrightness(value))
+        }
+    }
+
     companion object {
         private const val KEY_THEME = "reader_theme"
         private const val KEY_FONT_FAMILY = "reader_font_family"
@@ -106,6 +125,7 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
         private const val KEY_SCROLL = "reader_scroll"
         private const val KEY_TAP_ZONES = "reader_tap_zones"
         private const val KEY_PAGE_TURN_ANIMATION = "reader_page_turn_animation"
+        private const val KEY_BRIGHTNESS = "reader_brightness"
         internal const val PREFS_NAME = "leafline_reader_prefs"
 
         fun fromContext(context: Context): ReaderPreferencesStore {

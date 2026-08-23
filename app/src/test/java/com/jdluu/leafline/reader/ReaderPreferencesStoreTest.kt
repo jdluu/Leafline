@@ -42,6 +42,7 @@ class ReaderPreferencesStoreTest {
         assertNull(loaded.epub.scroll)
         assertEquals(TapZoneMode.DEFAULT, loaded.tapZones)
         assertEquals(PageTurnAnimation.SLIDE, loaded.pageTurnAnimation)
+        assertNull(loaded.brightness)
     }
 
     @Test
@@ -59,7 +60,8 @@ class ReaderPreferencesStoreTest {
                     scroll = true
                 ),
                 tapZones = TapZoneMode.REVERSED,
-                pageTurnAnimation = PageTurnAnimation.NONE
+                pageTurnAnimation = PageTurnAnimation.NONE,
+                brightness = 0.42f
             )
         )
 
@@ -73,6 +75,7 @@ class ReaderPreferencesStoreTest {
         assertEquals(true, loaded.epub.scroll)
         assertEquals(TapZoneMode.REVERSED, loaded.tapZones)
         assertEquals(PageTurnAnimation.NONE, loaded.pageTurnAnimation)
+        assertEquals(0.42f, loaded.brightness!!)
     }
 
     @Test
@@ -90,7 +93,8 @@ class ReaderPreferencesStoreTest {
                     scroll = true
                 ),
                 tapZones = TapZoneMode.REVERSED,
-                pageTurnAnimation = PageTurnAnimation.NONE
+                pageTurnAnimation = PageTurnAnimation.NONE,
+                brightness = 0.3f
             )
         )
         store.save(ReaderSettings())
@@ -105,6 +109,7 @@ class ReaderPreferencesStoreTest {
         assertNull(loaded.epub.scroll)
         assertEquals(TapZoneMode.DEFAULT, loaded.tapZones)
         assertEquals(PageTurnAnimation.SLIDE, loaded.pageTurnAnimation)
+        assertNull(loaded.brightness)
     }
 
     @Test
@@ -148,5 +153,21 @@ class ReaderPreferencesStoreTest {
 
         assertEquals(TapZoneMode.DEFAULT, loaded.tapZones)
         assertEquals(PageTurnAnimation.SLIDE, loaded.pageTurnAnimation)
+    }
+
+    @Test
+    fun `out of range stored brightness values are clamped on load`() {
+        val preferences =
+            context.getSharedPreferences(ReaderPreferencesStore.PREFS_NAME, Context.MODE_PRIVATE)
+        preferences.edit()
+            .putFloat("reader_brightness", 7f)
+            .commit()
+        val store = ReaderPreferencesStore.fromContext(context)
+        assertEquals(BRIGHTNESS_MAX, store.load().brightness!!)
+
+        preferences.edit()
+            .putFloat("reader_brightness", -2f)
+            .commit()
+        assertEquals(BRIGHTNESS_MIN, store.load().brightness!!)
     }
 }

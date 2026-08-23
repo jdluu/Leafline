@@ -14,6 +14,7 @@ import android.util.Log
 import android.view.ActionMode
 import android.view.Menu
 import android.view.MenuItem
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -36,6 +37,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.Brightness6
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FormatColorFill
 import androidx.compose.material.icons.filled.Menu
@@ -57,6 +59,7 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -80,6 +83,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -99,11 +103,14 @@ import com.jdluu.leafline.library.data.BookmarkRepository
 import com.jdluu.leafline.library.data.BookmarkToggleResult
 import com.jdluu.leafline.library.data.LocatorIdentity
 import com.jdluu.leafline.library.LibrarySortStore
+import com.jdluu.leafline.reader.BRIGHTNESS_MAX
+import com.jdluu.leafline.reader.BRIGHTNESS_MIN
 import com.jdluu.leafline.reader.PageTurnAnimation
 import com.jdluu.leafline.reader.ReaderPreferencesStore
 import com.jdluu.leafline.reader.ReaderSettings
 import com.jdluu.leafline.reader.TapZoneAction
 import com.jdluu.leafline.reader.TapZoneMode
+import com.jdluu.leafline.reader.clampBrightness
 import com.jdluu.leafline.reader.search.BookSearchQuery
 import com.jdluu.leafline.reader.search.BookSearchResult
 import com.jdluu.leafline.reader.search.BookSearchState
@@ -329,6 +336,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
 
             val savedSettings = readerPreferencesStore.load()
             currentSettings.value = savedSettings
+            applyBrightnessToWindow(savedSettings.brightness)
 
             val navigatorFactory = EpubNavigatorFactory(publication)
             val fragmentFactory = navigatorFactory.createFragmentFactory(
@@ -622,6 +630,25 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         readerPreferencesStore.save(settings)
     }
 
+    /**
+     * Applies a brightness change to this activity's window and persists it.
+     * A null value restores the system default; the system-wide brightness
+     * setting is never modified.
+     */
+    private fun submitBrightness(value: Float?) {
+        val updated = currentSettings.value.copy(brightness = value?.let { clampBrightness(it) })
+        currentSettings.value = updated
+        applyBrightnessToWindow(updated.brightness)
+        readerPreferencesStore.save(updated)
+    }
+
+    private fun applyBrightnessToWindow(brightness: Float?) {
+        val attributes = window.attributes
+        attributes.screenBrightness =
+            brightness ?: WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+        window.attributes = attributes
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         navigator?.removeInputListener(readerInputListener)
@@ -740,6 +767,8 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                         scope.launch { drawerState.close() }
                     },
                     onSettingsChange = { settings -> submitSettings(settings) },
+                    onBrightnessChange = { value -> submitBrightness(value) },
+                    onBrightnessReset = { submitBrightness(null) },
                     onOpenSearch = { searchSheetVisible.value = true },
                     onDismissSearch = { searchSheetVisible.value = false },
                     onSubmitSearch = { query -> submitSearch(query) },
@@ -889,6 +918,8 @@ private fun ReaderOverlay(
     onDeleteAnnotation: (Annotation) -> Unit,
     onTocClick: (Link) -> Unit,
     onSettingsChange: (ReaderSettings) -> Unit,
+    onBrightnessChange: (Float) -> Unit,
+    onBrightnessReset: () -> Unit,
     onOpenSearch: () -> Unit,
     onDismissSearch: () -> Unit,
     onSubmitSearch: (String) -> Unit,
@@ -915,26 +946,35 @@ private fun ReaderOverlay(
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             if (toolbarVisible) {
-                Surface(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .align(Alignment.TopCenter)
-                        .statusBarsPadding(),
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
-                    tonalElevation = 6.dp
+                        .statusBarsPadding()
                 ) {
-                    ReaderTopBar(
-                        title = title,
-                        bookmarks = bookmarks,
-                        bookmarkActionsEnabled = bookmarkActionsEnabled,
-                        currentLocatorJson = currentLocatorJson,
-                        onBack = onBack,
-                        onOpenToc = onOpenToc,
-                        onOpenSearch = onOpenSearch,
-                        onOpenSettings = onOpenSettings,
-                        onToggleBookmark = onToggleBookmark,
-                        onOpenBookmarks = onOpenBookmarks,
-                        onOpenHighlights = onOpenHighlights
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+                        tonalElevation = 6.dp
+                    ) {
+                        ReaderTopBar(
+                            title = title,
+                            bookmarks = bookmarks,
+                            bookmarkActionsEnabled = bookmarkActionsEnabled,
+                            currentLocatorJson = currentLocatorJson,
+                            onBack = onBack,
+                            onOpenToc = onOpenToc,
+                            onOpenSearch = onOpenSearch,
+                            onOpenSettings = onOpenSettings,
+                            onToggleBookmark = onToggleBookmark,
+                            onOpenBookmarks = onOpenBookmarks,
+                            onOpenHighlights = onOpenHighlights
+                        )
+                    }
+                    BrightnessControl(
+                        brightness = currentSettings.brightness,
+                        onBrightnessChange = onBrightnessChange,
+                        onReset = onBrightnessReset
                     )
                 }
             }
@@ -978,6 +1018,52 @@ private fun ReaderOverlay(
             SnackbarHost(
                 hostState = snackbarHostState,
                 modifier = Modifier.align(Alignment.BottomCenter)
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BrightnessControl(
+    brightness: Float?,
+    onBrightnessChange: (Float) -> Unit,
+    onReset: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+        tonalElevation = 6.dp
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.Brightness6,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+                Text(
+                    text = "Brightness",
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.clickable(
+                        role = Role.Button,
+                        onClickLabel = "Reset brightness to system default",
+                        onClick = onReset
+                    )
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    text = brightness?.let { "%.0f%%".format(it * 100) } ?: "System",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Slider(
+                value = brightness ?: BRIGHTNESS_MAX,
+                onValueChange = { onBrightnessChange(clampBrightness(it)) },
+                valueRange = BRIGHTNESS_MIN..BRIGHTNESS_MAX,
+                modifier = Modifier.fillMaxWidth()
             )
         }
     }

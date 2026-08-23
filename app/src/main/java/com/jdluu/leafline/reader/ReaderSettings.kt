@@ -22,13 +22,33 @@ enum class PageTurnAnimation(val animated: Boolean) {
 }
 
 /**
+ * Lowest window brightness override allowed by the reader slider. Keeping the
+ * floor slightly above zero prevents a fully black screen on devices where an
+ * absolute zero override is unusable.
+ */
+const val BRIGHTNESS_MIN = 0.05f
+
+/** Highest window brightness override allowed by the reader slider. */
+const val BRIGHTNESS_MAX = 1.0f
+
+/** Clamps a raw brightness value into the range allowed by the reader slider. */
+fun clampBrightness(value: Float): Float {
+    return value.coerceIn(BRIGHTNESS_MIN, BRIGHTNESS_MAX)
+}
+
+/**
  * Everything persisted by [ReaderPreferencesStore]: the Readium EPUB
  * preferences plus the Leafline-specific interaction settings.
  */
 data class ReaderSettings(
     val epub: EpubPreferences = EpubPreferences(),
     val tapZones: TapZoneMode = TapZoneMode.DEFAULT,
-    val pageTurnAnimation: PageTurnAnimation = PageTurnAnimation.SLIDE
+    val pageTurnAnimation: PageTurnAnimation = PageTurnAnimation.SLIDE,
+    /**
+     * Per-app window brightness override in [BRIGHTNESS_MIN]..[BRIGHTNESS_MAX],
+     * or null to follow the system brightness setting.
+     */
+    val brightness: Float? = null
 )
 
 /** Horizontal tap zones spanning the reader screen from left to right. */
