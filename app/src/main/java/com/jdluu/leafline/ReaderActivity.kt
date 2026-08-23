@@ -120,6 +120,7 @@ import com.jdluu.leafline.reader.TapZoneConfig
 import com.jdluu.leafline.reader.clampBrightness
 import com.jdluu.leafline.reader.snapPageMargins
 import com.jdluu.leafline.reader.styleModeFor
+import com.jdluu.leafline.reader.pageTurnIsAnimated
 import com.jdluu.leafline.reader.search.BookSearchQuery
 import com.jdluu.leafline.reader.search.BookSearchResult
 import com.jdluu.leafline.reader.search.BookSearchState
@@ -237,15 +238,29 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     true
                 }
                 TapZoneAction.NEXT_PAGE -> {
-                    navigator?.goForward(settings.pageTurnAnimation.animated)
+                    navigator?.goForward(pageTurnAnimated(settings))
                     true
                 }
                 TapZoneAction.PREVIOUS_PAGE -> {
-                    navigator?.goBackward(settings.pageTurnAnimation.animated)
+                    navigator?.goBackward(pageTurnAnimated(settings))
                     true
                 }
             }
         }
+    }
+
+    /**
+     * Resolves the effective page turn animation against the system animator
+     * duration scale so turns snap instantly while the OS has animations
+     * removed, regardless of the stored preference.
+     */
+    private fun pageTurnAnimated(settings: ReaderSettings): Boolean {
+        val animatorScale = android.provider.Settings.Global.getFloat(
+            contentResolver,
+            android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+            1f
+        )
+        return pageTurnIsAnimated(settings.pageTurnAnimation, animatorScale)
     }
 
     @OptIn(ExperimentalReadiumApi::class)

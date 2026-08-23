@@ -113,6 +113,20 @@ enum class PageTurnAnimation(val animated: Boolean) {
 }
 
 /**
+ * Resolves whether a page turn may animate. The stored choice only applies
+ * while the OS runs animations: when the system removes them (animator
+ * duration scale zeroed out, e.g. via the Remove Animations accessibility
+ * toggle or developer options), page turns snap instantly regardless of the
+ * preference. Any nonzero scale keeps animations available.
+ */
+fun pageTurnIsAnimated(
+    animation: PageTurnAnimation,
+    systemAnimatorDurationScale: Float
+): Boolean {
+    return animation.animated && systemAnimatorDurationScale != 0f
+}
+
+/**
  * Lowest window brightness override allowed by the reader slider. Keeping the
  * floor slightly above zero prevents a fully black screen on devices where an
  * absolute zero override is unusable.

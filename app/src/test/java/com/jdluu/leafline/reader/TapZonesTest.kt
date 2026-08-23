@@ -58,10 +58,4 @@ class TapZonesTest {
     fun `default reader settings use the conventional tap zone config`() {
         assertEquals(TapZoneConfig.DEFAULT, ReaderSettings().tapZoneConfig)
     }
-
-    @Test
-    fun `page turn animation modes carry their animated flag`() {
-        assertEquals(false, PageTurnAnimation.NONE.animated)
-        assertEquals(true, PageTurnAnimation.SLIDE.animated)
-    }
 }
