@@ -55,9 +55,11 @@ class CoverCache(private val coversDir: File) {
                 .map { c -> if (c.isLetterOrDigit() || c == '.' || c == '-' || c == '_') c else '_' }
                 .joinToString("")
                 .take(MAX_FILE_NAME_LENGTH)
-            return sanitized.ifEmpty { "book" }
+            if (sanitized.none { it.isLetterOrDigit() }) return FALLBACK_NAME
+            return sanitized
         }
 
         private const val MAX_FILE_NAME_LENGTH = 120
+        private const val FALLBACK_NAME = "book"
     }
 }
