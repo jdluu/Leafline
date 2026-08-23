@@ -18,7 +18,7 @@ class LibrarySortStore(private val preferences: SharedPreferences) {
 
     companion object {
         private const val KEY = "library_sort"
-        private const val PREFS_NAME = "leafline_prefs"
+        internal const val PREFS_NAME = "leafline_prefs"
 
         fun fromContext(context: Context): LibrarySortStore {
             return LibrarySortStore(

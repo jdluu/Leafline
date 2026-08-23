@@ -1,5 +1,6 @@
 package com.jdluu.leafline
 
+import android.app.AlertDialog
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -7,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.ActionMode
@@ -89,25 +91,36 @@ import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.commitNow
 import androidx.lifecycle.lifecycleScope
+import com.jdluu.leafline.library.LeaflineDependencyHolder
 import com.jdluu.leafline.library.data.Annotation
 import com.jdluu.leafline.library.data.AnnotationRepository
 import com.jdluu.leafline.library.data.Bookmark
 import com.jdluu.leafline.library.data.BookmarkRepository
 import com.jdluu.leafline.library.data.BookmarkToggleResult
 import com.jdluu.leafline.library.data.LocatorIdentity
+import com.jdluu.leafline.library.LibrarySortStore
 import com.jdluu.leafline.reader.search.BookSearchQuery
 import com.jdluu.leafline.reader.search.BookSearchResult
 import com.jdluu.leafline.reader.search.BookSearchState
 import com.jdluu.leafline.reader.search.BookSearchStatus
 import com.jdluu.leafline.reader.search.BookSearcher
+import com.jdluu.leafline.sync.BookRef
+import com.jdluu.leafline.sync.KoreaderSyncClient
+import com.jdluu.leafline.sync.KoreaderSyncConfigStore
+import com.jdluu.leafline.sync.ProgressSyncer
+import com.jdluu.leafline.sync.PullOutcome
+import com.jdluu.leafline.sync.PushOutcome
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
+import java.util.UUID
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import org.readium.r2.navigator.Decoration
 import org.readium.r2.navigator.DecorableNavigator
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
@@ -149,6 +162,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         private const val DEFAULT_ANNOTATION_TINT = 0x55FFF59F.toInt()
         private const val MENU_ITEM_HIGHLIGHT_ID = 1
         private const val MENU_ITEM_COPY_ID = 2
+        private const val KEY_SYNC_DEVICE_ID = "sync_device_id"
 
         fun newIntent(context: Context): Intent {
             return Intent(context, ReaderActivity::class.java)
@@ -181,6 +195,8 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     private lateinit var bookmarkRepository: BookmarkRepository
     private lateinit var annotationRepository: AnnotationRepository
     private lateinit var bookSearcher: BookSearcher
+    private lateinit var progressSyncer: ProgressSyncer
+    private var currentBook: com.jdluu.leafline.library.LibraryBook? = null
     private var toolbarVisible = mutableStateOf(false)
     private var settingsSheetVisible = mutableStateOf(false)
     private var bookmarkSheetVisible = mutableStateOf(false)
@@ -250,23 +266,26 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         )
 
         var savedLocatorJson: String? = null
+        var savedBook: com.jdluu.leafline.library.LibraryBook? = null
         if (usedImportedFile) {
             try {
                 val lookupPath = epubFile!!.absolutePath
-                val bookRecord = runBlocking {
+                savedBook = runBlocking {
                     com.jdluu.leafline.library.LeaflineDependencyHolder
                         .getRepository(this@ReaderActivity)
-                        .getBookLocatorByFilePath(lookupPath)
+                        .getBookByFilePath(lookupPath)
                 }
-                if (bookRecord == null) {
+                if (savedBook == null) {
                     Log.w(TAG, "No library book found for path: $lookupPath")
                 }
-                savedLocatorJson = bookRecord?.second
-                bookStableId = bookRecord?.first
+                savedLocatorJson = savedBook?.lastLocatorJson
+                bookStableId = savedBook?.stableId
             } catch (e: Exception) {
                 Log.w(TAG, "Could not load saved locator", e)
             }
         }
+        currentBook = savedBook
+        progressSyncer = createProgressSyncer()
 
         val initialLocator: Locator? = savedLocatorJson?.let { json ->
             try {
@@ -322,11 +341,14 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                         try {
                             com.jdluu.leafline.library.LeaflineDependencyHolder
                                 .getRepository(this@ReaderActivity)
-                                .saveLastLocator(stableId, locatorJson)
+                                .saveLastLocator(stableId, locatorJson, System.currentTimeMillis())
                         } catch (e: Exception) {
                             Log.w(TAG, "Could not save reading position", e)
                         }
                     }
+                }
+                lifecycleScope.launch {
+                    pullRemoteProgress()
                 }
                 lifecycleScope.launch {
                     try {
@@ -722,6 +744,95 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             startActivity(intent)
         } catch (e: ActivityNotFoundException) {
             Toast.makeText(this, "No app available to open link", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        pushProgressOnExit()
+    }
+
+    private fun createProgressSyncer(): ProgressSyncer {
+        val preferences = getSharedPreferences(LibrarySortStore.PREFS_NAME, Context.MODE_PRIVATE)
+        val deviceId = preferences.getString(KEY_SYNC_DEVICE_ID, null) ?: UUID.randomUUID().toString()
+            .also { generated ->
+                preferences.edit().putString(KEY_SYNC_DEVICE_ID, generated).apply()
+            }
+        return ProgressSyncer(
+            api = KoreaderSyncClient(),
+            configSource = { KoreaderSyncConfigStore.config },
+            repository = com.jdluu.leafline.library.LeaflineDependencyHolder.getRepository(this),
+            deviceName = Build.MODEL ?: "Leafline",
+            deviceId = deviceId
+        )
+    }
+
+    private suspend fun pullRemoteProgress() {
+        val book = currentBook ?: return
+        if (!this::progressSyncer.isInitialized) return
+        when (val outcome = progressSyncer.pull(BookRef(book))) {
+            is PullOutcome.RemoteAhead -> presentRemoteProgress(outcome)
+            is PullOutcome.Failure -> Toast.makeText(
+                this,
+                "Progress sync failed: ${outcome.message}",
+                Toast.LENGTH_LONG
+            ).show()
+            else -> Unit
+        }
+    }
+
+    private fun presentRemoteProgress(outcome: PullOutcome.RemoteAhead) {
+        val remote = outcome.remote
+        val target = remote.progress?.let { json -> parseLocatorOrNull(json) }
+        if (target == null) {
+            val percentage = outcome.remotePercentage
+            val detail = if (percentage != null) String.format(Locale.US, "%.0f%%", percentage) else ""
+            Toast.makeText(this, "Newer reading position$detail on ${remote.device ?: "another device"}", Toast.LENGTH_LONG).show()
+            return
+        }
+        val percentage = outcome.remotePercentage
+        val message = buildString {
+            append("Remote reading position")
+            if (percentage != null) {
+                append(String.format(Locale.US, " (%.0f%%)", percentage))
+            }
+            append(" from ").append(remote.device ?: "another device")
+            append(" is newer. Jump there?")
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Progress sync")
+            .setMessage(message)
+            .setPositiveButton("Jump") { _, _ -> navigator?.go(target, false) }
+            .setNegativeButton("Stay", null)
+            .show()
+    }
+
+    private fun pushProgressOnExit() {
+        val book = currentBook ?: return
+        if (!this::progressSyncer.isInitialized) return
+        val locator = navigator?.currentLocator?.value ?: return
+        val locatorJson = locator.toJSON().toString()
+        lifecycleScope.launch {
+            val outcome = try {
+                withContext(NonCancellable) { progressSyncer.push(BookRef(book), locatorJson) }
+            } catch (e: Exception) {
+                PushOutcome.Failure(e.message ?: "Pushing progress failed")
+            }
+            if (outcome is PushOutcome.Failure) {
+                Toast.makeText(
+                    this@ReaderActivity,
+                    "Progress sync failed: ${outcome.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
+
+    private fun parseLocatorOrNull(json: String): Locator? {
+        return try {
+            Locator.Companion.fromJSON(org.json.JSONObject(json))
+        } catch (e: Exception) {
+            null
         }
     }
 }

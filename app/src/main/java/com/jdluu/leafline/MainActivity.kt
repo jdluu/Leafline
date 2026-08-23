@@ -14,6 +14,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -54,7 +55,11 @@ import com.jdluu.leafline.opds.OpdsBrowseScreen
 import com.jdluu.leafline.opds.OpdsConfigStore
 import com.jdluu.leafline.opds.OpdsServerConfig
 import com.jdluu.leafline.opds.OpdsViewModel
+import com.jdluu.leafline.sync.KoreaderSyncClient
+import com.jdluu.leafline.sync.KoreaderSyncConfig
+import com.jdluu.leafline.sync.KoreaderSyncConfigStore
 import kotlinx.coroutines.launch
+import androidx.compose.material3.Switch
 
 private const val TAG = "MainActivity"
 
@@ -365,6 +370,122 @@ fun SettingsTab() {
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(top = 16.dp)
             )
+
+            KoreaderSyncSection(modifier = Modifier.padding(top = 40.dp))
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun KoreaderSyncSection(modifier: Modifier = Modifier) {
+    val scope = rememberCoroutineScope()
+    var serverUrl by remember { mutableStateOf(KoreaderSyncConfigStore.config?.serverUrl ?: "") }
+    var syncUsername by remember { mutableStateOf(KoreaderSyncConfigStore.config?.username ?: "") }
+    var syncPassword by remember { mutableStateOf(KoreaderSyncConfigStore.config?.password ?: "") }
+    var enabled by remember { mutableStateOf(KoreaderSyncConfigStore.config?.enabled ?: false) }
+    var testResult by remember { mutableStateOf<String?>(null) }
+    var testing by remember { mutableStateOf(false) }
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        Text(
+            "KOReader Sync",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+        OutlinedTextField(
+            value = serverUrl,
+            onValueChange = { serverUrl = it; testResult = null },
+            label = { Text("Server URL") },
+            placeholder = { Text("http://server:6061/api/koreader") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            value = syncUsername,
+            onValueChange = { syncUsername = it; testResult = null },
+            label = { Text("Username") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
+        )
+        OutlinedTextField(
+            value = syncPassword,
+            onValueChange = { syncPassword = it; testResult = null },
+            label = { Text("Password") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
+        )
+        Row(
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+        ) {
+            Text(
+                "Enable progress sync",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f)
+            )
+            Switch(
+                checked = enabled,
+                onCheckedChange = { checked ->
+                    enabled = checked
+                    val base = KoreaderSyncConfigStore.config ?: KoreaderSyncConfig(
+                        serverUrl = serverUrl.trim(),
+                        username = syncUsername.trim(),
+                        password = syncPassword,
+                        enabled = false
+                    )
+                    KoreaderSyncConfigStore.config = base.copy(enabled = checked)
+                }
+            )
+        }
+        Row(modifier = Modifier.padding(top = 16.dp)) {
+            Button(
+                onClick = {
+                    val config = KoreaderSyncConfig(
+                        serverUrl = serverUrl.trim(),
+                        username = syncUsername.trim(),
+                        password = syncPassword,
+                        enabled = enabled
+                    )
+                    KoreaderSyncConfigStore.config = config
+                    testResult = "Saved."
+                }
+            ) { Text("Save") }
+            Button(
+                onClick = {
+                    testing = true
+                    testResult = null
+                    scope.launch {
+                        testResult = try {
+                            val ok = KoreaderSyncClient()
+                                .auth(serverUrl.trim(), syncUsername.trim(), syncPassword)
+                            if (ok) "Connection OK" else "Authentication failed"
+                        } catch (e: Exception) {
+                            "Connection failed: ${e.message}"
+                        }
+                        testing = false
+                    }
+                },
+                enabled = !testing,
+                modifier = Modifier.padding(start = 12.dp)
+            ) { Text(if (testing) "Testing..." else "Test connection") }
+        }
+        testResult?.let { message ->
+            Text(
+                message,
+                style = MaterialTheme.typography.bodySmall,
+                color = when {
+                    message.startsWith("Connection OK") -> MaterialTheme.colorScheme.primary
+                    message == "Saved." -> MaterialTheme.colorScheme.onSurfaceVariant
+                    else -> MaterialTheme.colorScheme.error
+                },
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
+        Text(
+            "Syncs reading positions with a KOReader-compatible server using the book content hash. Credentials are stored only in memory for this session.",
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(top = 16.dp)
+        )
     }
 }

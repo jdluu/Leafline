@@ -24,12 +24,16 @@ class LibraryRepositoryImpl(
         dataSource.getBookByFileHash(fileHash)
     }
 
-    override suspend fun getBookLocatorByFilePath(filePath: String): Pair<String, String?>? = withContext(ioDispatcher) {
-        dataSource.getBookLocatorByFilePath(filePath)
+    override suspend fun getBookByFilePath(filePath: String): LibraryBook? = withContext(ioDispatcher) {
+        dataSource.getBookByFilePath(filePath)
     }
 
-    override suspend fun saveLastLocator(stableId: String, locatorJson: String?) = withContext(ioDispatcher) {
-        dataSource.saveLastLocator(stableId, locatorJson)
+    override suspend fun saveLastLocator(stableId: String, locatorJson: String?, readAtEpochMillis: Long?) = withContext(ioDispatcher) {
+        dataSource.saveLastLocator(stableId, locatorJson, readAtEpochMillis)
+    }
+
+    override suspend fun setKoreaderHash(stableId: String, koreaderHash: String?) = withContext(ioDispatcher) {
+        dataSource.setKoreaderHash(stableId, koreaderHash)
     }
 
     override suspend fun setCoverPath(stableId: String, coverPath: String?) = withContext(ioDispatcher) {

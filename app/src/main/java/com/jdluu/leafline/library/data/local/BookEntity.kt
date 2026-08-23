@@ -18,7 +18,9 @@ data class BookEntity(
     val addedAtEpochMillis: Long?,
     val pageCount: Int?,
     val lastLocatorJson: String? = null,
-    val coverPath: String? = null
+    val coverPath: String? = null,
+    val koreaderHash: String? = null,
+    val lastReadAtEpochMillis: Long? = null
 ) {
     companion object {
         fun fromLibraryBook(book: LibraryBook): BookEntity {
@@ -34,7 +36,10 @@ data class BookEntity(
                 fileHash = book.fileHash,
                 addedAtEpochMillis = book.addedAtEpochMillis,
                 pageCount = book.pageCount,
-                coverPath = book.coverPath
+                coverPath = book.coverPath,
+                koreaderHash = book.koreaderHash,
+                lastReadAtEpochMillis = book.lastReadAtEpochMillis,
+                lastLocatorJson = book.lastLocatorJson
             )
         }
 
@@ -51,7 +56,10 @@ data class BookEntity(
                 fileHash = entity.fileHash,
                 addedAtEpochMillis = entity.addedAtEpochMillis,
                 pageCount = entity.pageCount,
-                coverPath = entity.coverPath
+                coverPath = entity.coverPath,
+                koreaderHash = entity.koreaderHash,
+                lastReadAtEpochMillis = entity.lastReadAtEpochMillis,
+                lastLocatorJson = entity.lastLocatorJson
             )
         }
     }

@@ -8,8 +8,9 @@ interface LibraryRepository {
     fun searchBooks(query: String): Flow<List<LibraryBook>>
     suspend fun getBookByStableId(stableId: String): LibraryBook?
     suspend fun getBookByFileHash(fileHash: String): LibraryBook?
-    suspend fun getBookLocatorByFilePath(filePath: String): Pair<String, String?>?
-    suspend fun saveLastLocator(stableId: String, locatorJson: String?)
+    suspend fun getBookByFilePath(filePath: String): LibraryBook?
+    suspend fun saveLastLocator(stableId: String, locatorJson: String?, readAtEpochMillis: Long?)
+    suspend fun setKoreaderHash(stableId: String, koreaderHash: String?)
     suspend fun setCoverPath(stableId: String, coverPath: String?)
     suspend fun addBook(book: LibraryBook): Long
     suspend fun updateBook(book: LibraryBook)

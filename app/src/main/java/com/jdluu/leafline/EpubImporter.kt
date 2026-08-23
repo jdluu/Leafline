@@ -49,7 +49,8 @@ class EpubImporter(private val context: Context) {
                     metadata = metadata,
                     filePath = file.absolutePath,
                     fileHash = fileHash,
-                    addedAt = Instant.now()
+                    addedAt = Instant.now(),
+                    koreaderHash = FileHashUtil.koreaderHash(file)
                 )
                 val coverPath = try {
                     PublicationCoverWriter.extractAndStore(publication, book.stableId, coverCache)

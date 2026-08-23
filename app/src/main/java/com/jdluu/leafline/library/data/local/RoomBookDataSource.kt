@@ -29,12 +29,16 @@ class RoomBookDataSource(
         return database.bookDao().getBookByFileHash(fileHash)?.let { BookEntity.toLibraryBook(it) }
     }
 
-    override suspend fun getBookLocatorByFilePath(filePath: String): Pair<String, String?>? {
-        return database.bookDao().getBookByFilePath(filePath)?.let { it.stableId to it.lastLocatorJson }
+    override suspend fun getBookByFilePath(filePath: String): LibraryBook? {
+        return database.bookDao().getBookByFilePath(filePath)?.let { BookEntity.toLibraryBook(it) }
     }
 
-    override suspend fun saveLastLocator(stableId: String, locatorJson: String?) {
-        database.bookDao().updateLastLocator(stableId, locatorJson)
+    override suspend fun saveLastLocator(stableId: String, locatorJson: String?, readAtEpochMillis: Long?) {
+        database.bookDao().updateLastLocator(stableId, locatorJson, readAtEpochMillis)
+    }
+
+    override suspend fun setKoreaderHash(stableId: String, koreaderHash: String?) {
+        database.bookDao().setKoreaderHash(stableId, koreaderHash)
     }
 
     override suspend fun setCoverPath(stableId: String, coverPath: String?) {

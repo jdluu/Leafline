@@ -49,13 +49,21 @@ class InMemoryBookDataSource : BookDataSource {
         books.values.find { it.fileHash == fileHash }
     }
 
-    override suspend fun getBookLocatorByFilePath(filePath: String): Pair<String, String?>? =
-        mutex.withLock {
-            books.values.find { it.filePath == filePath }?.let { it.stableId to null }
-        }
+    override suspend fun getBookByFilePath(filePath: String): LibraryBook? = mutex.withLock {
+        books.values.find { it.filePath == filePath }
+    }
 
-    override suspend fun saveLastLocator(stableId: String, locatorJson: String?) {
+    override suspend fun saveLastLocator(stableId: String, locatorJson: String?, readAtEpochMillis: Long?) {
         // No-op for the in-memory interim source; locator persistence is Room-only.
+    }
+
+    override suspend fun setKoreaderHash(stableId: String, koreaderHash: String?) {
+        mutex.withLock {
+            books[stableId]?.let { current ->
+                books[stableId] = current.copy(koreaderHash = koreaderHash)
+                refreshFlow()
+            }
+        }
     }
 
     override suspend fun setCoverPath(stableId: String, coverPath: String?) {

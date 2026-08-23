@@ -28,8 +28,11 @@ interface BookDao {
     @Query("SELECT * FROM books WHERE filePath = :filePath LIMIT 1")
     suspend fun getBookByFilePath(filePath: String): BookEntity?
 
-    @Query("UPDATE books SET lastLocatorJson = :locatorJson WHERE stableId = :stableId")
-    suspend fun updateLastLocator(stableId: String, locatorJson: String?)
+    @Query("UPDATE books SET lastLocatorJson = :locatorJson, lastReadAtEpochMillis = :readAtEpochMillis WHERE stableId = :stableId")
+    suspend fun updateLastLocator(stableId: String, locatorJson: String?, readAtEpochMillis: Long?)
+
+    @Query("UPDATE books SET koreaderHash = :koreaderHash WHERE stableId = :stableId")
+    suspend fun setKoreaderHash(stableId: String, koreaderHash: String?)
 
     @Query("UPDATE books SET coverPath = :coverPath WHERE stableId = :stableId")
     suspend fun setCoverPath(stableId: String, coverPath: String?)

@@ -12,5 +12,8 @@ data class LibraryBook(
     val fileHash: String,
     val addedAtEpochMillis: Long?,
     val pageCount: Int?,
-    val coverPath: String? = null
+    val coverPath: String? = null,
+    val koreaderHash: String? = null,
+    val lastReadAtEpochMillis: Long? = null,
+    val lastLocatorJson: String? = null
 )

@@ -11,7 +11,8 @@ object BookMetadataMapper {
         metadata: Metadata,
         filePath: String,
         fileHash: String,
-        addedAt: Instant
+        addedAt: Instant,
+        koreaderHash: String? = null
     ): LibraryBook {
         val stableId = run {
             val identifier = metadata.identifier?.trim()
@@ -59,8 +60,9 @@ object BookMetadataMapper {
             publishedAtEpochMillis = publishedAtEpochMillis,
             filePath = filePath,
             fileHash = fileHash,
-            addedAtEpochMillis = addedAtEpochMillis,
-            pageCount = pageCount
+            addedAtEpochMillis = addedAt.toEpochMilli(),
+            pageCount = pageCount,
+            koreaderHash = koreaderHash
         )
     }
 }
