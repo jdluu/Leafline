@@ -5,4 +5,11 @@
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:colorAccent">#315C52</item>
     </style>
+
+    <!-- Splash screen used by SplashScreen API on Android 12+. -->
+    <style name="Theme.Leafline.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.Leafline</item>
+    </style>
 </resources>

@@ -48,6 +48,7 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.core:core-splashscreen:1.2.0-alpha02")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.2")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.2")
     implementation("androidx.fragment:fragment-ktx:1.8.9")

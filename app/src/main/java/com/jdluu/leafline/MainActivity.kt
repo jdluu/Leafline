@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.net.Uri
 import android.os.Bundle
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import android.provider.OpenableColumns
 import android.util.Log
 import android.widget.Toast
@@ -79,6 +80,7 @@ class MainActivity : ComponentActivity() {
     private var currentContext: Context? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         LeaflineDependencyHolder.initialize(this)
         currentContext = this
