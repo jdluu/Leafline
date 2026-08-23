@@ -39,3 +39,6 @@ scripts/opencode-bws.local
 
 # Test/runtime data
 *.log
+
+# Local scratch space for build experiments
+/build-tmp/
