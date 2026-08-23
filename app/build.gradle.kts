@@ -61,6 +61,8 @@ dependencies {
     androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation("androidx.test:core:1.6.1")
 
     implementation("androidx.room:room-ktx:$roomVersion")
     implementation("androidx.room:room-runtime:$roomVersion")
@@ -71,6 +73,7 @@ dependencies {
     implementation("org.readium.kotlin-toolkit:readium-shared:$readiumVersion")
     implementation("org.readium.kotlin-toolkit:readium-streamer:$readiumVersion")
     implementation("org.readium.kotlin-toolkit:readium-navigator:$readiumVersion")
+    implementation("org.readium.kotlin-toolkit:readium-opds:$readiumVersion")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
