@@ -13,8 +13,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,23 +22,29 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LibraryBooks
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.launch
-import com.jdluu.leafline.opds.OpdsFeedEntry
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,18 +53,15 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.jdluu.leafline.library.LeaflineDependencyHolder
 import com.jdluu.leafline.library.LibraryBook
+import com.jdluu.leafline.LibraryViewModel
 import com.jdluu.leafline.library.LibraryViewModelFactory
 import com.jdluu.leafline.opds.OpdsBrowseScreen
 import com.jdluu.leafline.opds.OpdsConfigStore
 import com.jdluu.leafline.opds.OpdsServerConfig
 import com.jdluu.leafline.opds.OpdsViewModel
-
+import kotlinx.coroutines.launch
 
 private const val TAG = "MainActivity"
-
-enum class NavigationState {
-    Main, Library, Opds
-}
 
 class MainActivity : ComponentActivity() {
     companion object {
@@ -176,6 +179,13 @@ private fun getFileName(context: Context, uri: Uri): String? {
     return fileName
 }
 
+private enum class LeaflineTab(val label: String) {
+    Library("Library"),
+    Catalog("Catalog"),
+    Settings("Settings")
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LeaflineApp(activity: ComponentActivity) {
     val repository = LeaflineDependencyHolder.getRepository(activity)
@@ -186,7 +196,7 @@ fun LeaflineApp(activity: ComponentActivity) {
     val scope = rememberCoroutineScope()
     var downloadMessage by remember { mutableStateOf<String?>(null) }
 
-    val navState = remember { mutableStateOf(NavigationState.Main) }
+    var selectedTab by remember { mutableIntStateOf(0) }
     val context = LocalContext.current
 
     var pendingBook by remember { mutableStateOf<LibraryBook?>(null) }
@@ -220,35 +230,43 @@ fun LeaflineApp(activity: ComponentActivity) {
     }
 
     MaterialTheme {
-        Surface(modifier = Modifier.fillMaxSize()) {
-            when (navState.value) {
-                NavigationState.Main -> {
-                    MainScreenContent(
-                        onImportEpub = { importEpubLauncher.launch(arrayOf(MainActivity.EPUB_MIME_TYPE)) },
-                        onReaderClick = {
-                            activity.startActivity(ReaderActivity.newIntent(context))
-                        },
-                        onLibraryClick = { navState.value = NavigationState.Library },
-                        onOpdsClick = { navState.value = NavigationState.Opds },
-                        books = libraryViewModel.books.collectAsState(initial = emptyList()).value
-                    )
+        Scaffold(
+            bottomBar = {
+                NavigationBar {
+                    LeaflineTab.entries.forEachIndexed { index, tab ->
+                        NavigationBarItem(
+                            selected = selectedTab == index,
+                            onClick = { selectedTab = index },
+                            icon = {
+                                Icon(
+                                    when (tab) {
+                                        LeaflineTab.Library -> Icons.Default.LibraryBooks
+                                        LeaflineTab.Catalog -> Icons.Default.CloudDownload
+                                        LeaflineTab.Settings -> Icons.Default.Settings
+                                    },
+                                    contentDescription = tab.label
+                                )
+                            },
+                            label = { Text(tab.label) }
+                        )
+                    }
                 }
-                NavigationState.Library -> {
-                    LibraryScreen(
+            }
+        ) { padding ->
+            Surface(modifier = Modifier.fillMaxSize().padding(padding)) {
+                when (LeaflineTab.entries.getOrNull(selectedTab)) {
+                    LeaflineTab.Library -> LibraryTab(
                         viewModel = libraryViewModel,
-                        onBack = { navState.value = NavigationState.Main },
+                        onImportEpub = { importEpubLauncher.launch(arrayOf(MainActivity.EPUB_MIME_TYPE)) },
                         onOpenBook = { book ->
-                            val activity = context as? MainActivity ?: return@LibraryScreen
                             activity.startActivity(
                                 ReaderActivity.newIntent(activity, book.filePath)
                             )
                         }
                     )
-                }
-                NavigationState.Opds -> {
-                    OpdsBrowseScreen(
+                    LeaflineTab.Catalog -> OpdsBrowseScreen(
                         viewModel = opdsViewModel,
-                        onBack = { navState.value = NavigationState.Main },
+                        onBack = { selectedTab = 0 },
                         onDownload = { entry ->
                             val config = OpdsConfigStore.config
                             if (config == null) {
@@ -271,76 +289,33 @@ fun LeaflineApp(activity: ComponentActivity) {
                             }
                         }
                     )
+                    LeaflineTab.Settings -> SettingsTab()
+                    null -> {}
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun MainScreenContent(
-    onImportEpub: () -> Unit,
-    onReaderClick: () -> Unit,
-    onLibraryClick: () -> Unit,
-    onOpdsClick: () -> Unit,
-    books: List<LibraryBook>
-) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text("Leafline", style = MaterialTheme.typography.headlineLarge)
-        Text(
-            "A focused EPUB reader for your library.",
-            modifier = Modifier.padding(top = 8.dp),
-        )
-        Button(
-            onClick = { onImportEpub() },
-            modifier = Modifier.padding(top = 16.dp),
-        ) {
-            Text("Import EPUB")
-        }
-        Button(
-            onClick = { onReaderClick() },
-            modifier = Modifier.padding(top = 16.dp),
-        ) {
-            Text("Open EPUB Spike")
-        }
-        Button(
-            onClick = { onLibraryClick() },
-            modifier = Modifier.padding(top = 16.dp),
-        ) {
-            Text("View Library")
-        }
-        Button(
-            onClick = { onOpdsClick() },
-            modifier = Modifier.padding(top = 16.dp),
-        ) {
-            Text("OPDS Catalog")
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LibraryScreen(
+fun LibraryTab(
     viewModel: LibraryViewModel,
-    onBack: () -> Unit,
-    onOpenBook: (LibraryBook) -> Unit = {}
+    onImportEpub: () -> Unit,
+    onOpenBook: (LibraryBook) -> Unit
 ) {
     val books by viewModel.books.collectAsState(initial = emptyList())
 
-    Column {
+    Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
-            title = { Text("Library") },
-            navigationIcon = {
-                TextButton(onClick = { onBack() }) {
-                    Text("Back")
-                }
-            }
+            title = { Text("Library") }
         )
-
+        Button(
+            onClick = onImportEpub,
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text("Import EPUB")
+        }
         if (books.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -356,6 +331,32 @@ fun LibraryScreen(
                     BookItem(book = book, onClick = { onOpenBook(book) })
                 }
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SettingsTab() {
+    Column(modifier = Modifier.fillMaxSize()) {
+        TopAppBar(
+            title = { Text("Settings") }
+        )
+        Column(modifier = Modifier.padding(24.dp)) {
+            Text(
+                "OPDS Catalog",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            Text(
+                "Configure your OPDS server in the Catalog tab.",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Text(
+                "Reader defaults will be available in a future update.",
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 16.dp)
+            )
         }
     }
 }
@@ -383,6 +384,7 @@ fun BookItem(book: LibraryBook, onClick: () -> Unit = {}) {
                 Text(
                     book.description,
                     style = MaterialTheme.typography.bodySmall,
+                    maxLines = 3,
                     modifier = Modifier.padding(top = 8.dp)
                 )
             }

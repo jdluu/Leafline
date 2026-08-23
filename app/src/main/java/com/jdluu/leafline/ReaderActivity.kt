@@ -7,6 +7,31 @@ import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.commitNow
 import androidx.lifecycle.lifecycleScope
@@ -60,6 +85,8 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
 
     private var navigator: EpubNavigatorFragment? = null
     private var bookStableId: String? = null
+    private var toolbarVisible = mutableStateOf(false)
+    private var bookTitle = mutableStateOf("")
 
     @OptIn(ExperimentalReadiumApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -150,6 +177,8 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                 }
             }
 
+            bookTitle.value = publication.metadata.title ?: "Reading"
+
             val navigatorFactory = EpubNavigatorFactory(publication)
             val fragmentFactory = navigatorFactory.createFragmentFactory(
                 initialLocator = initialLocator,
@@ -180,6 +209,8 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                 }
             }
 
+            addReaderOverlay()
+
             if (!usedImportedFile) {
                 Toast.makeText(this, "Opened bundled EPUB", Toast.LENGTH_SHORT).show()
             }
@@ -188,6 +219,24 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             Toast.makeText(this, "Failed to open EPUB: ${e.message}", Toast.LENGTH_LONG).show()
             finish()
         }
+    }
+
+    private fun addReaderOverlay() {
+        val composeView = ComposeView(this).apply {
+            setContent {
+                ReaderOverlay(
+                    title = bookTitle.value,
+                    toolbarVisible = toolbarVisible.value,
+                    onToggleToolbar = { toolbarVisible.value = !toolbarVisible.value },
+                    onBack = { finish() }
+                )
+            }
+        }
+        val layoutParams = android.view.ViewGroup.LayoutParams(
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT
+        )
+        addContentView(composeView, layoutParams)
     }
 
     override fun onExternalLinkActivated(url: AbsoluteUrl) {
@@ -200,4 +249,45 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             Toast.makeText(this, "No app available to open link", Toast.LENGTH_LONG).show()
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReaderOverlay(
+    title: String,
+    toolbarVisible: Boolean,
+    onToggleToolbar: () -> Unit,
+    onBack: () -> Unit
+) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        InvisibleTapZone(onToggleToolbar)
+        if (toolbarVisible) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding(),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+                tonalElevation = 6.dp
+            ) {
+                TopAppBar(
+                    title = { Text(title, maxLines = 1) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        }
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun InvisibleTapZone(onTap: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clickable(onClick = onTap)
+    )
 }
