@@ -30,7 +30,8 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun OpdsBrowseScreen(
     viewModel: OpdsViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onDownload: (OpdsFeedEntry) -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
 
@@ -60,6 +61,7 @@ fun OpdsBrowseScreen(
             )
             is OpdsUiState.SelectedAcquisition -> AcquisitionDetails(
                 entry = s.entry,
+                onDownload = { onDownload(s.entry) },
                 onBack = viewModel::reset
             )
             is OpdsUiState.Error -> Column(Modifier.padding(16.dp)) {
@@ -151,13 +153,19 @@ private fun OpdsFeedList(
 }
 
 @Composable
-private fun AcquisitionDetails(entry: OpdsFeedEntry, onBack: () -> Unit) {
+private fun AcquisitionDetails(
+    entry: OpdsFeedEntry,
+    onDownload: () -> Unit,
+    onBack: () -> Unit
+) {
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Text(entry.title, style = MaterialTheme.typography.headlineSmall)
         if (entry.authors.isNotEmpty()) {
             Text(entry.authors.joinToString(", "), Modifier.padding(top = 8.dp))
         }
-        Text("Download support is the next slice.", modifier = Modifier.padding(top = 16.dp))
+        Button(onClick = onDownload, modifier = Modifier.padding(top = 16.dp)) {
+            Text("Download EPUB")
+        }
         Text(
             entry.href,
             modifier = Modifier.padding(top = 8.dp),

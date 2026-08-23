@@ -30,6 +30,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import com.jdluu.leafline.opds.OpdsConfigStore
+import com.jdluu.leafline.opds.OpdsFeedEntry
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -144,11 +148,20 @@ fun LeaflineApp(activity: ComponentActivity) {
         factory = LibraryViewModelFactory(repository)
     )
     val opdsViewModel: OpdsViewModel = viewModel()
+    val scope = rememberCoroutineScope()
+    var downloadMessage by remember { mutableStateOf<String?>(null) }
 
     val navState = remember { mutableStateOf(NavigationState.Main) }
     val context = LocalContext.current
 
     var pendingBook by remember { mutableStateOf<LibraryBook?>(null) }
+
+    LaunchedEffect(downloadMessage) {
+        downloadMessage?.let { message ->
+            (activity as MainActivity).showToast(message)
+            downloadMessage = null
+        }
+    }
 
     LaunchedEffect(pendingBook) {
         pendingBook?.let { book ->
@@ -194,7 +207,28 @@ fun LeaflineApp(activity: ComponentActivity) {
                 NavigationState.Opds -> {
                     OpdsBrowseScreen(
                         viewModel = opdsViewModel,
-                        onBack = { navState.value = NavigationState.Main }
+                        onBack = { navState.value = NavigationState.Main },
+                        onDownload = { entry ->
+                            val config = OpdsConfigStore.config
+                            if (config == null) {
+                                downloadMessage = "Configure the OPDS catalog first"
+                            } else {
+                                downloadMessage = "Downloading ${entry.title}..."
+                                scope.launch {
+                                    try {
+                                        val book = OpdsDownloadCoordinator(context, repository)
+                                            .downloadAndImport(config, entry)
+                                        downloadMessage = if (book == null) {
+                                            "Could not import ${entry.title}"
+                                        } else {
+                                            "Imported: ${book.title}"
+                                        }
+                                    } catch (error: Exception) {
+                                        downloadMessage = "Download failed: ${error.message}"
+                                    }
+                                }
+                            }
+                        }
                     )
                 }
             }
