@@ -40,7 +40,7 @@ class ReaderPreferencesStoreTest {
         assertNull(loaded.epub.pageMargins)
         assertNull(loaded.epub.publisherStyles)
         assertNull(loaded.epub.scroll)
-        assertEquals(TapZoneMode.DEFAULT, loaded.tapZones)
+        assertEquals(TapZoneConfig.DEFAULT, loaded.tapZoneConfig)
         assertEquals(PageTurnAnimation.SLIDE, loaded.pageTurnAnimation)
         assertNull(loaded.brightness)
     }
@@ -59,7 +59,11 @@ class ReaderPreferencesStoreTest {
                     publisherStyles = false,
                     scroll = true
                 ),
-                tapZones = TapZoneMode.REVERSED,
+                tapZoneConfig = TapZoneConfig(
+                    leftZone = TapZoneAction.NEXT_PAGE,
+                    centerZone = TapZoneAction.NONE,
+                    rightZone = TapZoneAction.TOGGLE_MENU
+                ),
                 pageTurnAnimation = PageTurnAnimation.NONE,
                 brightness = 0.42f
             )
@@ -73,7 +77,9 @@ class ReaderPreferencesStoreTest {
         assertEquals(0.75, loaded.epub.pageMargins!!, 1e-9)
         assertEquals(false, loaded.epub.publisherStyles)
         assertEquals(true, loaded.epub.scroll)
-        assertEquals(TapZoneMode.REVERSED, loaded.tapZones)
+        assertEquals(TapZoneAction.NEXT_PAGE, loaded.tapZoneConfig.leftZone)
+        assertEquals(TapZoneAction.NONE, loaded.tapZoneConfig.centerZone)
+        assertEquals(TapZoneAction.TOGGLE_MENU, loaded.tapZoneConfig.rightZone)
         assertEquals(PageTurnAnimation.NONE, loaded.pageTurnAnimation)
         assertEquals(0.42f, loaded.brightness!!)
     }
@@ -92,7 +98,7 @@ class ReaderPreferencesStoreTest {
                     publisherStyles = false,
                     scroll = true
                 ),
-                tapZones = TapZoneMode.REVERSED,
+                tapZoneConfig = TapZoneConfig.REVERSED,
                 pageTurnAnimation = PageTurnAnimation.NONE,
                 brightness = 0.3f
             )
@@ -107,7 +113,7 @@ class ReaderPreferencesStoreTest {
         assertNull(loaded.epub.pageMargins)
         assertNull(loaded.epub.publisherStyles)
         assertNull(loaded.epub.scroll)
-        assertEquals(TapZoneMode.DEFAULT, loaded.tapZones)
+        assertEquals(TapZoneConfig.DEFAULT, loaded.tapZoneConfig)
         assertEquals(PageTurnAnimation.SLIDE, loaded.pageTurnAnimation)
         assertNull(loaded.brightness)
     }
@@ -119,14 +125,18 @@ class ReaderPreferencesStoreTest {
         store.save(
             ReaderSettings(
                 epub = EpubPreferences(theme = Theme.LIGHT, lineHeight = 1.0),
-                tapZones = TapZoneMode.REVERSED,
+                tapZoneConfig = TapZoneConfig.REVERSED,
                 pageTurnAnimation = PageTurnAnimation.NONE
             )
         )
         store.save(
             ReaderSettings(
                 epub = EpubPreferences(theme = Theme.DARK, lineHeight = 2.0),
-                tapZones = TapZoneMode.DEFAULT,
+                tapZoneConfig = TapZoneConfig(
+                    leftZone = TapZoneAction.TOGGLE_MENU,
+                    centerZone = TapZoneAction.PREVIOUS_PAGE,
+                    rightZone = TapZoneAction.NONE
+                ),
                 pageTurnAnimation = PageTurnAnimation.SLIDE
             )
         )
@@ -135,12 +145,44 @@ class ReaderPreferencesStoreTest {
 
         assertEquals(Theme.DARK, loaded.epub.theme)
         assertEquals(2.0, loaded.epub.lineHeight!!, 1e-9)
-        assertEquals(TapZoneMode.DEFAULT, loaded.tapZones)
+        assertEquals(TapZoneAction.TOGGLE_MENU, loaded.tapZoneConfig.leftZone)
+        assertEquals(TapZoneAction.PREVIOUS_PAGE, loaded.tapZoneConfig.centerZone)
+        assertEquals(TapZoneAction.NONE, loaded.tapZoneConfig.rightZone)
         assertEquals(PageTurnAnimation.SLIDE, loaded.pageTurnAnimation)
     }
 
     @Test
-    fun `unknown stored enum names fall back to defaults`() {
+    fun `unknown stored per-zone actions fall back to that zone default`() {
+        val preferences =
+            context.getSharedPreferences(ReaderPreferencesStore.PREFS_NAME, Context.MODE_PRIVATE)
+        preferences.edit()
+            .putString("reader_tap_zone_left", "SPIN")
+            .putString("reader_tap_zone_center", "WIGGLE")
+            .putString("reader_tap_zone_right", "FLIP")
+            .commit()
+        val store = ReaderPreferencesStore.fromContext(context)
+
+        val loaded = store.load()
+
+        assertEquals(TapZoneAction.PREVIOUS_PAGE, loaded.tapZoneConfig.leftZone)
+        assertEquals(TapZoneAction.TOGGLE_MENU, loaded.tapZoneConfig.centerZone)
+        assertEquals(TapZoneAction.NEXT_PAGE, loaded.tapZoneConfig.rightZone)
+    }
+
+    @Test
+    fun `legacy reversed preset migrates to swapped per-zone config`() {
+        val preferences =
+            context.getSharedPreferences(ReaderPreferencesStore.PREFS_NAME, Context.MODE_PRIVATE)
+        preferences.edit()
+            .putString("reader_tap_zones", "REVERSED")
+            .commit()
+        val store = ReaderPreferencesStore.fromContext(context)
+
+        assertEquals(TapZoneConfig.REVERSED, store.load().tapZoneConfig)
+    }
+
+    @Test
+    fun `legacy unknown preset migrates to conventional per-zone config`() {
         val preferences =
             context.getSharedPreferences(ReaderPreferencesStore.PREFS_NAME, Context.MODE_PRIVATE)
         preferences.edit()
@@ -151,8 +193,39 @@ class ReaderPreferencesStoreTest {
 
         val loaded = store.load()
 
-        assertEquals(TapZoneMode.DEFAULT, loaded.tapZones)
+        assertEquals(TapZoneConfig.DEFAULT, loaded.tapZoneConfig)
         assertEquals(PageTurnAnimation.SLIDE, loaded.pageTurnAnimation)
+    }
+
+    @Test
+    fun `per-zone keys take precedence over the stored legacy preset`() {
+        val preferences =
+            context.getSharedPreferences(ReaderPreferencesStore.PREFS_NAME, Context.MODE_PRIVATE)
+        preferences.edit()
+            .putString("reader_tap_zones", "REVERSED")
+            .putString("reader_tap_zone_left", "TOGGLE_MENU")
+            .commit()
+        val store = ReaderPreferencesStore.fromContext(context)
+
+        val loaded = store.load()
+
+        assertEquals(TapZoneAction.TOGGLE_MENU, loaded.tapZoneConfig.leftZone)
+        assertEquals(TapZoneAction.TOGGLE_MENU, loaded.tapZoneConfig.centerZone)
+        assertEquals(TapZoneAction.NEXT_PAGE, loaded.tapZoneConfig.rightZone)
+    }
+
+    @Test
+    fun `saving removes the superseded legacy preset key`() {
+        val preferences =
+            context.getSharedPreferences(ReaderPreferencesStore.PREFS_NAME, Context.MODE_PRIVATE)
+        preferences.edit()
+            .putString("reader_tap_zones", "REVERSED")
+            .commit()
+        val store = ReaderPreferencesStore.fromContext(context)
+
+        store.save(ReaderSettings())
+
+        assertEquals(false, preferences.contains("reader_tap_zones"))
     }
 
     @Test

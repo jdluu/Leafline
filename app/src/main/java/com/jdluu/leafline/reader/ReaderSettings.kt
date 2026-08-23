@@ -81,13 +81,26 @@ fun EpubPreferences.withStyleMode(mode: StyleMode): EpubPreferences {
 }
 
 /**
- * Mapping of the three horizontal tap zones over the reading surface. DEFAULT
- * turns pages with the conventional left-back, right-forward mapping; REVERSED
- * swaps the sides for left-handed use or right-to-left publications.
+ * Per-zone configuration of what a tap does over the reading surface: each of
+ * the three horizontal zones maps to one [TapZoneAction]. DEFAULT mirrors the
+ * conventional left-back, right-forward layout; REVERSED swaps the sides for
+ * left-handed use or right-to-left publications.
  */
-enum class TapZoneMode {
-    DEFAULT,
-    REVERSED
+data class TapZoneConfig(
+    val leftZone: TapZoneAction = TapZoneAction.PREVIOUS_PAGE,
+    val centerZone: TapZoneAction = TapZoneAction.TOGGLE_MENU,
+    val rightZone: TapZoneAction = TapZoneAction.NEXT_PAGE
+) {
+    companion object {
+        /** Conventional mapping: left turns back, right turns forward. */
+        val DEFAULT = TapZoneConfig()
+
+        /** Swapped side zones for left-handed use or right-to-left publications. */
+        val REVERSED = TapZoneConfig(
+            leftZone = TapZoneAction.NEXT_PAGE,
+            rightZone = TapZoneAction.PREVIOUS_PAGE
+        )
+    }
 }
 
 /**
@@ -120,7 +133,7 @@ fun clampBrightness(value: Float): Float {
  */
 data class ReaderSettings(
     val epub: EpubPreferences = EpubPreferences(),
-    val tapZones: TapZoneMode = TapZoneMode.DEFAULT,
+    val tapZoneConfig: TapZoneConfig = TapZoneConfig.DEFAULT,
     val pageTurnAnimation: PageTurnAnimation = PageTurnAnimation.SLIDE,
     /**
      * Per-app window brightness override in [BRIGHTNESS_MIN]..[BRIGHTNESS_MAX],
@@ -140,7 +153,8 @@ enum class TapZone {
 enum class TapZoneAction {
     PREVIOUS_PAGE,
     NEXT_PAGE,
-    TOGGLE_MENU
+    TOGGLE_MENU,
+    NONE
 }
 
 /** Maps a horizontal position (0..1 across the screen) to its tap zone. */
@@ -152,15 +166,11 @@ fun tapZoneAt(fraction: Float): TapZone {
     }
 }
 
-/** Resolves the action of a tap zone under the given tap zone mode. */
-fun tapZoneAction(zone: TapZone, mode: TapZoneMode): TapZoneAction {
+/** Resolves the action configured for a tap zone under the given configuration. */
+fun tapZoneAction(zone: TapZone, config: TapZoneConfig): TapZoneAction {
     return when (zone) {
-        TapZone.CENTER -> TapZoneAction.TOGGLE_MENU
-        TapZone.LEFT ->
-            if (mode == TapZoneMode.REVERSED) TapZoneAction.NEXT_PAGE
-            else TapZoneAction.PREVIOUS_PAGE
-        TapZone.RIGHT ->
-            if (mode == TapZoneMode.REVERSED) TapZoneAction.PREVIOUS_PAGE
-            else TapZoneAction.NEXT_PAGE
+        TapZone.LEFT -> config.leftZone
+        TapZone.CENTER -> config.centerZone
+        TapZone.RIGHT -> config.rightZone
     }
 }
