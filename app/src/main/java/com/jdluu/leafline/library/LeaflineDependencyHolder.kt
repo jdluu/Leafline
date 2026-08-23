@@ -3,6 +3,8 @@ package com.jdluu.leafline.library
 import android.content.Context
 import androidx.room.Room
 import com.jdluu.leafline.library.data.BookDataSource
+import com.jdluu.leafline.library.data.BookmarkRepository
+import com.jdluu.leafline.library.data.BookmarkRepositoryImpl
 import com.jdluu.leafline.library.data.LibraryRepository
 import com.jdluu.leafline.library.data.LibraryRepositoryImpl
 import com.jdluu.leafline.library.data.local.LeaflineDatabase
@@ -14,6 +16,9 @@ object LeaflineDependencyHolder {
     
     @Volatile
     private var repository: LibraryRepository? = null
+
+    @Volatile
+    private var bookmarkRepository: BookmarkRepository? = null
     
     private var context: Context? = null
     
@@ -40,5 +45,12 @@ object LeaflineDependencyHolder {
     private fun buildRepository(context: Context): LibraryRepository {
         val dataSource: BookDataSource = RoomBookDataSource(getDatabase(context))
         return LibraryRepositoryImpl(dataSource)
+    }
+
+    fun getBookmarkRepository(context: Context): BookmarkRepository {
+        return bookmarkRepository ?: synchronized(this) {
+            bookmarkRepository ?: BookmarkRepositoryImpl(getDatabase(context).bookmarkDao())
+                .also { bookmarkRepository = it }
+        }
     }
 }

@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,11 +23,17 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -35,14 +42,20 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -53,6 +66,15 @@ import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.commitNow
 import androidx.lifecycle.lifecycleScope
+import com.jdluu.leafline.library.data.Bookmark
+import com.jdluu.leafline.library.data.BookmarkRepository
+import com.jdluu.leafline.library.data.BookmarkToggleResult
+import com.jdluu.leafline.library.data.LocatorIdentity
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import java.util.Locale
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
@@ -108,15 +130,22 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
 
     private var navigator: EpubNavigatorFragment? = null
     private var bookStableId: String? = null
+    private lateinit var bookmarkRepository: BookmarkRepository
     private var toolbarVisible = mutableStateOf(false)
     private var settingsSheetVisible = mutableStateOf(false)
+    private var bookmarkSheetVisible = mutableStateOf(false)
     private var bookTitle = mutableStateOf("")
     private var tocLinks = mutableStateOf<List<Pair<Link, Int>>>(emptyList())
     private var currentPreferences = mutableStateOf(EpubPreferences())
+    private var bookmarks = mutableStateOf<List<Bookmark>>(emptyList())
+    private var currentLocation = mutableStateOf<Locator?>(null)
+    private val snackbarHostState = SnackbarHostState()
 
     @OptIn(ExperimentalReadiumApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        bookmarkRepository =
+            com.jdluu.leafline.library.LeaflineDependencyHolder.getBookmarkRepository(this)
 
         val importedPath = intent?.getStringExtra(EXTRA_FILE_PATH)
         var epubFile: File? = null
@@ -223,13 +252,24 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             bookStableId?.let { stableId ->
                 lifecycleScope.launch {
                     navigator?.currentLocator?.collect { locator ->
+                        val locatorJson = locator.toJSON().toString()
+                        currentLocation.value = locator
                         try {
                             com.jdluu.leafline.library.LeaflineDependencyHolder
                                 .getRepository(this@ReaderActivity)
-                                .saveLastLocator(stableId, locator.toJSON().toString())
+                                .saveLastLocator(stableId, locatorJson)
                         } catch (e: Exception) {
                             Log.w(TAG, "Could not save reading position", e)
                         }
+                    }
+                }
+                lifecycleScope.launch {
+                    try {
+                        bookmarkRepository.observeBookmarks(stableId).collect { stored ->
+                            bookmarks.value = stored
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Could not observe bookmarks", e)
                     }
                 }
             }
@@ -262,6 +302,49 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         toolbarVisible.value = false
     }
 
+    private fun toggleBookmark() {
+        val stableId = bookStableId ?: return
+        val locator = navigator?.currentLocator?.value ?: return
+        lifecycleScope.launch {
+            try {
+                val result = bookmarkRepository.toggleBookmark(
+                    bookId = stableId,
+                    locatorJson = locator.toJSON().toString()
+                )
+                snackbarHostState.showSnackbar(
+                    when (result) {
+                        is BookmarkToggleResult.Added -> "Bookmark added"
+                        is BookmarkToggleResult.Removed -> "Bookmark removed"
+                    }
+                )
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not toggle bookmark", e)
+            }
+        }
+    }
+
+    private fun deleteBookmark(bookmark: Bookmark) {
+        lifecycleScope.launch {
+            try {
+                bookmarkRepository.removeBookmark(bookmark.id)
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not delete bookmark", e)
+            }
+        }
+    }
+
+    private fun navigateToBookmark(bookmark: Bookmark) {
+        val locator = try {
+            Locator.Companion.fromJSON(org.json.JSONObject(bookmark.locatorJson))
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not parse bookmark locator", e)
+            null
+        } ?: return
+        navigator?.go(locator, false)
+        bookmarkSheetVisible.value = false
+        toolbarVisible.value = false
+    }
+
     private fun submitPreferences(prefs: EpubPreferences) {
         currentPreferences.value = prefs
         navigator?.submitPreferences(prefs)
@@ -279,11 +362,21 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     currentPreferences = currentPreferences.value,
                     drawerState = drawerState,
                     settingsSheetVisible = settingsSheetVisible.value,
+                    bookmarks = bookmarks.value,
+                    bookmarkActionsEnabled = bookStableId != null,
+                    currentLocatorJson = currentLocation.value?.toJSON()?.toString(),
+                    bookmarkSheetVisible = bookmarkSheetVisible.value,
+                    snackbarHostState = snackbarHostState,
                     onToggleToolbar = { toolbarVisible.value = !toolbarVisible.value },
                     onBack = { finish() },
                     onOpenToc = { scope.launch { drawerState.open() } },
                     onOpenSettings = { settingsSheetVisible.value = true },
                     onDismissSettings = { settingsSheetVisible.value = false },
+                    onToggleBookmark = { toggleBookmark() },
+                    onOpenBookmarks = { bookmarkSheetVisible.value = true },
+                    onDismissBookmarks = { bookmarkSheetVisible.value = false },
+                    onBookmarkClick = { navigateToBookmark(it) },
+                    onDeleteBookmark = { deleteBookmark(it) },
                     onTocClick = { link ->
                         navigateToTocLink(link)
                         scope.launch { drawerState.close() }
@@ -320,11 +413,21 @@ private fun ReaderOverlay(
     currentPreferences: EpubPreferences,
     drawerState: DrawerState,
     settingsSheetVisible: Boolean,
+    bookmarks: List<Bookmark>,
+    bookmarkActionsEnabled: Boolean,
+    currentLocatorJson: String?,
+    bookmarkSheetVisible: Boolean,
+    snackbarHostState: SnackbarHostState,
     onToggleToolbar: () -> Unit,
     onBack: () -> Unit,
     onOpenToc: () -> Unit,
     onOpenSettings: () -> Unit,
     onDismissSettings: () -> Unit,
+    onToggleBookmark: () -> Unit,
+    onOpenBookmarks: () -> Unit,
+    onDismissBookmarks: () -> Unit,
+    onBookmarkClick: (Bookmark) -> Unit,
+    onDeleteBookmark: (Bookmark) -> Unit,
     onTocClick: (Link) -> Unit,
     onPreferencesChange: (EpubPreferences) -> Unit
 ) {
@@ -357,21 +460,16 @@ private fun ReaderOverlay(
                     color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
                     tonalElevation = 6.dp
                 ) {
-                    TopAppBar(
-                        title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                        navigationIcon = {
-                            IconButton(onClick = onBack) {
-                                Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                            }
-                        },
-                        actions = {
-                            IconButton(onClick = onOpenToc) {
-                                Icon(Icons.Default.Menu, contentDescription = "Contents")
-                            }
-                            IconButton(onClick = onOpenSettings) {
-                                Icon(Icons.Default.Settings, contentDescription = "Reader settings")
-                            }
-                        }
+                    ReaderTopBar(
+                        title = title,
+                        bookmarks = bookmarks,
+                        bookmarkActionsEnabled = bookmarkActionsEnabled,
+                        currentLocatorJson = currentLocatorJson,
+                        onBack = onBack,
+                        onOpenToc = onOpenToc,
+                        onOpenSettings = onOpenSettings,
+                        onToggleBookmark = onToggleBookmark,
+                        onOpenBookmarks = onOpenBookmarks
                     )
                 }
             }
@@ -383,8 +481,182 @@ private fun ReaderOverlay(
                     onDismiss = onDismissSettings
                 )
             }
+
+            if (bookmarkSheetVisible) {
+                BookmarkListSheet(
+                    bookmarks = bookmarks,
+                    onBookmarkClick = onBookmarkClick,
+                    onDeleteBookmark = onDeleteBookmark,
+                    onDismiss = onDismissBookmarks
+                )
+            }
+
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReaderTopBar(
+    title: String,
+    bookmarks: List<Bookmark>,
+    bookmarkActionsEnabled: Boolean,
+    currentLocatorJson: String?,
+    onBack: () -> Unit,
+    onOpenToc: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onToggleBookmark: () -> Unit,
+    onOpenBookmarks: () -> Unit
+) {
+    var moreMenuExpanded by remember { mutableStateOf(false) }
+    val currentKey = remember(currentLocatorJson) {
+        currentLocatorJson?.let { LocatorIdentity.key(it) }
+    }
+    val isCurrentLocationBookmarked = currentKey != null && bookmarks.any {
+        LocatorIdentity.key(it.locatorJson) == currentKey
+    }
+    TopAppBar(
+        title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        navigationIcon = {
+            IconButton(onClick = onBack) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+            }
+        },
+        actions = {
+            IconButton(onClick = onOpenToc) {
+                Icon(Icons.Default.Menu, contentDescription = "Contents")
+            }
+            IconButton(onClick = onOpenSettings) {
+                Icon(Icons.Default.Settings, contentDescription = "Reader settings")
+            }
+            IconButton(onClick = { moreMenuExpanded = true }) {
+                Icon(Icons.Default.MoreVert, contentDescription = "More options")
+            }
+            DropdownMenu(
+                expanded = moreMenuExpanded,
+                onDismissRequest = { moreMenuExpanded = false }
+            ) {
+                DropdownMenuItem(
+                    text = {
+                        Text(if (isCurrentLocationBookmarked) "Remove bookmark" else "Add bookmark")
+                    },
+                    onClick = {
+                        moreMenuExpanded = false
+                        onToggleBookmark()
+                    },
+                    leadingIcon = {
+                        Icon(
+                            if (isCurrentLocationBookmarked) Icons.Default.Bookmark
+                            else Icons.Default.BookmarkBorder,
+                            contentDescription = null
+                        )
+                    },
+                    enabled = bookmarkActionsEnabled && currentLocatorJson != null
+                )
+                DropdownMenuItem(
+                    text = { Text("Bookmarks") },
+                    onClick = {
+                        moreMenuExpanded = false
+                        onOpenBookmarks()
+                    },
+                    leadingIcon = { Icon(Icons.Default.BookmarkBorder, contentDescription = null) },
+                    enabled = bookmarkActionsEnabled
+                )
+            }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BookmarkListSheet(
+    bookmarks: List<Bookmark>,
+    onBookmarkClick: (Bookmark) -> Unit,
+    onDeleteBookmark: (Bookmark) -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Text(
+            "Bookmarks",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(16.dp)
+        )
+        if (bookmarks.isEmpty()) {
+            Text(
+                "No bookmarks yet",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(16.dp)
+            )
+        } else {
+            LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                items(bookmarks, key = { it.id }) { bookmark ->
+                    SwipeToDismissBox(
+                        state = rememberSwipeToDismissBoxState(
+                            confirmValueChange = { value ->
+                                if (value == SwipeToDismissBoxValue.EndToStart) {
+                                    onDeleteBookmark(bookmark)
+                                    true
+                                } else {
+                                    false
+                                }
+                            }
+                        ),
+                        enableDismissFromStartToEnd = false,
+                        backgroundContent = {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.errorContainer),
+                                contentAlignment = Alignment.CenterEnd
+                            ) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = "Delete",
+                                    tint = MaterialTheme.colorScheme.onErrorContainer,
+                                    modifier = Modifier.padding(end = 24.dp)
+                                )
+                            }
+                        }
+                    ) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(onClick = { onBookmarkClick(bookmark) })
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                            ) {
+                                Text(
+                                    text = bookmark.label
+                                        ?: LocatorIdentity.displayTitle(bookmark.locatorJson)
+                                        ?: "Bookmark",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = formatCreatedAt(bookmark.createdAt),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(32.dp))
+    }
+}
+
+private fun formatCreatedAt(epochMillis: Long): String {
+    val formatter = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
+        .withLocale(Locale.getDefault())
+    return formatter.format(Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()))
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

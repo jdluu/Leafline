@@ -16,6 +16,7 @@ The project is under active development. The current prototype can:
 - Navigate OPDS feeds and acquisition entries
 - Download EPUB acquisitions into the local library
 - Open imported books for reading offline
+- Bookmark reading positions and jump back to them
 
 The reading experience, settings persistence, search, progress synchronization,
 and release packaging are still being developed.
