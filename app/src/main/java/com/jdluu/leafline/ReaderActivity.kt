@@ -118,6 +118,7 @@ import com.jdluu.leafline.reader.StyleMode
 import com.jdluu.leafline.reader.TapZoneAction
 import com.jdluu.leafline.reader.TapZoneConfig
 import com.jdluu.leafline.reader.clampBrightness
+import com.jdluu.leafline.reader.effectiveTapZoneAction
 import com.jdluu.leafline.reader.snapPageMargins
 import com.jdluu.leafline.reader.styleModeFor
 import com.jdluu.leafline.reader.pageTurnIsAnimated
@@ -126,7 +127,6 @@ import com.jdluu.leafline.reader.search.BookSearchResult
 import com.jdluu.leafline.reader.search.BookSearchState
 import com.jdluu.leafline.reader.search.BookSearchStatus
 import com.jdluu.leafline.reader.search.BookSearcher
-import com.jdluu.leafline.reader.tapZoneAction
 import com.jdluu.leafline.reader.tapZoneAt
 import com.jdluu.leafline.reader.withStyleMode
 import com.jdluu.leafline.sync.BookRef
@@ -223,6 +223,8 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
      * Turns taps reported by the Readium navigator into tap zone actions. The
      * listener consumes every tap except zones configured as none, which are
      * left unconsumed so the publication webview keeps default handling.
+     * While scroll mode is on, page-turn actions resolve to none so taps stay
+     * unconsumed and vertical webview gestures own the navigation.
      */
     private val readerInputListener = object : InputListener {
         override fun onTap(event: TapEvent): Boolean {
@@ -230,7 +232,11 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             if (width <= 0) return false
             val settings = currentSettings.value
             return when (
-                tapZoneAction(tapZoneAt(event.point.x / width), settings.tapZoneConfig)
+                effectiveTapZoneAction(
+                    tapZoneAt(event.point.x / width),
+                    settings.tapZoneConfig,
+                    settings.epub.scroll == true
+                )
             ) {
                 TapZoneAction.NONE -> false
                 TapZoneAction.TOGGLE_MENU -> {
@@ -1675,6 +1681,15 @@ private fun ReaderSettingsSheet(
                     }
                 )
             }
+            Text(
+                text = if (preferences.scroll == true) {
+                    "Content scrolls continuously. Swipe up or down to turn; page-turn taps are inactive."
+                } else {
+                    "Content is paginated and tap zones can turn pages."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
+            )
 
             Text("Tap zones", style = MaterialTheme.typography.labelLarge)
             TapZoneActionRow(

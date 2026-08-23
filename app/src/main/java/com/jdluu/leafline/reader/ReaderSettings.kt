@@ -188,3 +188,27 @@ fun tapZoneAction(zone: TapZone, config: TapZoneConfig): TapZoneAction {
         TapZone.RIGHT -> config.rightZone
     }
 }
+
+/**
+ * Resolves the effective action of a tap on [zone], where [scrollModeOn]
+ * indicates whether the publication renders in continuous scroll mode.
+ *
+ * Page-turn actions are disabled while scrolling: Readium 3.3.0 exposes no
+ * public screenful-scroll hook for scroll mode, so reusing its page-turn
+ * navigation cannot be relied on to step a viewport. Resolving page turns to
+ * [TapZoneAction.NONE] leaves such taps unconsumed so the navigator webview
+ * keeps default handling; vertical pan gestures remain the way to move through
+ * the content. Menu toggles and none keep working unchanged.
+ */
+fun effectiveTapZoneAction(
+    zone: TapZone,
+    config: TapZoneConfig,
+    scrollModeOn: Boolean
+): TapZoneAction {
+    val action = tapZoneAction(zone, config)
+    if (!scrollModeOn) return action
+    return when (action) {
+        TapZoneAction.PREVIOUS_PAGE, TapZoneAction.NEXT_PAGE -> TapZoneAction.NONE
+        else -> action
+    }
+}
