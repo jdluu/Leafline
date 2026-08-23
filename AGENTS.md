@@ -165,7 +165,14 @@ clients or manipulate EPUB archives directly.
   applies to tap-zone navigation (slide animates the turn, none snaps
   instantly). Swipe-driven turns are handled by Readium's internal pager and
   always animate; changing that would require reimplementing the paginator,
-  which is out of scope.
+  which is out of scope. A fade variant is not offered for the same reason:
+  Readium provides no fade transition hook, and faking one over the paginated
+  webview would mean reimplementing the paginator, so the setting stays
+  none/slide. When the system removes animations
+  (`Settings.Global.ANIMATOR_DURATION_SCALE == 0`, e.g. via the Remove
+  Animations accessibility toggle), tap-zone page turns snap instantly
+  regardless of the stored preference (`pageTurnIsAnimated` in
+  `ReaderSettings.kt`, applied per tap in `ReaderActivity`).
 - Reader settings persistence: `ReaderPreferencesStore` keeps Readium
   `EpubPreferences` plus the interaction settings above in one
   SharedPreferences file; unknown stored enum names fall back to defaults.
