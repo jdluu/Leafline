@@ -1,5 +1,8 @@
 package com.jdluu.leafline.library
 
+import com.jdluu.leafline.library.ReadingStatus
+import com.jdluu.leafline.library.ReadingStatus.UNREAD
+
 data class LibraryBook(
     val stableId: String,
     val title: String,
@@ -15,5 +18,6 @@ data class LibraryBook(
     val coverPath: String? = null,
     val koreaderHash: String? = null,
     val lastReadAtEpochMillis: Long? = null,
-    val lastLocatorJson: String? = null
+    val lastLocatorJson: String? = null,
+    val readingStatus: ReadingStatus = UNREAD
 )

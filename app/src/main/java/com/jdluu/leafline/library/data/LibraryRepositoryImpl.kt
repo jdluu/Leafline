@@ -1,6 +1,7 @@
 package com.jdluu.leafline.library.data
 
 import com.jdluu.leafline.library.LibraryBook
+import com.jdluu.leafline.library.ReadingStatus
 import com.jdluu.leafline.library.data.local.CollectionDao
 import com.jdluu.leafline.library.data.local.CollectionEntity
 import com.jdluu.leafline.library.data.local.BookCollectionCrossRef
@@ -99,6 +100,16 @@ class LibraryRepositoryImpl(
         val flow = dao.getBookIdsForCollection(collectionId)
         // We need a snapshot, so collect the first emission
         kotlinx.coroutines.flow.first(flow)
+    }
+
+    // -- Reading status --
+
+    override suspend fun setReadingStatus(stableId: String, status: ReadingStatus) = withContext(ioDispatcher) {
+        dataSource.setReadingStatus(stableId, status)
+    }
+
+    override fun getBooksByReadingStatus(status: ReadingStatus): Flow<List<LibraryBook>> {
+        return dataSource.getBooksByReadingStatus(status)
     }
 
     private fun <T> emptyFlow(): Flow<List<T>> = kotlinx.coroutines.flow.flowOf(emptyList())

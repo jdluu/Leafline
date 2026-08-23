@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.jdluu.leafline.library.LibraryBook
 import com.jdluu.leafline.library.LibrarySort
 import com.jdluu.leafline.library.LibrarySortStore
+import com.jdluu.leafline.library.ReadingStatus
 import com.jdluu.leafline.library.cover.CoverLoader
 import com.jdluu.leafline.library.data.Collection
 import com.jdluu.leafline.library.data.LibraryRepository
@@ -60,19 +61,29 @@ class LibraryViewModel(
     /** Book stableIds that belong to the currently selected collection. */
     private val _collectionBookIds = MutableStateFlow<Set<String>?>(null)
 
+    /** Currently selected reading status filter (null = show all). */
+    private val _readingStatusFilter = MutableStateFlow<ReadingStatus?>(null)
+    val readingStatusFilter: StateFlow<ReadingStatus?> = _readingStatusFilter.asStateFlow()
+
     val sortedBooks: StateFlow<List<LibraryBook>> =
         combine(
             searchedBooks,
             _sort,
             _selectedCollection,
-            _collectionBookIds
-        ) { books, sort, collectionId, bookIds ->
-            val filtered = if (collectionId == null || bookIds == null) {
+            _collectionBookIds,
+            _readingStatusFilter
+        ) { books, sort, collectionId, bookIds, statusFilter ->
+            val byCollection = if (collectionId == null || bookIds == null) {
                 books
             } else {
                 books.filter { it.stableId in bookIds }
             }
-            sort.sorted(filtered)
+            val byStatus = if (statusFilter == null) {
+                byCollection
+            } else {
+                byCollection.filter { it.readingStatus == statusFilter }
+            }
+            sort.sorted(byStatus)
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -91,7 +102,7 @@ class LibraryViewModel(
                 }
             }
         }
-        // Refresh book IDs when collections data changes (new book added to collection, etc.)
+        // Refresh book IDs when collections data changes
         viewModelScope.launch {
             collections.collect {
                 val sel = _selectedCollection.value ?: return@collect
@@ -133,6 +144,18 @@ class LibraryViewModel(
     fun addBook(book: LibraryBook) {
         viewModelScope.launch {
             repository.addBook(book)
+        }
+    }
+
+    // -- Reading status filter --
+
+    fun setReadingStatusFilter(status: ReadingStatus?) {
+        _readingStatusFilter.value = status
+    }
+
+    fun setBookReadingStatus(stableId: String, status: ReadingStatus) {
+        viewModelScope.launch {
+            repository.setReadingStatus(stableId, status)
         }
     }
 

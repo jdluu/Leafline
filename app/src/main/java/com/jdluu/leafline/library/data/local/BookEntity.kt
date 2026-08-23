@@ -3,6 +3,7 @@ package com.jdluu.leafline.library.data.local
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.jdluu.leafline.library.LibraryBook
+import com.jdluu.leafline.library.ReadingStatus
 
 @Entity(tableName = "books")
 data class BookEntity(
@@ -20,7 +21,8 @@ data class BookEntity(
     val lastLocatorJson: String? = null,
     val coverPath: String? = null,
     val koreaderHash: String? = null,
-    val lastReadAtEpochMillis: Long? = null
+    val lastReadAtEpochMillis: Long? = null,
+    val readingStatus: String = "unread"
 ) {
     companion object {
         fun fromLibraryBook(book: LibraryBook): BookEntity {
@@ -39,7 +41,8 @@ data class BookEntity(
                 coverPath = book.coverPath,
                 koreaderHash = book.koreaderHash,
                 lastReadAtEpochMillis = book.lastReadAtEpochMillis,
-                lastLocatorJson = book.lastLocatorJson
+                lastLocatorJson = book.lastLocatorJson,
+                readingStatus = book.readingStatus.dbValue
             )
         }
 
@@ -59,7 +62,8 @@ data class BookEntity(
                 coverPath = entity.coverPath,
                 koreaderHash = entity.koreaderHash,
                 lastReadAtEpochMillis = entity.lastReadAtEpochMillis,
-                lastLocatorJson = entity.lastLocatorJson
+                lastLocatorJson = entity.lastLocatorJson,
+                readingStatus = ReadingStatus.fromDb(entity.readingStatus)
             )
         }
     }

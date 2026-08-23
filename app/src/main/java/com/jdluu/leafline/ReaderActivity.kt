@@ -107,6 +107,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.commitNow
 import androidx.lifecycle.lifecycleScope
 import com.jdluu.leafline.library.LeaflineDependencyHolder
+import com.jdluu.leafline.library.ReadingStatus
 import com.jdluu.leafline.library.data.Annotation
 import com.jdluu.leafline.library.data.AnnotationRepository
 import com.jdluu.leafline.library.data.Bookmark
@@ -395,6 +396,14 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                 }
                 savedLocatorJson = savedBook?.lastLocatorJson
                 bookStableId = savedBook?.stableId
+                // Update reading status to READING when opening
+                savedBook?.let { book ->
+                    if (book.readingStatus == ReadingStatus.UNREAD) {
+                        val repo = com.jdluu.leafline.library.LeaflineDependencyHolder
+                            .getRepository(this@ReaderActivity)
+                        repo.setReadingStatus(book.stableId, ReadingStatus.READING)
+                    }
+                }
             } catch (e: Exception) {
                 Log.w(TAG, "Could not load saved locator", e)
             }
@@ -1004,6 +1013,25 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     "Progress sync failed: ${outcome.message}",
                     Toast.LENGTH_SHORT
                 ).show()
+            }
+        }
+
+        // Auto-suggest FINISHED status when progress >= 98%
+        val progress = ReadingProgressMath.percentageFromLocator(locatorJson)
+        if (progress != null && progress >= 98.0 && book.readingStatus == ReadingStatus.READING) {
+            runOnUiThread {
+                AlertDialog.Builder(this@ReaderActivity)
+                    .setTitle("Mark as finished?")
+                    .setMessage("You're at ${progress.toInt()}% — looks like you've finished this book. Would you like to mark it as finished?")
+                    .setPositiveButton("Mark finished") { _, _ ->
+                        lifecycleScope.launch {
+                            com.jdluu.leafline.library.LeaflineDependencyHolder
+                                .getRepository(this@ReaderActivity)
+                                .setReadingStatus(book.stableId, ReadingStatus.FINISHED)
+                        }
+                    }
+                    .setNegativeButton("Keep reading") { _, _ -> }
+                    .show()
             }
         }
     }
