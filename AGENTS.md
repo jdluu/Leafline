@@ -159,6 +159,20 @@ clients or manipulate EPUB archives directly.
   zone's default, and saving drops the legacy key. A zone set to none leaves
   its tap unconsumed so the publication webview keeps default handling.
   Readium 3.3.0 has no tap-zone direction configuration to reuse.
+- Scroll mode: continuous scrolling is offered next to pagination via a
+  switch in the reader settings sheet, backed by Readium's
+  `EpubPreferences.scroll` and applied live through `submitPreferences`.
+  Scope is global-only: the flag is persisted once in `ReaderPreferencesStore`
+  (`reader_scroll`) like the other reader settings and is deliberately not
+  stored per book, which avoids a Room schema change for marginal value.
+  While scroll mode is on, page-turn tap actions are disabled: taps mapped to
+  previous/next page resolve to none (`effectiveTapZoneAction` in
+  `ReaderSettings.kt`), stay unconsumed, and vertical pan gestures inside the
+  navigator webview remain the way to move. Rationale: Readium 3.3.0 exposes
+  no public screenful-scroll hook for scroll mode, so reusing
+  `goForward`/`goBackward` for taps cannot be relied on to step a viewport;
+  faking screenful scrolls would require reaching into the internal webview.
+  Menu toggles keep working.
 - Page-turn animation: Readium 3.3.0 exposes no page transition preference in
   `EpubPreferences` or the navigator configuration. The only supported lever is
   the `animated` flag of `goForward`/`goBackward`, so the none/slide setting
