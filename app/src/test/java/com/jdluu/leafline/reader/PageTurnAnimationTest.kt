@@ -35,4 +35,15 @@ class PageTurnAnimationTest {
         assertEquals(PageTurnAnimation.SLIDE, ReaderSettings().pageTurnAnimation)
         assertTrue(pageTurnIsAnimated(ReaderSettings().pageTurnAnimation, 1f))
     }
+
+    @Test
+    fun `reduce motion forces instant turns even with system animations`() {
+        assertFalse(pageTurnIsAnimated(PageTurnAnimation.SLIDE, 1f, reduceMotion = true))
+        assertFalse(pageTurnIsAnimated(PageTurnAnimation.SLIDE, 0.5f, reduceMotion = true))
+    }
+
+    @Test
+    fun `reduce motion keeps none page turns instant`() {
+        assertFalse(pageTurnIsAnimated(PageTurnAnimation.NONE, 1f, reduceMotion = true))
+    }
 }

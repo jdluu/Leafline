@@ -23,13 +23,18 @@ import org.readium.r2.navigator.preferences.Theme
  */
 class ReaderPreferencesStore(private val preferences: SharedPreferences) {
 
-    fun load(): ReaderSettings {
+    fun load(initialReduceMotion: Boolean = false): ReaderSettings {
         return ReaderSettings(
             epub = loadEpubPreferences(),
             tapZoneConfig = loadTapZoneConfig(),
             pageTurnAnimation = enumFromName(KEY_PAGE_TURN_ANIMATION, PageTurnAnimation.SLIDE),
             brightness = restoreBrightness(),
-            preSepiaTheme = restorePreSepiaTheme()
+            preSepiaTheme = restorePreSepiaTheme(),
+            reduceMotion = if (preferences.contains(KEY_REDUCE_MOTION)) {
+                preferences.getBoolean(KEY_REDUCE_MOTION, false)
+            } else {
+                initialReduceMotion
+            }
         )
     }
 
@@ -49,6 +54,7 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
             .putString(KEY_PAGE_TURN_ANIMATION, settings.pageTurnAnimation.name)
             .putNullableFloat(KEY_BRIGHTNESS, settings.brightness)
             .putString(KEY_PRE_SEPIA_THEME, settings.preSepiaTheme?.name)
+            .putBoolean(KEY_REDUCE_MOTION, settings.reduceMotion)
             .apply()
     }
 
@@ -191,6 +197,7 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
         private const val KEY_PAGE_TURN_ANIMATION = "reader_page_turn_animation"
         private const val KEY_BRIGHTNESS = "reader_brightness"
         private const val KEY_PRE_SEPIA_THEME = "reader_pre_sepia_theme"
+        private const val KEY_REDUCE_MOTION = "reader_reduce_motion"
         internal const val PREFS_NAME = "leafline_reader_prefs"
 
         fun fromContext(context: Context): ReaderPreferencesStore {
