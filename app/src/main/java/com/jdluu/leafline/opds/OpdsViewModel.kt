@@ -21,6 +21,16 @@ class OpdsViewModel : ViewModel() {
     private val _uiState = MutableStateFlow<OpdsUiState>(OpdsUiState.Idle)
     val uiState: StateFlow<OpdsUiState> = _uiState
 
+    init {
+        config?.let { loadFeed(it) }
+    }
+
+    fun loadIfConfigured() {
+        if (_uiState.value is OpdsUiState.Idle) {
+            config?.let { loadFeed(it) }
+        }
+    }
+
     fun saveConfig(url: String, username: String, password: String) {
         val trimmedUrl = url.trim()
         if (trimmedUrl.isBlank()) {

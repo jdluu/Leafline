@@ -33,6 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -264,7 +265,11 @@ fun LeaflineApp(activity: ComponentActivity) {
                             )
                         }
                     )
-                    LeaflineTab.Catalog -> OpdsBrowseScreen(
+                    LeaflineTab.Catalog -> {
+                        LaunchedEffect(selectedTab) {
+                            opdsViewModel.loadIfConfigured()
+                        }
+                        OpdsBrowseScreen(
                         viewModel = opdsViewModel,
                         onBack = { selectedTab = 0 },
                         onDownload = { entry ->
@@ -289,6 +294,7 @@ fun LeaflineApp(activity: ComponentActivity) {
                             }
                         }
                     )
+                    }
                     LeaflineTab.Settings -> SettingsTab()
                     null -> {}
                 }
@@ -338,6 +344,11 @@ fun LibraryTab(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsTab() {
+    var url by remember { mutableStateOf(OpdsConfigStore.config?.catalogUrl ?: "") }
+    var username by remember { mutableStateOf(OpdsConfigStore.config?.username ?: "") }
+    var password by remember { mutableStateOf(OpdsConfigStore.config?.password ?: "") }
+    var saved by remember { mutableStateOf(false) }
+
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
             title = { Text("Settings") }
@@ -346,14 +357,51 @@ fun SettingsTab() {
             Text(
                 "OPDS Catalog",
                 style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(bottom = 8.dp)
+                modifier = Modifier.padding(bottom = 16.dp)
             )
-            Text(
-                "Configure your OPDS server in the Catalog tab.",
-                style = MaterialTheme.typography.bodyMedium
+            OutlinedTextField(
+                value = url,
+                onValueChange = { url = it; saved = false },
+                label = { Text("Catalog URL") },
+                placeholder = { Text("https://server/api/v1/opds") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
             )
+            OutlinedTextField(
+                value = username,
+                onValueChange = { username = it; saved = false },
+                label = { Text("Username") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
+            )
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it; saved = false },
+                label = { Text("Password") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
+            )
+            Button(
+                onClick = {
+                    OpdsConfigStore.config = OpdsServerConfig(
+                        catalogUrl = url,
+                        username = username,
+                        password = password
+                    )
+                    saved = true
+                },
+                modifier = Modifier.padding(top = 16.dp)
+            ) { Text("Save") }
+            if (saved) {
+                Text(
+                    "Saved. Go to the Catalog tab to browse.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
             Text(
-                "Reader defaults will be available in a future update.",
+                "Credentials are stored only in memory for this session.",
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(top = 16.dp)
             )
