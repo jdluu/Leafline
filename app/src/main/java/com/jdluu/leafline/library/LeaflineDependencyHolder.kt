@@ -2,6 +2,8 @@ package com.jdluu.leafline.library
 
 import android.content.Context
 import androidx.room.Room
+import com.jdluu.leafline.library.data.AnnotationRepository
+import com.jdluu.leafline.library.data.AnnotationRepositoryImpl
 import com.jdluu.leafline.library.data.BookDataSource
 import com.jdluu.leafline.library.data.BookmarkRepository
 import com.jdluu.leafline.library.data.BookmarkRepositoryImpl
@@ -19,6 +21,9 @@ object LeaflineDependencyHolder {
 
     @Volatile
     private var bookmarkRepository: BookmarkRepository? = null
+
+    @Volatile
+    private var annotationRepository: AnnotationRepository? = null
     
     private var context: Context? = null
     
@@ -51,6 +56,13 @@ object LeaflineDependencyHolder {
         return bookmarkRepository ?: synchronized(this) {
             bookmarkRepository ?: BookmarkRepositoryImpl(getDatabase(context).bookmarkDao())
                 .also { bookmarkRepository = it }
+        }
+    }
+
+    fun getAnnotationRepository(context: Context): AnnotationRepository {
+        return annotationRepository ?: synchronized(this) {
+            annotationRepository ?: AnnotationRepositoryImpl(getDatabase(context).annotationDao())
+                .also { annotationRepository = it }
         }
     }
 }

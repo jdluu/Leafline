@@ -1,11 +1,17 @@
 package com.jdluu.leafline
 
 import android.content.ActivityNotFoundException
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
+import android.view.ActionMode
+import android.view.Menu
+import android.view.MenuItem
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -29,6 +35,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FormatColorFill
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Remove
@@ -82,6 +89,8 @@ import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.commitNow
 import androidx.lifecycle.lifecycleScope
+import com.jdluu.leafline.library.data.Annotation
+import com.jdluu.leafline.library.data.AnnotationRepository
 import com.jdluu.leafline.library.data.Bookmark
 import com.jdluu.leafline.library.data.BookmarkRepository
 import com.jdluu.leafline.library.data.BookmarkToggleResult
@@ -100,6 +109,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.readium.r2.navigator.Decoration
+import org.readium.r2.navigator.DecorableNavigator
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.navigator.epub.EpubPreferences
@@ -134,6 +144,11 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         private const val MAX_SEARCH_DECORATIONS = 200
         private const val SEARCH_MATCH_TINT = 0x55FFD54F.toInt()
         private const val SEARCH_ACTIVE_TINT = 0xCCFF8F00.toInt()
+        private const val ANNOTATION_DECORATION_GROUP = "leafline-annotations"
+        private const val ANNOTATION_DECORATION_PREFIX = "annotation-"
+        private const val DEFAULT_ANNOTATION_TINT = 0x55FFF59F.toInt()
+        private const val MENU_ITEM_HIGHLIGHT_ID = 1
+        private const val MENU_ITEM_COPY_ID = 2
 
         fun newIntent(context: Context): Intent {
             return Intent(context, ReaderActivity::class.java)
@@ -164,15 +179,18 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     private var publication: Publication? = null
     private var bookStableId: String? = null
     private lateinit var bookmarkRepository: BookmarkRepository
+    private lateinit var annotationRepository: AnnotationRepository
     private lateinit var bookSearcher: BookSearcher
     private var toolbarVisible = mutableStateOf(false)
     private var settingsSheetVisible = mutableStateOf(false)
     private var bookmarkSheetVisible = mutableStateOf(false)
+    private var highlightsSheetVisible = mutableStateOf(false)
     private var searchSheetVisible = mutableStateOf(false)
     private var bookTitle = mutableStateOf("")
     private var tocLinks = mutableStateOf<List<Pair<Link, Int>>>(emptyList())
     private var currentPreferences = mutableStateOf(EpubPreferences())
     private var bookmarks = mutableStateOf<List<Bookmark>>(emptyList())
+    private var annotations = mutableStateOf<List<Annotation>>(emptyList())
     private var currentLocation = mutableStateOf<Locator?>(null)
     @Volatile
     private var activeSearchResultId: Int? = null
@@ -183,6 +201,8 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         super.onCreate(savedInstanceState)
         bookmarkRepository =
             com.jdluu.leafline.library.LeaflineDependencyHolder.getBookmarkRepository(this)
+        annotationRepository =
+            com.jdluu.leafline.library.LeaflineDependencyHolder.getAnnotationRepository(this)
 
         val importedPath = intent?.getStringExtra(EXTRA_FILE_PATH)
         var epubFile: File? = null
@@ -278,7 +298,10 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             val navigatorFactory = EpubNavigatorFactory(publication)
             val fragmentFactory = navigatorFactory.createFragmentFactory(
                 initialLocator = initialLocator,
-                listener = this
+                listener = this,
+                configuration = EpubNavigatorFragment.Configuration(
+                    selectionActionModeCallback = annotationSelectionActionMode()
+                )
             )
 
             supportFragmentManager.fragmentFactory = fragmentFactory
@@ -314,7 +337,35 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                         Log.w(TAG, "Could not observe bookmarks", e)
                     }
                 }
+                lifecycleScope.launch {
+                    try {
+                        annotationRepository.observeAnnotations(stableId).collect { stored ->
+                            annotations.value = stored
+                            applyAnnotationDecorations()
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Could not observe annotations", e)
+                    }
+                }
             }
+
+            navigator?.addDecorationListener(
+                ANNOTATION_DECORATION_GROUP,
+                object : DecorableNavigator.Listener {
+                    override fun onDecorationActivated(
+                        event: DecorableNavigator.OnActivatedEvent
+                    ): Boolean {
+                        val annotationId = event.decoration.id
+                            .removePrefix(ANNOTATION_DECORATION_PREFIX)
+                            .toLongOrNull() ?: return false
+                        val target = annotations.value.firstOrNull { it.id == annotationId }
+                            ?: return false
+                        val message = target.note ?: annotationExcerpt(target)
+                        Toast.makeText(this@ReaderActivity, message, Toast.LENGTH_SHORT).show()
+                        return true
+                    }
+                }
+            )
 
             lifecycleScope.launch {
                 bookSearcher.state.collect { state ->
@@ -393,6 +444,140 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         navigator?.go(locator, false)
         bookmarkSheetVisible.value = false
         toolbarVisible.value = false
+    }
+
+    private fun annotationSelectionActionMode(): ActionMode.Callback {
+        return object : ActionMode.Callback {
+            override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
+                menu.add(Menu.NONE, MENU_ITEM_HIGHLIGHT_ID, Menu.NONE, "Highlight")
+                menu.add(Menu.NONE, MENU_ITEM_COPY_ID, Menu.NONE, "Copy")
+                return true
+            }
+
+            override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean = false
+
+            override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
+                return when (item.itemId) {
+                    MENU_ITEM_HIGHLIGHT_ID -> {
+                        saveSelectionAsAnnotation()
+                        mode.finish()
+                        true
+                    }
+                    MENU_ITEM_COPY_ID -> {
+                        copySelectedText()
+                        mode.finish()
+                        true
+                    }
+                    else -> false
+                }
+            }
+
+            override fun onDestroyActionMode(mode: ActionMode) = Unit
+        }
+    }
+
+    private fun saveSelectionAsAnnotation() {
+        val stableId = bookStableId
+        if (stableId == null) {
+            Toast.makeText(this, "Highlights need an imported library book", Toast.LENGTH_SHORT)
+                .show()
+            return
+        }
+        lifecycleScope.launch {
+            try {
+                val selection = navigator?.currentSelection()
+                if (selection == null) {
+                    Toast.makeText(this@ReaderActivity, "No text selected", Toast.LENGTH_SHORT)
+                        .show()
+                    return@launch
+                }
+                annotationRepository.addAnnotation(
+                    bookId = stableId,
+                    locatorJson = selection.locator.toJSON().toString()
+                )
+                navigator?.clearSelection()
+                snackbarHostState.showSnackbar("Highlight added")
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not save highlight", e)
+                runCatching { navigator?.clearSelection() }
+                Toast.makeText(this@ReaderActivity, "Could not save highlight", Toast.LENGTH_SHORT)
+                    .show()
+            }
+        }
+    }
+
+    private fun copySelectedText() {
+        lifecycleScope.launch {
+            val text = runCatching {
+                navigator?.currentSelection()?.locator?.let { selectedTextOf(it) }
+            }.getOrNull().takeIf { !it.isNullOrBlank() }
+            if (text == null) {
+                navigator?.clearSelection()
+                return@launch
+            }
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+            clipboard?.setPrimaryClip(ClipData.newPlainText("Selected text", text))
+            navigator?.clearSelection()
+            snackbarHostState.showSnackbar("Copied to clipboard")
+        }
+    }
+
+    private fun selectedTextOf(locator: Locator): String? {
+        return try {
+            locator.toJSON().optJSONObject("text")?.optString("exact")
+                ?.takeIf { it.isNotBlank() }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun applyAnnotationDecorations() {
+        val navigator = this.navigator ?: return
+        if (!navigator.supportsDecorationStyle(Decoration.Style.Highlight::class)) return
+        lifecycleScope.launch {
+            try {
+                val decorations = annotations.value.mapNotNull { annotation ->
+                    val locator = parseLocator(annotation.locatorJson) ?: return@mapNotNull null
+                    Decoration(
+                        id = "$ANNOTATION_DECORATION_PREFIX${annotation.id}",
+                        locator = locator,
+                        style = Decoration.Style.Highlight(tint = annotationTint(annotation.colorHex))
+                    )
+                }
+                navigator.applyDecorations(decorations, ANNOTATION_DECORATION_GROUP)
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not apply annotation decorations", e)
+            }
+        }
+    }
+
+    private fun deleteAnnotation(annotation: Annotation) {
+        lifecycleScope.launch {
+            try {
+                annotationRepository.removeAnnotation(annotation.id)
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not delete annotation", e)
+            }
+        }
+    }
+
+    private fun navigateToAnnotation(annotation: Annotation) {
+        val locator = parseLocator(annotation.locatorJson)
+        if (locator == null) {
+            Toast.makeText(this, "Could not open this highlight", Toast.LENGTH_SHORT).show()
+            return
+        }
+        navigator?.go(locator, false)
+        highlightsSheetVisible.value = false
+        toolbarVisible.value = false
+    }
+
+    private fun annotationTint(colorHex: String): Int {
+        return try {
+            Color.parseColor(colorHex)
+        } catch (e: IllegalArgumentException) {
+            DEFAULT_ANNOTATION_TINT
+        }
     }
 
     private fun submitPreferences(prefs: EpubPreferences) {
@@ -490,6 +675,8 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     bookmarkActionsEnabled = bookStableId != null,
                     currentLocatorJson = currentLocation.value?.toJSON()?.toString(),
                     bookmarkSheetVisible = bookmarkSheetVisible.value,
+                    annotations = annotations.value,
+                    highlightsSheetVisible = highlightsSheetVisible.value,
                     searchSheetVisible = searchSheetVisible.value,
                     searchState = searchState,
                     snackbarHostState = snackbarHostState,
@@ -503,6 +690,10 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     onDismissBookmarks = { bookmarkSheetVisible.value = false },
                     onBookmarkClick = { navigateToBookmark(it) },
                     onDeleteBookmark = { deleteBookmark(it) },
+                    onOpenHighlights = { highlightsSheetVisible.value = true },
+                    onDismissHighlights = { highlightsSheetVisible.value = false },
+                    onAnnotationClick = { navigateToAnnotation(it) },
+                    onDeleteAnnotation = { deleteAnnotation(it) },
                     onTocClick = { link ->
                         navigateToTocLink(link)
                         scope.launch { drawerState.close() }
@@ -548,6 +739,8 @@ private fun ReaderOverlay(
     bookmarkActionsEnabled: Boolean,
     currentLocatorJson: String?,
     bookmarkSheetVisible: Boolean,
+    annotations: List<Annotation>,
+    highlightsSheetVisible: Boolean,
     searchSheetVisible: Boolean,
     searchState: BookSearchState,
     snackbarHostState: SnackbarHostState,
@@ -561,6 +754,10 @@ private fun ReaderOverlay(
     onDismissBookmarks: () -> Unit,
     onBookmarkClick: (Bookmark) -> Unit,
     onDeleteBookmark: (Bookmark) -> Unit,
+    onOpenHighlights: () -> Unit,
+    onDismissHighlights: () -> Unit,
+    onAnnotationClick: (Annotation) -> Unit,
+    onDeleteAnnotation: (Annotation) -> Unit,
     onTocClick: (Link) -> Unit,
     onPreferencesChange: (EpubPreferences) -> Unit,
     onOpenSearch: () -> Unit,
@@ -608,7 +805,8 @@ private fun ReaderOverlay(
                         onOpenSearch = onOpenSearch,
                         onOpenSettings = onOpenSettings,
                         onToggleBookmark = onToggleBookmark,
-                        onOpenBookmarks = onOpenBookmarks
+                        onOpenBookmarks = onOpenBookmarks,
+                        onOpenHighlights = onOpenHighlights
                     )
                 }
             }
@@ -627,6 +825,15 @@ private fun ReaderOverlay(
                     onBookmarkClick = onBookmarkClick,
                     onDeleteBookmark = onDeleteBookmark,
                     onDismiss = onDismissBookmarks
+                )
+            }
+
+            if (highlightsSheetVisible) {
+                AnnotationListSheet(
+                    annotations = annotations,
+                    onAnnotationClick = onAnnotationClick,
+                    onDeleteAnnotation = onDeleteAnnotation,
+                    onDismiss = onDismissHighlights
                 )
             }
 
@@ -660,7 +867,8 @@ private fun ReaderTopBar(
     onOpenSearch: () -> Unit,
     onOpenSettings: () -> Unit,
     onToggleBookmark: () -> Unit,
-    onOpenBookmarks: () -> Unit
+    onOpenBookmarks: () -> Unit,
+    onOpenHighlights: () -> Unit
 ) {
     var moreMenuExpanded by remember { mutableStateOf(false) }
     val currentKey = remember(currentLocatorJson) {
@@ -717,6 +925,17 @@ private fun ReaderTopBar(
                         onOpenBookmarks()
                     },
                     leadingIcon = { Icon(Icons.Default.BookmarkBorder, contentDescription = null) },
+                    enabled = bookmarkActionsEnabled
+                )
+                DropdownMenuItem(
+                    text = { Text("Highlights") },
+                    onClick = {
+                        moreMenuExpanded = false
+                        onOpenHighlights()
+                    },
+                    leadingIcon = {
+                        Icon(Icons.Default.FormatColorFill, contentDescription = null)
+                    },
                     enabled = bookmarkActionsEnabled
                 )
             }
@@ -810,6 +1029,79 @@ private fun formatCreatedAt(epochMillis: Long): String {
     val formatter = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
         .withLocale(Locale.getDefault())
     return formatter.format(Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()))
+}
+
+private fun annotationExcerpt(annotation: Annotation): String {
+    return try {
+        val text = org.json.JSONObject(annotation.locatorJson).optJSONObject("text")
+        text?.optString("exact")?.takeIf { it.isNotBlank() }
+            ?: LocatorIdentity.displayTitle(annotation.locatorJson)
+            ?: "Highlight"
+    } catch (e: Exception) {
+        LocatorIdentity.displayTitle(annotation.locatorJson) ?: "Highlight"
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AnnotationListSheet(
+    annotations: List<Annotation>,
+    onAnnotationClick: (Annotation) -> Unit,
+    onDeleteAnnotation: (Annotation) -> Unit,
+    onDismiss: () -> Unit,
+    excerptFor: (Annotation) -> String = { annotationExcerpt(it) }
+) {    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Text(
+            "Highlights",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(16.dp)
+        )
+        if (annotations.isEmpty()) {
+            Text(
+                "No highlights yet",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(16.dp)
+            )
+        } else {
+            LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                items(annotations, key = { it.id }) { annotation ->
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = { onAnnotationClick(annotation) })
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(
+                                start = 16.dp,
+                                top = 12.dp,
+                                bottom = 12.dp,
+                                end = 4.dp
+                            )
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = excerptFor(annotation),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    maxLines = 3,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = formatCreatedAt(annotation.createdAt),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            IconButton(onClick = { onDeleteAnnotation(annotation) }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Delete highlight")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(32.dp))
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

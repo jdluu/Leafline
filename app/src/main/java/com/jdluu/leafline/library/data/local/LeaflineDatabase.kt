@@ -9,14 +9,15 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [BookEntity::class, BookmarkEntity::class],
-    version = 4,
+    entities = [BookEntity::class, BookmarkEntity::class, AnnotationEntity::class],
+    version = 5,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
 abstract class LeaflineDatabase : RoomDatabase() {
     abstract fun bookDao(): BookDao
     abstract fun bookmarkDao(): BookmarkDao
+    abstract fun annotationDao(): AnnotationDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -47,13 +48,30 @@ abstract class LeaflineDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `annotations` (" +
+                        "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`bookId` TEXT NOT NULL, " +
+                        "`locatorJson` TEXT NOT NULL, " +
+                        "`colorHex` TEXT NOT NULL, " +
+                        "`note` TEXT, " +
+                        "`createdAt` INTEGER NOT NULL)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_annotations_bookId` ON `annotations` (`bookId`)"
+                )
+            }
+        }
+
         fun build(context: Context): LeaflineDatabase {
             return Room.databaseBuilder(
                 context.applicationContext,
                 LeaflineDatabase::class.java,
                 "leafline-database"
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build()
         }
     }
