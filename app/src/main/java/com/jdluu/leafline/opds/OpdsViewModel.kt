@@ -11,13 +11,13 @@ sealed interface OpdsUiState {
     data object Idle : OpdsUiState
     data object Loading : OpdsUiState
     data class ConfigSaved(val config: OpdsServerConfig) : OpdsUiState
-    data class Loaded(val navigation: List<OpdsNavigationEntry>) : OpdsUiState
+    data class Loaded(val page: OpdsFeedPage) : OpdsUiState
+    data class SelectedAcquisition(val entry: OpdsFeedEntry) : OpdsUiState
     data class Error(val message: String) : OpdsUiState
 }
 
 class OpdsViewModel : ViewModel() {
     private val service = OpdsCatalogService()
-
     private val _uiState = MutableStateFlow<OpdsUiState>(OpdsUiState.Idle)
     val uiState: StateFlow<OpdsUiState> = _uiState
 
@@ -41,9 +41,21 @@ class OpdsViewModel : ViewModel() {
             _uiState.value = OpdsUiState.Error("Configure the OPDS catalog first")
             return
         }
+        loadFeed(current)
+    }
+
+    fun loadFeed(url: String) {
+        val current = config ?: run {
+            _uiState.value = OpdsUiState.Error("Configure the OPDS catalog first")
+            return
+        }
+        loadFeed(current.copy(catalogUrl = url))
+    }
+
+    private fun loadFeed(current: OpdsServerConfig) {
         _uiState.value = OpdsUiState.Loading
         viewModelScope.launch {
-            val result = service.fetchRootNavigation(current)
+            val result = service.fetchFeed(current)
             val value = result.getOrNull()
             if (value != null) {
                 _uiState.value = OpdsUiState.Loaded(value)
@@ -52,6 +64,10 @@ class OpdsViewModel : ViewModel() {
                 _uiState.value = OpdsUiState.Error(failure?.message ?: "Failed to fetch catalog")
             }
         }
+    }
+
+    fun selectAcquisition(entry: OpdsFeedEntry) {
+        _uiState.value = OpdsUiState.SelectedAcquisition(entry)
     }
 
     fun reset() {

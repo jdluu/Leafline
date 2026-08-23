@@ -1,6 +1,5 @@
 package com.jdluu.leafline.opds
 
-import java.nio.charset.StandardCharsets
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -37,9 +36,37 @@ class OpdsCatalogServiceTest {
     }
 
     @Test
+    fun parseXmlPage_extractsAcquisitionEntry() {
+        val result = service.parseXmlPage(
+            loadFixture("grimmory-catalog-feed.xml"),
+            "http://localhost:6060/api/v1/opds/catalog"
+        )
+
+        assertTrue("Expected successful parse", result.isSuccess)
+        val page = result.getOrNull()!!
+        val acquisitions = page.acquisitionEntries()
+
+        assertEquals(1, acquisitions.size)
+        assertEquals("Pride and Prejudice", acquisitions.single().title)
+        assertEquals("Jane Austen", acquisitions.single().authors.single())
+        assertEquals("http://localhost:6060/books/pride.epub", acquisitions.single().href)
+    }
+
+    @Test
     fun parseXml_returnsFailure_onBadXml() {
-        val bad = "<feed><entry></feed>".toByteArray(StandardCharsets.UTF_8)
-        val result = service.parseXml(bad, "http://localhost:6060/api/v1/opds")
+        val result = service.parseXml(
+            "<feed><entry></feed>".toByteArray(),
+            "http://localhost:6060/api/v1/opds"
+        )
         assertTrue("Expected failure on malformed feed", result.isFailure)
+    }
+}
+
+class OpdsFeedEntryTest {
+    @Test
+    fun acquisitionRel_acceptsOpenAccessAndAcquisitionVariants() {
+        assertTrue(isAcquisitionRel(setOf("http://opds-spec.org/acquisition")))
+        assertTrue(isAcquisitionRel(setOf("http://opds-spec.org/acquisition/open-access")))
+        assertTrue(isAcquisitionRel(setOf("http://opds-spec.org/acquisition/borrow")))
     }
 }

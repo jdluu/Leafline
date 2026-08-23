@@ -37,78 +37,66 @@ fun OpdsBrowseScreen(
     Column(Modifier.fillMaxSize()) {
         TopAppBar(
             title = { Text("OPDS Catalog") },
-            navigationIcon = {
-                TextButton(onClick = onBack) { Text("Back") }
-            }
+            navigationIcon = { TextButton(onClick = onBack) { Text("Back") } }
         )
 
         when (val s = state) {
-            is OpdsUiState.Idle -> OpdsConfigForm(
-                onConnect = { url, user, pass ->
-                    viewModel.saveConfig(url, user, pass)
-                    viewModel.loadRootNavigation()
-                }
-            )
-
-            is OpdsUiState.Loading -> Box(
-                modifier = Modifier.fillMaxSize(),
+            OpdsUiState.Idle -> OpdsConfigForm { url, user, pass ->
+                viewModel.saveConfig(url, user, pass)
+                viewModel.loadRootNavigation()
+            }
+            OpdsUiState.Loading -> Box(
+                Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) { CircularProgressIndicator() }
-
             is OpdsUiState.ConfigSaved -> Text(
-                "Connected to ${s.config.catalogUrl}",
-                modifier = Modifier.padding(16.dp)
+                "Connected to ${s.config.catalogUrl}", Modifier.padding(16.dp)
             )
-
-            is OpdsUiState.Loaded -> OpdsNavigationList(
-                entries = s.navigation,
-                onEdit = { viewModel.reset() }
+            is OpdsUiState.Loaded -> OpdsFeedList(
+                page = s.page,
+                onNavigationClick = viewModel::loadFeed,
+                onAcquisitionClick = viewModel::selectAcquisition,
+                onEdit = viewModel::reset
             )
-
+            is OpdsUiState.SelectedAcquisition -> AcquisitionDetails(
+                entry = s.entry,
+                onBack = viewModel::reset
+            )
             is OpdsUiState.Error -> Column(Modifier.padding(16.dp)) {
                 Text("Error: ${s.message}", color = MaterialTheme.colorScheme.error)
-                Button(onClick = { viewModel.reset() }) { Text("Back to settings") }
+                Button(onClick = viewModel::reset) { Text("Back to settings") }
             }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun OpdsConfigForm(
-    onConnect: (String, String, String) -> Unit
-) {
+private fun OpdsConfigForm(onConnect: (String, String, String) -> Unit) {
     var url by remember { mutableStateOf("") }
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         OutlinedTextField(
-            value = url,
-            onValueChange = { url = it },
+            value = url, onValueChange = { url = it },
             label = { Text("Catalog URL") },
             placeholder = { Text("http://server:6060/api/v1/opds") },
             modifier = Modifier.fillMaxWidth()
         )
         OutlinedTextField(
-            value = username,
-            onValueChange = { username = it },
+            value = username, onValueChange = { username = it },
             label = { Text("OPDS username") },
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
         )
         OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("OPDS password") },
-            singleLine = true,
+            value = password, onValueChange = { password = it },
+            label = { Text("OPDS password") }, singleLine = true,
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
         )
         Button(
             onClick = { onConnect(url, username, password) },
             modifier = Modifier.padding(top = 16.dp)
-        ) {
-            Text("Browse Grimmory")
-        }
+        ) { Text("Browse Grimmory") }
         Text(
             "Credentials are stored only in memory and are never committed.",
             style = MaterialTheme.typography.bodySmall,
@@ -118,29 +106,63 @@ private fun OpdsConfigForm(
 }
 
 @Composable
-private fun OpdsNavigationList(
-    entries: List<OpdsNavigationEntry>,
+private fun OpdsFeedList(
+    page: OpdsFeedPage,
+    onNavigationClick: (String) -> Unit,
+    onAcquisitionClick: (OpdsFeedEntry) -> Unit,
     onEdit: () -> Unit
 ) {
     LazyColumn(Modifier.fillMaxSize()) {
-        if (entries.isEmpty()) {
-            item { Text("No navigation feeds found", modifier = Modifier.padding(16.dp)) }
-        } else {
-            items(entries) { entry ->
-                Card(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text(entry.title, style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            entry.href,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
+        item {
+            Text(
+                page.title,
+                modifier = Modifier.padding(16.dp),
+                style = MaterialTheme.typography.headlineSmall
+            )
+        }
+        items(page.entries) { entry ->
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                onClick = {
+                    if (entry.isAcquisition) onAcquisitionClick(entry)
+                    else onNavigationClick(entry.href)
+                }
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text(entry.title, style = MaterialTheme.typography.titleMedium)
+                    if (entry.authors.isNotEmpty()) {
+                        Text(entry.authors.joinToString(", "), style = MaterialTheme.typography.bodyMedium)
                     }
+                    Text(
+                        entry.href,
+                        modifier = Modifier.padding(top = 4.dp),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Text(
+                        if (entry.isAcquisition) "EPUB available" else "Open feed",
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
                 }
             }
         }
-        item {
-            TextButton(onClick = onEdit) { Text("Edit settings") }
+        item { TextButton(onClick = onEdit) { Text("Edit settings") } }
+    }
+}
+
+@Composable
+private fun AcquisitionDetails(entry: OpdsFeedEntry, onBack: () -> Unit) {
+    Column(Modifier.fillMaxSize().padding(16.dp)) {
+        Text(entry.title, style = MaterialTheme.typography.headlineSmall)
+        if (entry.authors.isNotEmpty()) {
+            Text(entry.authors.joinToString(", "), Modifier.padding(top = 8.dp))
         }
+        Text("Download support is the next slice.", modifier = Modifier.padding(top = 16.dp))
+        Text(
+            entry.href,
+            modifier = Modifier.padding(top = 8.dp),
+            style = MaterialTheme.typography.bodySmall
+        )
+        Button(onClick = onBack, modifier = Modifier.padding(top = 16.dp)) { Text("Back") }
     }
 }

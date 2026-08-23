@@ -14,22 +14,11 @@ import org.readium.r2.shared.util.http.HttpRequest.Method
 /** Lightweight logger that works in both JVM unit tests and Android. */
 private val logger = java.util.logging.Logger.getLogger("OpdsCatalogService")
 
-/**
- * Simplest in-memory holder of OPDS server configuration for the first slice.
- * Credentials live only here and are never committed.
- */
 object OpdsConfigStore {
     @Volatile
     var config: OpdsServerConfig? = null
 }
 
-/**
- * Fetches and parses a Grimmory OPDS 1.2 root catalog feed using the official
- * Readium `readium-opds` parser and the shared `DefaultHttpClient`.
- *
- * HTTP Basic Auth is applied from [OpdsServerConfig]. Returns navigation
- * entries (title + href) found in the feed root.
- */
 class OpdsCatalogService(
     private val client: HttpClient = DefaultHttpClient()
 ) {
@@ -39,17 +28,41 @@ class OpdsCatalogService(
         return "Basic $encoded"
     }
 
-    private fun List<org.readium.r2.shared.publication.Link>.toNavigation(): List<OpdsNavigationEntry> =
-        mapNotNull { link ->
-            val hrefText = link.href.toString()
-            if (hrefText.isBlank()) null else OpdsNavigationEntry(
-                title = link.title ?: hrefText,
-                href = hrefText
-            )
-        }
+    private fun org.readium.r2.shared.publication.Link.resolvedHref(): String = href.toString()
 
-    /** Fetches and parses the root OPDS feed, returning its navigation links. */
+    private fun org.readium.r2.shared.publication.Link.toFeedEntry(
+        title: String,
+        authors: List<String> = emptyList()
+    ): OpdsFeedEntry = OpdsFeedEntry(
+        title = title,
+        href = resolvedHref(),
+        isAcquisition = isAcquisitionRel(rels),
+        authors = authors
+    )
+
+    private fun org.readium.r2.shared.opds.Feed.toPage(): OpdsFeedPage {
+        val navigation = navigation.map { link ->
+            link.toFeedEntry(link.title ?: link.href.toString())
+        }
+        val publications = publications.flatMap { publication ->
+            val authors = publication.metadata.authors.mapNotNull { it.name }
+            publication.links
+                .filter { isAcquisitionRel(it.rels) }
+                .map { link ->
+                    link.toFeedEntry(publication.metadata.title ?: link.href.toString(), authors)
+                }
+        }
+        return OpdsFeedPage(
+            title = metadata?.title ?: title,
+            entries = navigation + publications
+        )
+    }
+
     suspend fun fetchRootNavigation(config: OpdsServerConfig): Try<List<OpdsNavigationEntry>, Exception> =
+        fetchFeed(config).map { it.navigationEntries() }
+
+    /** Fetches and parses any OPDS 1.2 feed, preserving resolved links. */
+    suspend fun fetchFeed(config: OpdsServerConfig): Try<OpdsFeedPage, Exception> =
         withContext(Dispatchers.IO) {
             try {
                 val url = AbsoluteUrl(config.catalogUrl)
@@ -66,7 +79,7 @@ class OpdsCatalogService(
                     logger.severe("OPDS parse failed: $failure")
                     Try.failure(failure ?: Exception("OPDS parse failed"))
                 } else {
-                    Try.success(parseData.feed!!.navigation.toNavigation())
+                    Try.success(parseData.feed!!.toPage())
                 }
             } catch (e: Exception) {
                 logger.severe("OPDS root fetch failed: ${e.message}")
@@ -74,15 +87,33 @@ class OpdsCatalogService(
             }
         }
 
-    /** Parses raw OPDS 1.2 XML bytes, used in tests with fixture feeds. */
     fun parseXml(xml: ByteArray, catalogUrl: String): Try<List<OpdsNavigationEntry>, Exception> =
+        parseXmlPage(xml, catalogUrl).map { it.navigationEntries() }
+
+    fun parseXmlPage(xml: ByteArray, catalogUrl: String): Try<OpdsFeedPage, Exception> =
         try {
             val url = AbsoluteUrl(catalogUrl)
                 ?: throw IllegalArgumentException("Invalid catalog URL")
             val parseData = OPDS1Parser.parse(xml, url)
-            Try.success(parseData.feed!!.navigation.toNavigation())
+            Try.success(parseData.feed!!.toPage())
         } catch (e: Exception) {
             logger.severe("OPDS XML parse failed: ${e.message}")
             Try.failure(e)
         }
 }
+
+private fun List<org.readium.r2.shared.publication.Link>.toNavigation(): List<OpdsNavigationEntry> =
+    mapNotNull { link ->
+        val hrefText = link.href.toString()
+        if (hrefText.isBlank()) null else OpdsNavigationEntry(
+            title = link.title ?: hrefText,
+            href = hrefText
+        )
+    }
+
+internal fun isAcquisitionRel(relations: Set<String>): Boolean =
+    relations.any {
+        it == "http://opds-spec.org/acquisition" ||
+            it.startsWith("http://opds-spec.org/acquisition/") ||
+            it == "http://opds-spec.org/acquisition/open-access"
+    }
