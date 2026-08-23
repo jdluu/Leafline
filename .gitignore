@@ -42,3 +42,4 @@ scripts/opencode-bws.local
 
 # Local scratch space for build experiments
 /build-tmp/
+.kotlin
