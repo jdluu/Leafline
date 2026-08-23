@@ -58,6 +58,8 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -160,6 +162,7 @@ import java.util.UUID
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.MutableStateFlow
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -186,6 +189,15 @@ import org.readium.r2.streamer.PublicationOpener
 import org.readium.r2.streamer.parser.DefaultPublicationParser
 import java.io.File
 import java.io.IOException
+
+/** UI state for the sync conflict bottom sheet. */
+internal data class SyncConflictState(
+    val localPercentage: Double?,
+    val remotePercentage: Double?,
+    val remoteDevice: String?,
+    val remoteTimestamp: Long?,
+    val onJump: () -> Unit
+)
 
 private const val SEARCH_DEBOUNCE_MS = 300L
 
@@ -237,6 +249,9 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     private var highlightsSheetVisible = mutableStateOf(false)
     private var searchSheetVisible = mutableStateOf(false)
     private var bookTitle = mutableStateOf("")
+
+    /** Sync conflict state for the bottom sheet. */
+    private val syncConflictState = MutableStateFlow<SyncConflictState?>(null)
     private var tocLinks = mutableStateOf<List<Pair<Link, Int>>>(emptyList())
     private var currentSettings = mutableStateOf(ReaderSettings())
     private var bookmarks = mutableStateOf<List<Bookmark>>(emptyList())
@@ -867,6 +882,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
                 val searchState by bookSearcher.state.collectAsState()
+                val syncConflict by syncConflictState.collectAsState()
                 ReaderOverlay(
                     title = bookTitle.value,
                     toolbarVisible = toolbarVisible.value,
@@ -884,6 +900,9 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     searchState = searchState,
                     pageAnnouncement = pageTurnAnnouncement.value,
                     snackbarHostState = snackbarHostState,
+                    syncConflict = syncConflict,
+                    onJumpToRemote = { syncConflict?.onJump?.invoke(); syncConflictState.value = null },
+                    onDismissSyncConflict = { syncConflictState.value = null },
                     onBack = { finish() },
                     onOpenToc = { scope.launch { drawerState.open() } },
                     onOpenSettings = { settingsSheetVisible.value = true },
@@ -972,28 +991,27 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
 
     private fun presentRemoteProgress(outcome: PullOutcome.RemoteAhead) {
         val remote = outcome.remote
+        val localProgress = currentLocation.value?.let { locator ->
+            ReadingProgressMath.percentageFromLocator(locator.toJSON().toString())
+        }
         val target = remote.progress?.let { json -> parseLocatorOrNull(json) }
         if (target == null) {
-            val percentage = outcome.remotePercentage
-            val detail = if (percentage != null) String.format(Locale.US, "%.0f%%", percentage) else ""
-            Toast.makeText(this, "Newer reading position$detail on ${remote.device ?: "another device"}", Toast.LENGTH_LONG).show()
+            syncConflictState.value = SyncConflictState(
+                localPercentage = localProgress,
+                remotePercentage = outcome.remotePercentage,
+                remoteDevice = remote.device,
+                remoteTimestamp = remote.timestamp,
+                onJump = {}
+            )
             return
         }
-        val percentage = outcome.remotePercentage
-        val message = buildString {
-            append("Remote reading position")
-            if (percentage != null) {
-                append(String.format(Locale.US, " (%.0f%%)", percentage))
-            }
-            append(" from ").append(remote.device ?: "another device")
-            append(" is newer. Jump there?")
-        }
-        AlertDialog.Builder(this)
-            .setTitle("Progress sync")
-            .setMessage(message)
-            .setPositiveButton("Jump") { _, _ -> navigator?.go(target, false) }
-            .setNegativeButton("Stay", null)
-            .show()
+        syncConflictState.value = SyncConflictState(
+            localPercentage = localProgress,
+            remotePercentage = outcome.remotePercentage,
+            remoteDevice = remote.device,
+            remoteTimestamp = remote.timestamp,
+            onJump = { navigator?.go(target, false) }
+        )
     }
 
     private fun pushProgressOnExit() {
@@ -1064,6 +1082,9 @@ private fun ReaderOverlay(
     searchState: BookSearchState,
     pageAnnouncement: String?,
     snackbarHostState: SnackbarHostState,
+    syncConflict: SyncConflictState?,
+    onJumpToRemote: () -> Unit,
+    onDismissSyncConflict: () -> Unit,
     onBack: () -> Unit,
     onOpenToc: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -1190,6 +1211,14 @@ private fun ReaderOverlay(
                 )
             }
 
+            syncConflict?.let { conflict ->
+                SyncConflictSheet(
+                    conflict = conflict,
+                    onJump = onJumpToRemote,
+                    onDismiss = onDismissSyncConflict
+                )
+            }
+
             pageAnnouncement?.let { announcement ->
                 Text(
                     text = announcement,
@@ -1205,6 +1234,69 @@ private fun ReaderOverlay(
                 hostState = snackbarHostState,
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SyncConflictSheet(
+    conflict: SyncConflictState,
+    onJump: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(modifier = Modifier.padding(24.dp)) {
+            Text("Progress sync", style = MaterialTheme.typography.titleLarge)
+            Spacer(Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Local", style = MaterialTheme.typography.labelMedium)
+                    Text(
+                        text = conflict.localPercentage?.let { "%.0f%%".format(it) } ?: "—",
+                        style = MaterialTheme.typography.headlineMedium
+                    )
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Remote", style = MaterialTheme.typography.labelMedium)
+                    Text(
+                        text = conflict.remotePercentage?.let { "%.0f%%".format(it) } ?: "—",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            if (conflict.remoteDevice != null) {
+                MetadataRow("Device", conflict.remoteDevice)
+            }
+            conflict.remoteTimestamp?.let { ts ->
+                MetadataRow("Last synced", formatEpochMillis(ts))
+            }
+
+            Spacer(Modifier.height(20.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f)
+                ) { Text("Stay") }
+                Button(
+                    onClick = onJump,
+                    modifier = Modifier.weight(1f)
+                ) { Text("Jump to remote") }
+            }
+
+            Spacer(Modifier.height(16.dp))
         }
     }
 }
@@ -2053,6 +2145,7 @@ private fun HighlightTintPickerSheet(
                         selected = false,
                         onClick = { onTintSelected(tint) },
                         label = { Text(tint.label) },
+
                         leadingIcon = {
                             Box(
                                 modifier = Modifier
@@ -2068,4 +2161,9 @@ private fun HighlightTintPickerSheet(
             }
         }
     }
+}
+
+private fun formatEpochMillis(millis: Long): String {
+    val sdf = java.text.SimpleDateFormat("MMM d, yyyy HH:mm", java.util.Locale.US)
+    return sdf.format(java.util.Date(millis))
 }
