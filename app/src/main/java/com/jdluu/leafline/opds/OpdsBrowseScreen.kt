@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -70,7 +72,12 @@ fun OpdsBrowseScreen(
                 onDownload = { onDownload(s.entry) },
                 onBack = viewModel::reset
             )
-            is OpdsUiState.Error -> Column(Modifier.padding(16.dp)) {
+            is OpdsUiState.Error -> Column(
+                Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp)
+            ) {
                 Text("Error: ${s.message}", color = MaterialTheme.colorScheme.error)
                 Button(onClick = viewModel::reset) { Text("Back to settings") }
             }
@@ -84,7 +91,12 @@ private fun OpdsConfigForm(onConnect: (String, String, String) -> Unit) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
-    Column(Modifier.fillMaxSize().padding(16.dp)) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp)
+    ) {
         OutlinedTextField(
             value = url, onValueChange = { url = it },
             label = { Text("Catalog URL") },
@@ -164,7 +176,12 @@ private fun AcquisitionDetails(
     onDownload: () -> Unit,
     onBack: () -> Unit
 ) {
-    Column(Modifier.fillMaxSize().padding(16.dp)) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp)
+    ) {
         Text(entry.title, style = MaterialTheme.typography.headlineSmall)
         if (entry.authors.isNotEmpty()) {
             Text(entry.authors.joinToString(", "), Modifier.padding(top = 8.dp))

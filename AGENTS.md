@@ -208,6 +208,22 @@ clients or manipulate EPUB archives directly.
   unknown font names fall back to original, page margins snap into range, and
   a stored Publisher selection drops stale custom typography.
 
+### Dynamic type decisions
+
+- All Compose text uses `MaterialTheme.typography` (sp based), so the system
+  font scale applies automatically up to 200%; no `fontSize`, `.sp`, or `.px`
+  text sizes exist in Compose or XML resources.
+- `scripts/check_dynamic_type.sh` is the grep-level guard: it fails when any
+  Compose `fontSize` is set in dp or px, which would ignore font scale. Run
+  it alongside `git diff --check`; it needs only POSIX sh and grep.
+- Sheets and long forms reflow instead of clipping: the reader settings sheet
+  scrolls vertically; book search results size to content up to the remaining
+  sheet height (`weight(1f, fill = false)`) instead of a fixed dp cap; the
+  OPDS config form, acquisition details, and error panel scroll vertically.
+  Bookmark and highlight sheets, the TOC drawer, dropdown menus, and search
+  result lists already scroll through LazyColumn; the framework progress-sync
+  dialog scrolls its message internally.
+
 ### Open architecture items
 
 - release license and distribution channel;
