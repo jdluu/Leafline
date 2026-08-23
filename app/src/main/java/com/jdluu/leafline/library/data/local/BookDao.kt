@@ -12,6 +12,13 @@ interface BookDao {
     @Query("SELECT * FROM books ORDER BY addedAtEpochMillis DESC")
     fun getAllBooks(): Flow<List<BookEntity>>
 
+    @Query(
+        "SELECT * FROM books " +
+            "WHERE title LIKE '%' || :query || '%' OR authors LIKE '%' || :query || '%' " +
+            "ORDER BY addedAtEpochMillis DESC"
+    )
+    fun searchBooks(query: String): Flow<List<BookEntity>>
+
     @Query("SELECT * FROM books WHERE stableId = :stableId LIMIT 1")
     suspend fun getBookByStableId(stableId: String): BookEntity?
 

@@ -14,6 +14,8 @@ class LibraryRepositoryImpl(
 
     override fun getAllBooks(): Flow<List<LibraryBook>> = dataSource.getAllBooks()
 
+    override fun searchBooks(query: String): Flow<List<LibraryBook>> = dataSource.searchBooks(query)
+
     override suspend fun getBookByStableId(stableId: String): LibraryBook? = withContext(ioDispatcher) {
         dataSource.getBookByStableId(stableId)
     }

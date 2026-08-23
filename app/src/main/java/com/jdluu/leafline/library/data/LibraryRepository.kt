@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.Flow
 
 interface LibraryRepository {
     fun getAllBooks(): Flow<List<LibraryBook>>
+    fun searchBooks(query: String): Flow<List<LibraryBook>>
     suspend fun getBookByStableId(stableId: String): LibraryBook?
     suspend fun getBookByFileHash(fileHash: String): LibraryBook?
     suspend fun getBookLocatorByFilePath(filePath: String): Pair<String, String?>?

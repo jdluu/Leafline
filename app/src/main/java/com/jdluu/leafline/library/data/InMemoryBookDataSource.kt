@@ -4,6 +4,7 @@ import com.jdluu.leafline.library.LibraryBook
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -20,6 +21,21 @@ class InMemoryBookDataSource : BookDataSource {
     private val _booksFlow = MutableStateFlow<List<LibraryBook>>(emptyList())
 
     override fun getAllBooks(): kotlinx.coroutines.flow.Flow<List<LibraryBook>> = _booksFlow.asStateFlow()
+
+    override fun searchBooks(query: String): kotlinx.coroutines.flow.Flow<List<LibraryBook>> {
+        val normalized = query.trim()
+        return _booksFlow.asStateFlow().map { all ->
+            if (normalized.isEmpty()) {
+                all
+            } else {
+                val lowerQuery = normalized.lowercase()
+                all.filter { book ->
+                    book.title.lowercase().contains(lowerQuery) ||
+                        book.authors.any { author -> author.lowercase().contains(lowerQuery) }
+                }
+            }
+        }
+    }
 
     private fun refreshFlow() {
         _booksFlow.value = books.values.sortedByDescending { it.addedAtEpochMillis }

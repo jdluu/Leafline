@@ -20,7 +20,9 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -31,6 +33,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -62,11 +65,23 @@ fun LibraryScreen(
 ) {
     val books by viewModel.sortedBooks.collectAsStateWithLifecycle()
     val currentSort by viewModel.sort.collectAsStateWithLifecycle()
+    val query by viewModel.query.collectAsStateWithLifecycle()
+    var searchActive by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
             title = { Text("Library") },
             actions = {
+                IconButton(
+                    onClick = {
+                        if (searchActive) {
+                            viewModel.setQuery("")
+                        }
+                        searchActive = !searchActive
+                    }
+                ) {
+                    Icon(Icons.Default.Search, contentDescription = "Search library")
+                }
                 Box {
                     var menuExpanded by remember { mutableStateOf(false) }
                     IconButton(onClick = { menuExpanded = true }) {
@@ -84,6 +99,27 @@ fun LibraryScreen(
                 }
             }
         )
+        if (searchActive) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = viewModel::setQuery,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                placeholder = { Text("Search title or author") },
+                singleLine = true,
+                trailingIcon = {
+                    IconButton(
+                        onClick = {
+                            viewModel.setQuery("")
+                            searchActive = false
+                        }
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = "Clear search")
+                    }
+                }
+            )
+        }
         Button(
             onClick = onImportEpub,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -95,7 +131,11 @@ fun LibraryScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                Text("No books imported yet")
+                if (query.isNotBlank()) {
+                    Text("No books match")
+                } else {
+                    Text("No books imported yet")
+                }
             }
         } else {
             LazyVerticalGrid(

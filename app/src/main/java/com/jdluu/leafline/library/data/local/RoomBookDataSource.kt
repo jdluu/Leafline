@@ -15,6 +15,12 @@ class RoomBookDataSource(
         }
     }
 
+    override fun searchBooks(query: String): Flow<List<LibraryBook>> {
+        return database.bookDao().searchBooks(query).map { entities ->
+            entities.map { BookEntity.toLibraryBook(it) }
+        }
+    }
+
     override suspend fun getBookByStableId(stableId: String): LibraryBook? {
         return database.bookDao().getBookByStableId(stableId)?.let { BookEntity.toLibraryBook(it) }
     }
