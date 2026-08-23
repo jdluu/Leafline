@@ -10,37 +10,39 @@ import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.TextFields
-import androidx.compose.material3.DismissibleDrawerSheet
-import androidx.compose.material3.DismissibleNavigationDrawer
-import androidx.compose.material3.DrawerState
-import androidx.compose.material3.DrawerValue
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.DrawerState
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -55,14 +57,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
-import org.readium.r2.navigator.preferences.Configurable
+import org.readium.r2.navigator.epub.EpubPreferences
 import org.readium.r2.navigator.preferences.FontFamily
 import org.readium.r2.navigator.preferences.Theme
-import org.readium.r2.navigator.epub.EpubPreferences
 import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.publication.Link
 import org.readium.r2.shared.publication.Locator
-import org.readium.r2.shared.publication.Publication
 import org.readium.r2.shared.util.AbsoluteUrl
 import org.readium.r2.shared.util.asset.AssetRetriever
 import org.readium.r2.shared.util.getOrElse
@@ -109,6 +109,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     private var navigator: EpubNavigatorFragment? = null
     private var bookStableId: String? = null
     private var toolbarVisible = mutableStateOf(false)
+    private var settingsSheetVisible = mutableStateOf(false)
     private var bookTitle = mutableStateOf("")
     private var tocLinks = mutableStateOf<List<Pair<Link, Int>>>(emptyList())
     private var currentPreferences = mutableStateOf(EpubPreferences())
@@ -277,9 +278,12 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     tocLinks = tocLinks.value,
                     currentPreferences = currentPreferences.value,
                     drawerState = drawerState,
+                    settingsSheetVisible = settingsSheetVisible.value,
                     onToggleToolbar = { toolbarVisible.value = !toolbarVisible.value },
                     onBack = { finish() },
                     onOpenToc = { scope.launch { drawerState.open() } },
+                    onOpenSettings = { settingsSheetVisible.value = true },
+                    onDismissSettings = { settingsSheetVisible.value = false },
                     onTocClick = { link ->
                         navigateToTocLink(link)
                         scope.launch { drawerState.close() }
@@ -315,9 +319,12 @@ private fun ReaderOverlay(
     tocLinks: List<Pair<Link, Int>>,
     currentPreferences: EpubPreferences,
     drawerState: DrawerState,
+    settingsSheetVisible: Boolean,
     onToggleToolbar: () -> Unit,
     onBack: () -> Unit,
     onOpenToc: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onDismissSettings: () -> Unit,
     onTocClick: (Link) -> Unit,
     onPreferencesChange: (EpubPreferences) -> Unit
 ) {
@@ -361,19 +368,117 @@ private fun ReaderOverlay(
                             IconButton(onClick = onOpenToc) {
                                 Icon(Icons.Default.Menu, contentDescription = "Contents")
                             }
-                            IconButton(onClick = {
-                                onPreferencesChange(
-                                    currentPreferences.copy(
-                                        fontSize = (currentPreferences.fontSize ?: 1.0) + 0.25
-                                    )
-                                )
-                            }) {
-                                Icon(Icons.Default.TextFields, contentDescription = "Font size")
+                            IconButton(onClick = onOpenSettings) {
+                                Icon(Icons.Default.Settings, contentDescription = "Reader settings")
                             }
                         }
                     )
                 }
             }
+
+            if (settingsSheetVisible) {
+                ReaderSettingsSheet(
+                    preferences = currentPreferences,
+                    onPreferencesChange = onPreferencesChange,
+                    onDismiss = onDismissSettings
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReaderSettingsSheet(
+    preferences: EpubPreferences,
+    onPreferencesChange: (EpubPreferences) -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
+            Text(
+                "Reader Settings",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+
+            Text("Theme", style = MaterialTheme.typography.labelLarge)
+            Row(modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)) {
+                listOf(
+                    Theme.LIGHT to "Light",
+                    Theme.SEPIA to "Sepia",
+                    Theme.DARK to "Dark"
+                ).forEach { (theme, label) ->
+                    FilterChip(
+                        selected = preferences.theme == theme,
+                        onClick = { onPreferencesChange(preferences.copy(theme = theme)) },
+                        label = { Text(label) },
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                }
+            }
+
+            Text("Font", style = MaterialTheme.typography.labelLarge)
+            Row(modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)) {
+                listOf(
+                    null to "Original",
+                    FontFamily.SERIF to "Serif",
+                    FontFamily.SANS_SERIF to "Sans"
+                ).forEach { (family, label) ->
+                    FilterChip(
+                        selected = preferences.fontFamily == family,
+                        onClick = { onPreferencesChange(preferences.copy(fontFamily = family)) },
+                        label = { Text(label) },
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                }
+            }
+
+            Text("Line height", style = MaterialTheme.typography.labelLarge)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
+            ) {
+                IconButton(onClick = {
+                    val current = preferences.lineHeight ?: 1.2
+                    if (current > 1.0) {
+                        onPreferencesChange(preferences.copy(lineHeight = current - 0.2))
+                    }
+                }) {
+                    Icon(Icons.Default.Remove, contentDescription = "Decrease line height")
+                }
+                Text(
+                    text = "%.1f".format(preferences.lineHeight ?: 1.2),
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
+                IconButton(onClick = {
+                    val current = preferences.lineHeight ?: 1.2
+                    if (current < 2.5) {
+                        onPreferencesChange(preferences.copy(lineHeight = current + 0.2))
+                    }
+                }) {
+                    Icon(Icons.Default.Add, contentDescription = "Increase line height")
+                }
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    "Use publisher styles",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                Switch(
+                    checked = preferences.publisherStyles ?: true,
+                    onCheckedChange = { checked ->
+                        onPreferencesChange(preferences.copy(publisherStyles = checked))
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }
