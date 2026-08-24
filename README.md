@@ -46,6 +46,9 @@ device. The catalog server must expose OPDS access for your account.
 
 ## Status
 
+Active development. See [CHANGELOG.md](CHANGELOG.md) for release history and
+the versioning policy. Current version: 0.2.0.
+
 Leafline is under active development and not yet published. There is no
 release license yet; until one is added, all rights are reserved.
 
