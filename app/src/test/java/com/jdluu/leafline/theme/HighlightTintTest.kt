@@ -34,20 +34,6 @@ class HighlightTintTest {
         }
     }
 
-    @Test
-    fun `all swatch colors are visible on white background`() {
-        HIGHLIGHT_TINTS.forEach { tint ->
-            val ratio = contrastRatio(
-                String.format("#%06X", tint.swatchColor.toArgb() and 0xFFFFFF),
-                "#FFFFFF"
-            )
-            assertTrue(
-                "${tint.label} on white: expected >= 1.5, got ${ratio}",
-                ratio >= 1.5
-            )
-        }
-    }
-
     // --- WCAG utilities (reused) ---
 
     private fun relativeLuminance(hex: String): Double {

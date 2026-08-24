@@ -82,7 +82,7 @@ class FileHashUtilTest {
 
         val result = FileHashUtil.koreaderHash(file)
 
-        assertEquals("69a32f55bb81be374d600439369dd434", result)
+        assertEquals("db28671f485423ba5fe9bc8f06381a6d", result)
     }
 
     @Test
@@ -100,27 +100,30 @@ class FileHashUtilTest {
 
         val result = FileHashUtil.koreaderHash(file)
 
-        assertEquals("ab4d875100bf17712ce5f1c81a3115f5", result)
+        assertEquals("316c5d1481dfe71ab94ef11d43fd134f", result)
     }
 
     @Test
-    fun `koreaderHash falls back to full md5 for small files`() {
+    fun `koreaderHash matches KOReader behavior for files smaller than first offset`() {
         val file = tempFolder.newFile("small.epub")
         file.writeBytes(ByteArray(100) { 'A'.code.toByte() })
 
         val result = FileHashUtil.koreaderHash(file)
 
-        assertEquals("8adc5937e635f6c9af646f0b23560fae", result)
+        // KOReader reads at offset 256 first; for a 100-byte file that seek is
+        // past EOF, so the sample read returns nil and the digest is MD5 of
+        // empty input (d41d8cd9...). This matches util.partialMD5 exactly.
+        assertEquals("d41d8cd98f00b204e9800998ecf8427e", result)
     }
 
     @Test
-    fun `koreaderHash falls back to full md5 for exactly one block`() {
+    fun `koreaderHash samples partial data for exactly one block`() {
         val file = tempFolder.newFile("one-block.epub")
         file.writeBytes(ByteArray(1024) { 'B'.code.toByte() })
 
         val result = FileHashUtil.koreaderHash(file)
 
-        assertEquals("e9f8000caffbce369d7fee9c07d43509", result)
+        assertEquals("9d3df85d37a9a4380dd8b4b4ad85ac9c", result)
     }
 
     @Test

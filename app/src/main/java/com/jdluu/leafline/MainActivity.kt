@@ -87,7 +87,7 @@ class MainActivity : ComponentActivity() {
         currentContext = this
         handleOpdsConfigIntent(intent)
         registerOpdsDebugReceiver()
-        setContent { LeaflineApp(this) }
+        setContent { LeaflineApp(this as MainActivity) }
     }
 
     private fun handleOpdsConfigIntent(intent: Intent?) {
@@ -220,7 +220,7 @@ private enum class LeaflineTab(val label: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LeaflineApp(activity: ComponentActivity) {
+fun LeaflineApp(activity: MainActivity) {
     val repository = LeaflineDependencyHolder.getRepository(activity)
     val libraryViewModel: LibraryViewModel = viewModel(
         factory = LibraryViewModelFactory(
@@ -433,6 +433,7 @@ fun SettingsTab() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun KoreaderSyncSection(modifier: Modifier = Modifier) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
     var serverUrl by remember { mutableStateOf(KoreaderSyncConfigStore.config?.serverUrl ?: "") }
     var syncUsername by remember { mutableStateOf(KoreaderSyncConfigStore.config?.username ?: "") }

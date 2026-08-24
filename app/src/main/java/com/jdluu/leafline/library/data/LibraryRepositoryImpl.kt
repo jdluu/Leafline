@@ -9,6 +9,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
 class LibraryRepositoryImpl(
@@ -71,20 +72,20 @@ class LibraryRepositoryImpl(
         dao.insert(CollectionEntity(name = name, createdAtEpochMillis = System.currentTimeMillis()))
     }
 
-    override suspend fun deleteCollection(id: Long) = withContext(ioDispatcher) {
-        collectionDao?.deleteById(id)
+    override suspend fun deleteCollection(id: Long) {
+        withContext(ioDispatcher) { collectionDao?.deleteById(id) }
     }
 
-    override suspend fun renameCollection(id: Long, name: String) = withContext(ioDispatcher) {
-        collectionDao?.rename(id, name)
+    override suspend fun renameCollection(id: Long, name: String) {
+        withContext(ioDispatcher) { collectionDao?.rename(id, name) }
     }
 
-    override suspend fun addBookToCollection(collectionId: Long, bookStableId: String) = withContext(ioDispatcher) {
-        collectionDao?.addBookToCollection(BookCollectionCrossRef(collectionId, bookStableId))
+    override suspend fun addBookToCollection(collectionId: Long, bookStableId: String) {
+        withContext(ioDispatcher) { collectionDao?.addBookToCollection(BookCollectionCrossRef(collectionId, bookStableId)) }
     }
 
-    override suspend fun removeBookFromCollection(collectionId: Long, bookStableId: String) = withContext(ioDispatcher) {
-        collectionDao?.removeBookFromCollection(collectionId, bookStableId)
+    override suspend fun removeBookFromCollection(collectionId: Long, bookStableId: String) {
+        withContext(ioDispatcher) { collectionDao?.removeBookFromCollection(collectionId, bookStableId) }
     }
 
     override fun getCollectionsForBook(bookStableId: String): Flow<List<Collection>> {
@@ -99,7 +100,7 @@ class LibraryRepositoryImpl(
         val dao = collectionDao ?: return@withContext emptyList()
         val flow = dao.getBookIdsForCollection(collectionId)
         // We need a snapshot, so collect the first emission
-        kotlinx.coroutines.flow.first(flow)
+        flow.first()
     }
 
     // -- Reading status --
