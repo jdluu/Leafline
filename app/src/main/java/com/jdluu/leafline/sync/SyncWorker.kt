@@ -1,56 +1,47 @@
-package com.jdluu.leafline
+package com.jdluu.leafline.sync
 
 import android.content.Context
 import android.util.Log
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
+import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
-import androidx.work.Worker
 import androidx.work.WorkerParameters
-import com.jdluu.leafline.sync.KoreaderSyncClient
-import com.jdluu.leafline.sync.KoreaderSyncConfigStore
-import com.jdluu.leafline.sync.KoreaderPushProgress
-import com.jdluu.leafline.sync.ReadingProgressMath
+import com.jdluu.leafline.library.LeaflineDependencyHolder
+import kotlinx.coroutines.flow.first
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 /**
- * Background worker that pushes reading positions for recently-read books
- * to the KOReader-compatible sync server.
+ * Background worker that pushes reading positions for books with saved
+ * progress to the KOReader-compatible sync server.
  */
 class SyncWorker(
     appContext: Context,
     params: WorkerParameters
-) : Worker(appContext, params) {
+) : CoroutineWorker(appContext, params) {
 
-    override fun doWork(): Result {
+    override suspend fun doWork(): Result {
         val config = KoreaderSyncConfigStore.config
         if (config == null || !config.enabled) {
-            Log.d(TAG, "Sync config not available or disabled — skipping")
+            Log.d(TAG, "Sync config not available or disabled - skipping")
             return Result.success()
         }
         val repository = try {
-            com.jdluu.leafline.library.LeaflineDependencyHolder.getRepository(applicationContext)
+            LeaflineDependencyHolder.getRepository(applicationContext)
         } catch (e: Exception) {
             Log.w(TAG, "Could not get repository", e)
             return Result.retry()
         }
 
-        // Get books with saved progress (blocking — this is on Worker's background thread)
-        val books = runCatching {
-            kotlinx.coroutines.runBlocking {
-                val all = repository.getAllBooks().let { flow ->
-                    // Collect first emission for snapshot
-                    kotlinx.coroutines.flow.first(flow)
-                }
-                all.filter { it.lastLocatorJson != null }
-                    .filter { it.koreaderHash != null || it.lastLocatorJson != null }
-            }
-        }.getOrElse {
-            Log.w(TAG, "Failed to read books", it)
+        val books = try {
+            repository.getAllBooks().first()
+                .filter { it.lastLocatorJson != null && it.koreaderHash != null }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to read books", e)
             return Result.retry()
         }
 
@@ -90,7 +81,7 @@ class SyncWorker(
             }
         }
 
-        Log.d(TAG, "Sync complete: $pushed pushed, $failed failed")
+        Log.d(TAG, "Background sync complete: $pushed pushed, $failed failed")
         return if (failed > 0 && pushed == 0) Result.retry() else Result.success()
     }
 
