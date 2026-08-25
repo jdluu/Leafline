@@ -10,6 +10,9 @@ android {
 
     defaultConfig {
         applicationId = "com.jdluu.leafline"
+        // SDK pinning decision (#31): min 26 covers Android 8.0+ (the README's
+        // stated floor, including most e-ink readers); target 36 tracks the
+        // current platform. Revisit only with a concrete device requirement.
         minSdk = 26
         targetSdk = 36
         versionCode = 2
