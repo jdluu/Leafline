@@ -194,7 +194,7 @@ import java.io.File
 import java.io.IOException
 
 /** UI state for the sync conflict bottom sheet. */
-internal data class SyncConflictState(
+data class SyncConflictState(
     val localPercentage: Double?,
     val remotePercentage: Double?,
     val remoteDevice: String?,
@@ -237,7 +237,12 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     private lateinit var annotationRepository: AnnotationRepository
     private lateinit var readerPreferencesStore: ReaderPreferencesStore
     private lateinit var bookSearcher: BookSearcher
-    private lateinit var progressSyncer: ProgressSyncer
+    private lateinit var syncManager: com.jdluu.leafline.reader.sync.ReaderSyncManager
+
+    /** Lazily wired once the navigator exists; see onCreate. */
+    private val goToLocator: (org.readium.r2.shared.publication.Locator) -> Unit = { locator ->
+        navigator?.go(locator, false)
+    }
 
     /** Locator JSON captured when the user selects text and taps Highlight, pending tint selection. */
     private var pendingHighlightLocator: String? = null
@@ -429,7 +434,15 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             }
         }
         currentBook = savedBook
-        progressSyncer = createProgressSyncer()
+        syncManager = com.jdluu.leafline.reader.sync.ReaderSyncManager(
+            context = this,
+            scope = lifecycleScope,
+            currentBookProvider = { currentBook },
+            currentLocatorProvider = { currentLocation.value },
+            goToLocator = goToLocator,
+            onConflictState = { syncConflictState.value = it }
+        )
+        syncManager.initialize()
 
         val initialLocator: Locator? = savedLocatorJson?.let { json ->
             try {
@@ -508,7 +521,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     }
                 }
                 lifecycleScope.launch {
-                    pullRemoteProgress()
+                    run { lifecycleScope.launch { syncManager.pullRemoteProgress() } }
                 }
                 lifecycleScope.launch {
                     try {
@@ -962,109 +975,10 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
 
     override fun onStop() {
         super.onStop()
-        pushProgressOnExit()
-    }
-
-    private fun createProgressSyncer(): ProgressSyncer {
-        val preferences = getSharedPreferences(LibrarySortStore.PREFS_NAME, Context.MODE_PRIVATE)
-        val deviceId = preferences.getString(KEY_SYNC_DEVICE_ID, null) ?: UUID.randomUUID().toString()
-            .also { generated ->
-                preferences.edit().putString(KEY_SYNC_DEVICE_ID, generated).apply()
+        if (this::syncManager.isInitialized) {
+            syncManager.pushProgressOnExit { book, progress ->
+                syncManager.showMarkFinishedDialog(book, progress)
             }
-        return ProgressSyncer(
-            api = KoreaderSyncClient(),
-            configSource = { KoreaderSyncConfigStore.config },
-            repository = com.jdluu.leafline.library.LeaflineDependencyHolder.getRepository(this),
-            deviceName = Build.MODEL ?: "Leafline",
-            deviceId = deviceId
-        )
-    }
-
-    private suspend fun pullRemoteProgress() {
-        val book = currentBook ?: return
-        if (!this::progressSyncer.isInitialized) return
-        when (val outcome = progressSyncer.pull(BookRef(book))) {
-            is PullOutcome.RemoteAhead -> presentRemoteProgress(outcome)
-            is PullOutcome.Failure -> Toast.makeText(
-                this,
-                "Progress sync failed: ${outcome.message}",
-                Toast.LENGTH_LONG
-            ).show()
-            else -> Unit
-        }
-    }
-
-    private fun presentRemoteProgress(outcome: PullOutcome.RemoteAhead) {
-        val remote = outcome.remote
-        val localProgress = currentLocation.value?.let { locator ->
-            ReadingProgressMath.percentageFromLocator(locator.toJSON().toString())
-        }
-        val target = remote.progress?.let { json -> parseLocatorOrNull(json) }
-        if (target == null) {
-            syncConflictState.value = SyncConflictState(
-                localPercentage = localProgress,
-                remotePercentage = outcome.remotePercentage,
-                remoteDevice = remote.device,
-                remoteTimestamp = remote.timestamp,
-                onJump = {}
-            )
-            return
-        }
-        syncConflictState.value = SyncConflictState(
-            localPercentage = localProgress,
-            remotePercentage = outcome.remotePercentage,
-            remoteDevice = remote.device,
-            remoteTimestamp = remote.timestamp,
-            onJump = { navigator?.go(target, false) }
-        )
-    }
-
-    private fun pushProgressOnExit() {
-        val book = currentBook ?: return
-        if (!this::progressSyncer.isInitialized) return
-        val locator = navigator?.currentLocator?.value ?: return
-        val locatorJson = locator.toJSON().toString()
-        lifecycleScope.launch {
-            val outcome = try {
-                withContext(NonCancellable) { progressSyncer.push(BookRef(book), locatorJson) }
-            } catch (e: Exception) {
-                PushOutcome.Failure(e.message ?: "Pushing progress failed")
-            }
-            if (outcome is PushOutcome.Failure) {
-                Toast.makeText(
-                    this@ReaderActivity,
-                    "Progress sync failed: ${outcome.message}",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-        }
-
-        // Auto-suggest FINISHED status when progress >= 98%
-        val progress = ReadingProgressMath.percentageFromLocator(locatorJson)
-        if (progress != null && progress >= 98.0 && book.readingStatus == ReadingStatus.READING) {
-            runOnUiThread {
-                AlertDialog.Builder(this@ReaderActivity)
-                    .setTitle("Mark as finished?")
-                    .setMessage("You're at ${progress.toInt()}% — looks like you've finished this book. Would you like to mark it as finished?")
-                    .setPositiveButton("Mark finished") { _, _ ->
-                        lifecycleScope.launch {
-                            com.jdluu.leafline.library.LeaflineDependencyHolder
-                                .getRepository(this@ReaderActivity)
-                                .setReadingStatus(book.stableId, ReadingStatus.FINISHED)
-                        }
-                    }
-                    .setNegativeButton("Keep reading") { _, _ -> }
-                    .show()
-            }
-        }
-    }
-
-    private fun parseLocatorOrNull(json: String): Locator? {
-        return try {
-            Locator.Companion.fromJSON(org.json.JSONObject(json))
-        } catch (e: Exception) {
-            null
         }
     }
 }
-
