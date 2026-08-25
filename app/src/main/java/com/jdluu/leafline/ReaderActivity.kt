@@ -148,6 +148,7 @@ import com.jdluu.leafline.reader.search.BookSearchState
 import com.jdluu.leafline.reader.search.BookSearchStatus
 import com.jdluu.leafline.reader.search.BookSearcher
 import com.jdluu.leafline.reader.tapZoneAt
+import com.jdluu.leafline.reader.theme.toReadiumTheme
 import com.jdluu.leafline.reader.withStyleMode
 import com.jdluu.leafline.sync.BookRef
 import com.jdluu.leafline.sync.KoreaderSyncClient
@@ -178,7 +179,6 @@ import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.navigator.epub.EpubPreferences
 import org.readium.r2.navigator.input.InputListener
 import org.readium.r2.navigator.input.TapEvent
-import org.readium.r2.navigator.preferences.Theme
 import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.publication.Link
 import org.readium.r2.shared.publication.Locator
@@ -423,7 +423,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             val navigatorFactory = EpubNavigatorFactory(publication)
             val fragmentFactory = navigatorFactory.createFragmentFactory(
                 initialLocator = initialLocator,
-                initialPreferences = savedSettings.epub,
+                initialPreferences = savedSettings.toNavigatorPreferences(),
                 listener = this,
                 configuration = EpubNavigatorFragment.Configuration(
                     selectionActionModeCallback = annotationManager.selectionActionMode()
@@ -547,8 +547,17 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
 
     private fun submitSettings(settings: ReaderSettings) {
         currentSettings.value = settings
-        navigator?.submitPreferences(settings.epub)
+        navigator?.submitPreferences(settings.toNavigatorPreferences())
         readerPreferencesStore.save(settings)
+    }
+
+    /**
+     * Builds the preferences handed to the Readium navigator, mapping the pure
+     * Kotlin [com.jdluu.leafline.reader.theme.ReaderTheme] onto the Readium
+     * theme at this Android boundary.
+     */
+    private fun ReaderSettings.toNavigatorPreferences(): EpubPreferences {
+        return epub.copy(theme = theme?.toReadiumTheme())
     }
 
     /**

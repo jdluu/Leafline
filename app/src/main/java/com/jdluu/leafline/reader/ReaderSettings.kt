@@ -1,8 +1,8 @@
 package com.jdluu.leafline.reader
 
+import com.jdluu.leafline.reader.theme.ReaderTheme
 import org.readium.r2.navigator.epub.EpubPreferences
 import org.readium.r2.navigator.preferences.FontFamily
-import org.readium.r2.navigator.preferences.Theme
 
 /**
  * Selectable EPUB font families offered by the reader settings sheet, backed by
@@ -147,25 +147,23 @@ fun clampBrightness(value: Float): Float {
 
 /**
  * Toggles the sepia quick control shown next to the brightness slider in the
- * reader overlay. Engaging it switches the EPUB theme to sepia and records
- * the current theme so disengaging restores exactly what the user had,
- * including an unset theme. Picking a theme in the settings sheet stays
- * authoritative; it becomes the new restore target on the next engage. A
- * remembered sepia restore target is ignored so a corrupt store cannot wedge
- * the toggle in sepia.
+ * reader overlay. Engaging it switches the theme to sepia and records the
+ * current theme so disengaging restores exactly what the user had, including
+ * an unset theme. Picking a theme in the settings sheet stays authoritative;
+ * it becomes the new restore target on the next engage. A remembered sepia
+ * restore target is ignored so a corrupt store cannot wedge the toggle in
+ * sepia.
  */
 fun toggleSepia(settings: ReaderSettings): ReaderSettings {
-    val current = settings.epub.theme
-    return if (current == Theme.SEPIA) {
+    val current = settings.theme
+    return if (current == ReaderTheme.SEPIA) {
         settings.copy(
-            epub = settings.epub.copy(
-                theme = settings.preSepiaTheme.takeUnless { it == Theme.SEPIA }
-            ),
+            theme = settings.preSepiaTheme.takeUnless { it == ReaderTheme.SEPIA },
             preSepiaTheme = null
         )
     } else {
         settings.copy(
-            epub = settings.epub.copy(theme = Theme.SEPIA),
+            theme = ReaderTheme.SEPIA,
             preSepiaTheme = current
         )
     }
@@ -173,10 +171,17 @@ fun toggleSepia(settings: ReaderSettings): ReaderSettings {
 
 /**
  * Everything persisted by [ReaderPreferencesStore]: the Readium EPUB
- * preferences plus the Leafline-specific interaction settings.
+ * preferences plus the Leafline-specific interaction settings. The theme is
+ * held as a [ReaderTheme] outside [epub] so the domain stays independent of
+ * Readium; it is converted at the Android boundary where preferences are
+ * submitted to the navigator.
  */
 data class ReaderSettings(
     val epub: EpubPreferences = EpubPreferences(),
+    /**
+     * Selected reading theme, or null to keep the Readium default.
+     */
+    val theme: ReaderTheme? = null,
     val tapZoneConfig: TapZoneConfig = TapZoneConfig.DEFAULT,
     val pageTurnAnimation: PageTurnAnimation = PageTurnAnimation.SLIDE,
     /**
@@ -186,9 +191,9 @@ data class ReaderSettings(
     val brightness: Float? = null,
     /**
      * Theme restored by the sepia quick control on disengage, or null to
-     * restore an unset theme. Only meaningful while the EPUB theme is sepia.
+     * restore an unset theme. Only meaningful while the theme is sepia.
      */
-    val preSepiaTheme: Theme? = null,
+    val preSepiaTheme: ReaderTheme? = null,
     /**
      * When true, page-turn animations are disabled and nonessential reader
      * animations are suppressed regardless of the OS animator scale. Defaults

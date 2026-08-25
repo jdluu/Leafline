@@ -2,14 +2,16 @@ package com.jdluu.leafline.reader
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.jdluu.leafline.reader.theme.ReaderTheme
 import org.readium.r2.navigator.epub.EpubPreferences
-import org.readium.r2.navigator.preferences.Theme
 
 /**
  * Persists reader display and interaction settings in app-private
  * SharedPreferences so they survive activity recreation and app restarts. Only
  * the fields managed by the reader settings sheet are stored; every other
- * EpubPreferences field stays unset so Readium applies its own defaults.
+ * EpubPreferences field stays unset so Readium applies its own defaults. The
+ * reading theme is stored as a [ReaderTheme] name on [ReaderSettings] itself,
+ * not inside EpubPreferences, keeping Readium types out of the domain model.
  * Values loaded from storage are validated against the reader domain rules:
  * unknown font names fall back to the original font, page margins snap back
  * into range, and a stored publisher-mode selection clears stale custom
@@ -26,6 +28,7 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
     fun load(initialReduceMotion: Boolean = false): ReaderSettings {
         return ReaderSettings(
             epub = loadEpubPreferences(),
+            theme = restoreTheme(),
             tapZoneConfig = loadTapZoneConfig(),
             pageTurnAnimation = enumFromName(KEY_PAGE_TURN_ANIMATION, PageTurnAnimation.SLIDE),
             brightness = restoreBrightness(),
@@ -41,7 +44,7 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
     fun save(settings: ReaderSettings) {
         val epub = settings.epub
         preferences.edit()
-            .putString(KEY_THEME, epub.theme?.name)
+            .putString(KEY_THEME, settings.theme?.name)
             .putString(KEY_FONT_FAMILY, epub.fontFamily?.name)
             .putNullableDouble(KEY_LINE_HEIGHT, epub.lineHeight)
             .putNullableDouble(KEY_PAGE_MARGINS, epub.pageMargins?.let(::snapPageMargins))
@@ -60,7 +63,6 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
 
     private fun loadEpubPreferences(): EpubPreferences {
         val restored = EpubPreferences(
-            theme = preferences.getString(KEY_THEME, null)?.let { themeFromName(it) },
             fontFamily = preferences.getString(KEY_FONT_FAMILY, null)
                 ?.let(::fontFamilyFromStoredName),
             lineHeight = restoreDouble(KEY_LINE_HEIGHT),
@@ -119,20 +121,28 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
     }
 
     /**
+     * Restores the selected reading theme. Unknown stored names fall back to
+     * unset so a stale or corrupt value cannot force an invalid theme.
+     */
+    private fun restoreTheme(): ReaderTheme? {
+        return preferences.getString(KEY_THEME, null)?.let(::themeFromName)
+    }
+
+    /**
      * Restores the theme remembered by the sepia quick control for
      * [ReaderSettings.preSepiaTheme]. Unknown names fall back to unset via
      * [themeFromName]; a stored sepia value is likewise treated as unset so a
      * corrupt store cannot make disengaging restore sepia.
      */
-    private fun restorePreSepiaTheme(): Theme? {
+    private fun restorePreSepiaTheme(): ReaderTheme? {
         return preferences.getString(KEY_PRE_SEPIA_THEME, null)
             ?.let(::themeFromName)
-            ?.takeUnless { it == Theme.SEPIA }
+            ?.takeUnless { it == ReaderTheme.SEPIA }
     }
 
-    private fun themeFromName(name: String): Theme? {
+    private fun themeFromName(name: String): ReaderTheme? {
         return try {
-            Theme.valueOf(name)
+            ReaderTheme.valueOf(name)
         } catch (_: IllegalArgumentException) {
             null
         }
