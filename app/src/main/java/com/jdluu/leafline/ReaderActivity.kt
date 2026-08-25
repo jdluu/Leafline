@@ -238,6 +238,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     private lateinit var readerPreferencesStore: ReaderPreferencesStore
     private lateinit var bookSearcher: BookSearcher
     private lateinit var syncManager: com.jdluu.leafline.reader.sync.ReaderSyncManager
+    private lateinit var annotationManager: com.jdluu.leafline.reader.annotations.AnnotationManager
 
     /** Lazily wired once the navigator exists; see onCreate. */
     private val goToLocator: (org.readium.r2.shared.publication.Locator) -> Unit = { locator ->
@@ -434,6 +435,21 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             }
         }
         currentBook = savedBook
+        annotationManager = com.jdluu.leafline.reader.annotations.AnnotationManager(
+            context = this,
+            scope = lifecycleScope,
+            repository = annotationRepository,
+            navigatorProvider = { navigator },
+            bookStableIdProvider = { bookStableId },
+            annotationsProvider = { annotations.value },
+            onPendingHighlightChanged = { pendingHighlightLocator = it },
+            onShowHighlightTintSheet = { highlightTintSheetVisible.value = true },
+            onSnackbar = { msg -> lifecycleScope.launch { snackbarHostState.showSnackbar(msg) } },
+            onAnnotationNavigated = {
+                highlightsSheetVisible.value = false
+                toolbarVisible.value = false
+            }
+        )
         syncManager = com.jdluu.leafline.reader.sync.ReaderSyncManager(
             context = this,
             scope = lifecycleScope,
@@ -486,7 +502,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                 initialPreferences = savedSettings.epub,
                 listener = this,
                 configuration = EpubNavigatorFragment.Configuration(
-                    selectionActionModeCallback = annotationSelectionActionMode()
+                    selectionActionModeCallback = annotationManager.selectionActionMode()
                 )
             )
 
@@ -536,7 +552,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     try {
                         annotationRepository.observeAnnotations(stableId).collect { stored ->
                             annotations.value = stored
-                            applyAnnotationDecorations()
+                            annotationManager.applyDecorations()
                         }
                     } catch (e: Exception) {
                         Log.w(TAG, "Could not observe annotations", e)
@@ -637,159 +653,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         toolbarVisible.value = false
     }
 
-    private fun annotationSelectionActionMode(): ActionMode.Callback {
-        return object : ActionMode.Callback {
-            override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
-                menu.add(Menu.NONE, MENU_ITEM_HIGHLIGHT_ID, Menu.NONE, "Highlight")
-                menu.add(Menu.NONE, MENU_ITEM_COPY_ID, Menu.NONE, "Copy")
-                return true
-            }
 
-            override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean = false
-
-            override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
-                return when (item.itemId) {
-                    MENU_ITEM_HIGHLIGHT_ID -> {
-                        saveSelectionAsAnnotation()
-                        mode.finish()
-                        true
-                    }
-                    MENU_ITEM_COPY_ID -> {
-                        copySelectedText()
-                        mode.finish()
-                        true
-                    }
-                    else -> false
-                }
-            }
-
-            override fun onDestroyActionMode(mode: ActionMode) = Unit
-        }
-    }
-
-    private fun saveSelectionAsAnnotation() {
-        val stableId = bookStableId
-        if (stableId == null) {
-            Toast.makeText(this, "Highlights need an imported library book", Toast.LENGTH_SHORT)
-                .show()
-            return
-        }
-        lifecycleScope.launch {
-            try {
-                val selection = navigator?.currentSelection()
-                if (selection == null) {
-                    Toast.makeText(this@ReaderActivity, "No text selected", Toast.LENGTH_SHORT)
-                        .show()
-                    return@launch
-                }
-                // Capture the locator, clear selection, then show the tint picker
-                pendingHighlightLocator = selection.locator.toJSON().toString()
-                navigator?.clearSelection()
-                selectedHighlightTint = DEFAULT_HIGHLIGHT_TINT
-                highlightTintSheetVisible.value = true
-            } catch (e: Exception) {
-                Log.w(TAG, "Could not prepare highlight", e)
-                runCatching { navigator?.clearSelection() }
-                Toast.makeText(this@ReaderActivity, "Could not create highlight", Toast.LENGTH_SHORT)
-                    .show()
-            }
-        }
-    }
-
-    private fun saveHighlightWithTint(tint: HighlightTint) {
-        val stableId = bookStableId ?: return
-        val locatorJson = pendingHighlightLocator ?: return
-        lifecycleScope.launch {
-            try {
-                annotationRepository.addAnnotation(
-                    bookId = stableId,
-                    locatorJson = locatorJson,
-                    colorHex = tint.hex
-                )
-                pendingHighlightLocator = null
-                snackbarHostState.showSnackbar("Highlight added")
-            } catch (e: Exception) {
-                Log.w(TAG, "Could not save highlight", e)
-                runCatching { navigator?.clearSelection() }
-                Toast.makeText(this@ReaderActivity, "Could not save highlight", Toast.LENGTH_SHORT)
-                    .show()
-            }
-        }
-    }
-
-    private fun copySelectedText() {
-        lifecycleScope.launch {
-            val text = runCatching {
-                navigator?.currentSelection()?.locator?.let { selectedTextOf(it) }
-            }.getOrNull().takeIf { !it.isNullOrBlank() }
-            if (text == null) {
-                navigator?.clearSelection()
-                return@launch
-            }
-            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-            clipboard?.setPrimaryClip(ClipData.newPlainText("Selected text", text))
-            navigator?.clearSelection()
-            snackbarHostState.showSnackbar("Copied to clipboard")
-        }
-    }
-
-    private fun selectedTextOf(locator: Locator): String? {
-        return try {
-            locator.toJSON().optJSONObject("text")?.optString("exact")
-                ?.takeIf { it.isNotBlank() }
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    private fun applyAnnotationDecorations() {
-        val navigator = this.navigator ?: return
-        if (!navigator.supportsDecorationStyle(Decoration.Style.Highlight::class)) return
-        lifecycleScope.launch {
-            try {
-                val decorations = annotations.value.mapNotNull { annotation ->
-                    val locator = parseLocator(annotation.locatorJson) ?: return@mapNotNull null
-                    Decoration(
-                        id = "$ANNOTATION_DECORATION_PREFIX${annotation.id}",
-                        locator = locator,
-                        style = Decoration.Style.Highlight(tint = annotationTint(annotation.colorHex))
-                    )
-                }
-                navigator.applyDecorations(decorations, ANNOTATION_DECORATION_GROUP)
-            } catch (e: Exception) {
-                Log.w(TAG, "Could not apply annotation decorations", e)
-            }
-        }
-    }
-
-    private fun deleteAnnotation(annotation: Annotation) {
-        lifecycleScope.launch {
-            try {
-                annotationRepository.removeAnnotation(annotation.id)
-            } catch (e: Exception) {
-                Log.w(TAG, "Could not delete annotation", e)
-            }
-        }
-    }
-
-    private fun navigateToAnnotation(annotation: Annotation) {
-        val locator = parseLocator(annotation.locatorJson)
-        if (locator == null) {
-            Toast.makeText(this, "Could not open this highlight", Toast.LENGTH_SHORT).show()
-            return
-        }
-        navigator?.go(locator, false)
-        highlightsSheetVisible.value = false
-        toolbarVisible.value = false
-    }
-
-    private fun annotationTint(colorHex: String): Int {
-        return try {
-            Color.parseColor(colorHex)
-        } catch (e: IllegalArgumentException) {
-            DEFAULT_ANNOTATION_TINT
-        }
-    }
 
     private fun submitSettings(settings: ReaderSettings) {
         currentSettings.value = settings
@@ -932,8 +796,8 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     onDeleteBookmark = { deleteBookmark(it) },
                     onOpenHighlights = { highlightsSheetVisible.value = true },
                     onDismissHighlights = { highlightsSheetVisible.value = false },
-                    onAnnotationClick = { navigateToAnnotation(it) },
-                    onDeleteAnnotation = { deleteAnnotation(it) },
+                    onAnnotationClick = { annotationManager.navigateTo(it) },
+                    onDeleteAnnotation = { annotationManager.delete(it) },
                     onTocClick = { link ->
                         navigateToTocLink(link)
                         scope.launch { drawerState.close() }
@@ -950,7 +814,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     highlightTintSheetVisible = highlightTintSheetVisible.value,
                     onHighlightTintSelected = { tint ->
                         highlightTintSheetVisible.value = false
-                        saveHighlightWithTint(tint)
+                        annotationManager.saveHighlightWithTint(tint, pendingHighlightLocator)
                     }
                 )
             }
