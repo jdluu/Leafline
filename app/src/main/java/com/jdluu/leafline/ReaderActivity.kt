@@ -675,7 +675,10 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     syncConflict = syncConflict,
                     onJumpToRemote = { syncConflict?.onJump?.invoke(); syncConflictState.value = null },
                     onDismissSyncConflict = { syncConflictState.value = null },
-                    onBack = { finish() },
+                    onBack = {
+                    finish()
+                    overridePendingTransition(0, android.R.anim.fade_out)
+                },
                     onOpenToc = { scope.launch { drawerState.open() } },
                     onOpenSettings = { settingsSheetVisible.value = true },
                     onDismissSettings = { settingsSheetVisible.value = false },

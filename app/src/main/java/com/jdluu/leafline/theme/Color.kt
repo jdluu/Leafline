@@ -38,9 +38,9 @@ object LeaflineColors {
     val LightErrorContainer = Color(0xFFFFDAD6)
     val LightOnErrorContainer = Color(0xFF410002)
 
-    val LightBackground = Color(0xFFFBFDF9)
+    val LightBackground = Color(0xFFF9F8F4) // warm off-white (paper)
     val LightOnBackground = Color(0xFF191C1A)
-    val LightSurface = Color(0xFFFBFDF9)
+    val LightSurface = Color(0xFFF9F8F4)
     val LightOnSurface = Color(0xFF191C1A)
     val LightSurfaceVariant = Color(0xFFDCE5DE)
     val LightOnSurfaceVariant = Color(0xFF414944)
