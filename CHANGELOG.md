@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-24
+
 ### Added
 
 - User-defined collections/tags with filter chip row (#16)
@@ -39,6 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   algorithm exactly; Room index declarations added to fix migration crash (#22)
 - Settings page is now scrollable so all KOReader Sync fields are reachable
 - Cleartext HTTP permitted for local server connections (Grimmory on LAN)
+- Comprehensive brand and UI redesign (#77)
+- Warm paper-toned background and activity transitions (#78)
 
 ## [0.1.0] - 2026-08-22
 
@@ -58,5 +62,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dynamic type up to 200%, 48dp touch targets, reduced-motion support
 - Dynamic color theme support and full palette refresh
 
-[Unreleased]: https://github.com/jdluu/Leafline/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/jdluu/Leafline/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/jdluu/Leafline/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/jdluu/Leafline/releases/tag/v0.1.0
