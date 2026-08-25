@@ -7,9 +7,11 @@
 ![EPUB](https://img.shields.io/badge/EPUB-8B4513?style=for-the-badge&logo=bookreader&logoColor=white)
 
 Leafline is a free, open-source EPUB reader for Android. It keeps your books,
-highlights, and reading progress entirely on your device, and connects to any
-OPDS-compatible library server to browse and download books. The name refers to
+highlights, and reading progress entirely on your device. The name refers to
 both the leaves of a book and a continuous reading line across devices.
+For fetching books from OPDS library servers, see
+[ShelfSync](https://github.com/jdluu/ShelfSync), a companion sync client that
+downloads and hands off EPUBs to any local reader, Leafline included.
 
 Leafline collects no analytics, crash reports, or usage data. Everything stays
 on your device except the progress sync you configure yourself against your
@@ -26,9 +28,6 @@ own server.
 
 - **EPUB reading** — Read EPUB 2 and EPUB 3 books in a paginated or scrolled view
 - **On-device library** — Import your own EPUB files with cover thumbnails
-- **OPDS catalogs** — Browse authenticated OPDS catalogs and download books over
-  the network. Any OPDS 1.2 catalog works; self-hosted library software such as
-  [Grimmory](https://grimmory.org/) pairs naturally.
 - **Progress sync** — Sync reading progress between your devices using any
   KOReader-compatible sync server you host yourself
 - **Bookmarks & annotations** — Multi-color highlights and full-text in-book
@@ -55,6 +54,9 @@ from this repository's releases and keeps it up to date automatically.
 Download an APK from the [Releases](https://github.com/jdluu/Leafline/releases)
 page and install it. You may need to allow installation from unknown sources.
 
+**Note:** Leafline is pre-release. No releases are published yet; install by
+building from source below.
+
 ## Building from source
 
 Requirements: JDK 17+ and the Android SDK.
@@ -65,10 +67,7 @@ Requirements: JDK 17+ and the Android SDK.
 ./gradlew lintDebug            # run lint checks
 ```
 
-See [docs/release-builds.md](docs/release-builds.md) for signed release builds
-and F-Droid/Acres packaging notes. Continuous integration runs on every pull
-request; tagged releases (`v*`) produce signed APKs attached to GitHub
-Releases when signing secrets are configured.
+Continuous integration runs on every pull request.
 
 ## License
 

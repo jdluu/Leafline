@@ -13,7 +13,8 @@ hosting outside this repository.
 - Use Readium Kotlin Toolkit for EPUB publication handling; do not write a new
   EPUB renderer without an explicit architecture decision.
 - Use Room for durable local state and WorkManager for deferred network work.
-- Treat OPDS as the public library integration boundary.
+- Treat OPDS as out of scope: catalog fetching belongs to ShelfSync. Leafline
+  opens EPUB files already on the device.
 - Never put credentials, tokens, signing keys, or `local.properties` in Git.
 - Prefer small vertical slices with tests before broad refactors.
 - Verify every change with the narrowest relevant Gradle test/check, then run the
@@ -57,7 +58,7 @@ Leafline and ShelfSync are two separate apps with strictly separated concerns.
 | Purpose | EPUB reading app | Grimmory/Calibre-compatible sync client |
 | Platform | Native Android (Kotlin, Jetpack Compose) | Tauri (React frontend, Rust backend) |
 | Rendering | Readium Kotlin Toolkit (EPUB rendering) | None. Never renders or opens books for reading |
-| Catalog | OPDS browse + download into local library (client role only) | OPDS browse, authenticated download, offline reconciliation (primary domain) |
+| Catalog | Out of scope. Books arrive via local import or ShelfSync handoff | OPDS browse, authenticated download, offline reconciliation (primary domain) |
 | Local data | Room DB: library metadata, reading position, bookmarks, highlights, covers | SQLite (rusqlite): provider-scoped publications, acquisitions, file revisions, download jobs |
 | Sync/progress | Reads locally; pushes/pulls KOReader-compatible progress | Future: library reconciliation against the Grimmory server |
 | Calibre | Out of scope entirely | Legacy compatibility layer exists; new work uses OPDS instead |
@@ -67,12 +68,12 @@ Leafline owns:
 - Reading experience: paginated/scrolled EPUB rendering, themes, fonts, tap zones
 - Reader features: bookmarks, highlights/annotations, in-book search
 - Local reading state: last-read locator, per-book preferences
-- Its own small on-device library of imported/downloaded EPUBs
+- Its own small on-device library of locally imported EPUBs
 
 Leafline must never do:
 
 - Host a server, act as a Calibre replacement, or mutate a Calibre `metadata.db`
-- Implement OPDS server logic (it is an OPDS *client* only)
+- Implement OPDS browsing or downloading (that is ShelfSync's job entirely)
 - Duplicate ShelfSync's download-job/persistence model beyond what reading needs
 
 ShelfSync owns catalog connection/authentication/browsing, safe verified
@@ -94,7 +95,6 @@ coupling between the two apps.
 app/src/main/java/com/jdluu/leafline/
 ├── library/            # Library screen, ViewModels, settings, DI holder
 │   └── data/           # Book models, repositories, Room DAOs/entities
-├── opds/               # OPDS client: catalog browsing, download coordination
 ├── sync/               # KOReader-compatible progress sync (pure Kotlin)
 └── reader/             # In-book search support; ReaderActivity hosts Readium
 ```
@@ -110,7 +110,7 @@ clients or manipulate EPUB archives directly.
   Decorator API used for highlight and match decorations
 - Room for durable local state (library, bookmarks, annotations, reading
   positions), with explicit migrations per schema change
-- OkHttp for OPDS and progress-sync networking
+- OkHttp for KOReader progress-sync networking
 - Kotlin coroutines and Flow for asynchronous work
 
 ### Progress sync decisions
@@ -132,9 +132,8 @@ clients or manipulate EPUB archives directly.
 - Timestamps: remote timestamps are normalized from seconds or milliseconds
   before comparison against the locally stamped last-read time; when a server
   omits the timestamp the comparison falls back to percentages.
-- Credentials: `KoreaderSyncConfig` mirrors `OpdsServerConfig`. Values live
-  only in the session-scoped config stores and are never written to disk, git,
-  or logs.
+- Credentials: `KoreaderSyncConfig` values live only in the session-scoped
+  config store and are never written to disk, git, or logs.
 - Reader integration: opening a book pulls remote progress and offers a jump
   when the remote timestamp is newer; leaving the reader pushes the current
   locator. Success is silent, failures surface as toasts.
@@ -218,8 +217,8 @@ clients or manipulate EPUB archives directly.
   it alongside `git diff --check`; it needs only POSIX sh and grep.
 - Sheets and long forms reflow instead of clipping: the reader settings sheet
   scrolls vertically; book search results size to content up to the remaining
-  sheet height (`weight(1f, fill = false)`) instead of a fixed dp cap; the
-  OPDS config form, acquisition details, and error panel scroll vertically.
+  sheet height (`weight(1f, fill = false)`) instead of a fixed dp cap. The
+  KOReader sync settings section scrolls vertically.
   Bookmark and highlight sheets, the TOC drawer, dropdown menus, and search
   result lists already scroll through LazyColumn; the framework progress-sync
   dialog scrolls its message internally.
@@ -239,22 +238,13 @@ clients or manipulate EPUB archives directly.
 - `scripts/check_touch_targets.sh` and `scripts/check_dynamic_type.sh` guard
   against regressions in touch target sizing and font-scale compliance.
 
-### Release builds
+### Release builds (on hold)
 
-Generate a release keystore once:
+The project is pre-release: no versions are published and no release APKs are
+built. When releases resume:
 
-```bash
-keytool -genkeypair -v \
-  -keystore leafline-release.jks \
-  -alias leafline \
-  -keyalg RSA -keysize 4096 -validity 10000
-```
-
-Store it somewhere safe and back it up. Losing it means losing the ability to
-ship updates to existing installs under the same application id.
-
-Add credentials to `~/.gradle/gradle.properties` (never to the repo or any
-file under version control):
+- Generate a release keystore once and keep credentials in
+  `~/.gradle/gradle.properties` (never in the repo):
 
 ```properties
 LEAFLINE_STORE_FILE=/absolute/path/to/leafline-release.jks
@@ -263,45 +253,11 @@ LEAFLINE_KEY_ALIAS=leafline
 LEAFLINE_KEY_PASSWORD=...
 ```
 
-Then build:
-
-```bash
-./gradlew :app:assembleRelease
-```
-
-With properties present this produces a signed APK at
-`app/build/outputs/apk/release/`. Without them the build still succeeds and
-produces `app-release-unsigned.apk`.
-
-#### F-Droid / Acre recipe builds
-
-F-Droid and similar repositories build from source with **their own** signing
-keys, so the recipe needs no secrets at all:
-
-```yaml
-- versionName: 0.2.0
-  versionCode: 2
-  commit: v0.2.0
-  gradle:
-    - yes
-```
-
-Requirements this repo satisfies for such recipes:
-
-- All dependencies come from public Maven repositories (`mavenCentral`,
-  Google's Maven, and Readium's Maven host); no proprietary SDK blobs.
-- No prebuilt binaries are checked in; everything is built from source.
-- `./gradlew :app:assembleRelease` works without any signing credentials,
-  producing an unsigned APK the packager signs itself.
-- The baseline profile in `app/src/main/baseline-prof.txt` is a plain text
-  artifact compiled by the Android Gradle Plugin during the normal build;
-  no extra tooling is needed.
-
-#### Versioning
-
-Versions follow the scheme documented in CHANGELOG.md: `versionCode` increments
-monotonically per release, `versionName` follows semver. Releases are cut from
-`main` and tagged `v<versionName>`.
+- `./gradlew :app:assembleRelease` produces a signed APK when the properties
+  exist, `app-release-unsigned.apk` otherwise. The build never fails for lack
+  of signing credentials.
+- Versioning: `versionCode` increments monotonically per release, `versionName`
+  follows semver. Releases are cut from `main` and tagged `v<versionName>`.
 
 ### Open architecture items
 
@@ -328,8 +284,8 @@ acceptance criteria, and verification command. Review the diff before commit.
 
 ## Current baseline
 
-Leafline is a working EPUB reader client: OPDS browsing and download, local
-library with covers, sorting, and search, a full reader (TOC, themes, reading
+Leafline is a working EPUB reader client: local library with covers, sorting,
+and search, a full reader (TOC, themes, reading
 positions, bookmarks, in-book search, highlights), and KOReader-compatible
 progress sync. Before adding dependencies, confirm current versions from the
 official Android, Kotlin, Gradle, and Readium documentation.

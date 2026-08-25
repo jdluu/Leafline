@@ -3,7 +3,7 @@ package com.jdluu.leafline.sync
 /**
  * Configuration for the KOReader-compatible progress sync endpoint.
  *
- * Mirrors [com.jdluu.leafline.opds.OpdsServerConfig]: credentials live only in
+ * Credentials live only in
  * this model and the associated in-memory store. They are never written to
  * git, logs, or durable storage.
  */

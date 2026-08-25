@@ -1,9 +1,7 @@
 package com.jdluu.leafline
 
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.net.Uri
 import android.os.Bundle
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -24,7 +22,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LibraryBooks
-import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -46,7 +43,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.jdluu.leafline.library.LeaflineDependencyHolder
@@ -55,10 +51,6 @@ import com.jdluu.leafline.library.LibraryScreen
 import com.jdluu.leafline.library.LibrarySortStore
 import com.jdluu.leafline.library.LibraryViewModelFactory
 import com.jdluu.leafline.library.cover.EpubCoverLoader
-import com.jdluu.leafline.opds.OpdsBrowseScreen
-import com.jdluu.leafline.opds.OpdsConfigStore
-import com.jdluu.leafline.opds.OpdsServerConfig
-import com.jdluu.leafline.opds.OpdsViewModel
 import com.jdluu.leafline.sync.KoreaderSyncClient
 import com.jdluu.leafline.sync.KoreaderSyncConfig
 import com.jdluu.leafline.sync.KoreaderSyncConfigStore
@@ -80,45 +72,12 @@ class MainActivity : ComponentActivity() {
     }
 
     private var pendingToast: String? = null
-    private var currentContext: Context? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         LeaflineDependencyHolder.initialize(this)
-        currentContext = this
-        handleOpdsConfigIntent(intent)
-        registerOpdsDebugReceiver()
         setContent { LeaflineApp(this as MainActivity) }
-    }
-
-    private fun handleOpdsConfigIntent(intent: Intent?) {
-        val url = intent?.getStringExtra("opds_url") ?: return
-        val username = intent.getStringExtra("opds_username") ?: ""
-        val password = intent.getStringExtra("opds_password") ?: ""
-        OpdsConfigStore.config = OpdsServerConfig(
-            catalogUrl = url,
-            username = username,
-            password = password
-        )
-        showToast("OPDS config set")
-    }
-
-    private fun registerOpdsDebugReceiver() {
-        val filter = IntentFilter("com.jdluu.leafline.OPDS_CONFIG")
-        registerReceiver(object : BroadcastReceiver() {
-            override fun onReceive(context: Context, intent: Intent) {
-                val url = intent.getStringExtra("url") ?: return
-                val username = intent.getStringExtra("username") ?: ""
-                val password = intent.getStringExtra("password") ?: ""
-                OpdsConfigStore.config = OpdsServerConfig(
-                    catalogUrl = url,
-                    username = username,
-                    password = password
-                )
-                showToast("OPDS config set via debug broadcast")
-            }
-        }, filter, Context.RECEIVER_EXPORTED)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -216,36 +175,24 @@ private fun getFileName(context: Context, uri: Uri): String? {
 
 private enum class LeaflineTab(val label: String) {
     Library("Library"),
-    Catalog("Catalog"),
     Settings("Settings")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LeaflineApp(activity: MainActivity) {
-    val repository = LeaflineDependencyHolder.getRepository(activity)
     val libraryViewModel: LibraryViewModel = viewModel(
         factory = LibraryViewModelFactory(
-            repository = repository,
+            repository = LeaflineDependencyHolder.getRepository(activity),
             coverLoader = EpubCoverLoader(activity.applicationContext),
             sortStore = LibrarySortStore.fromContext(activity)
         )
     )
-    val opdsViewModel: OpdsViewModel = viewModel()
-    val scope = rememberCoroutineScope()
-    var downloadMessage by remember { mutableStateOf<String?>(null) }
 
     var selectedTab by remember { mutableIntStateOf(0) }
-    val context = LocalContext.current
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     var pendingBook by remember { mutableStateOf<LibraryBook?>(null) }
-
-    LaunchedEffect(downloadMessage) {
-        downloadMessage?.let { message ->
-            (activity as MainActivity).showToast(message)
-            downloadMessage = null
-        }
-    }
 
     LaunchedEffect(pendingBook) {
         pendingBook?.let { book ->
@@ -301,7 +248,6 @@ fun LeaflineApp(activity: MainActivity) {
                                 Icon(
                                     when (tab) {
                                         LeaflineTab.Library -> Icons.Default.LibraryBooks
-                                        LeaflineTab.Catalog -> Icons.Default.CloudDownload
                                         LeaflineTab.Settings -> Icons.Default.Settings
                                     },
                                     contentDescription = tab.label
@@ -319,44 +265,15 @@ fun LeaflineApp(activity: MainActivity) {
                         viewModel = libraryViewModel,
                         onImportEpub = { importEpubLauncher.launch(arrayOf(MainActivity.EPUB_MIME_TYPE)) },
                         onOpenBook = { book ->
-                                                      activity.startActivity(
-                                                          ReaderActivity.newIntent(activity, book.filePath)
-                                                      )
-                                                      activity.overridePendingTransition(
-                                                          android.R.anim.fade_in, 0
-                                                      )
-                                                  }
-                    )
-                    LeaflineTab.Catalog -> {
-                        LaunchedEffect(selectedTab) {
-                            opdsViewModel.loadIfConfigured()
-                        }
-                        OpdsBrowseScreen(
-                        viewModel = opdsViewModel,
-                        onBack = { selectedTab = 0 },
-                        onDownload = { entry ->
-                            val config = OpdsConfigStore.config
-                            if (config == null) {
-                                downloadMessage = "Configure the OPDS catalog first"
-                            } else {
-                                downloadMessage = "Downloading ${entry.title}..."
-                                scope.launch {
-                                    try {
-                                        val book = OpdsDownloadCoordinator(context, repository)
-                                            .downloadAndImport(config, entry)
-                                        downloadMessage = if (book == null) {
-                                            "Could not import ${entry.title}"
-                                        } else {
-                                            "Imported: ${book.title}"
-                                        }
-                                    } catch (error: Exception) {
-                                        downloadMessage = "Download failed: ${error.message}"
-                                    }
-                                }
-                            }
+                            activity.startActivity(
+                                ReaderActivity.newIntent(activity, book.filePath)
+                            )
+                            @Suppress("DEPRECATION")
+                            activity.overridePendingTransition(
+                                android.R.anim.fade_in, 0
+                            )
                         }
                     )
-                    }
                     LeaflineTab.Settings -> SettingsTab()
                     null -> {}
                 }
@@ -368,11 +285,6 @@ fun LeaflineApp(activity: MainActivity) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsTab() {
-    var url by remember { mutableStateOf(OpdsConfigStore.config?.catalogUrl ?: "") }
-    var username by remember { mutableStateOf(OpdsConfigStore.config?.username ?: "") }
-    var password by remember { mutableStateOf(OpdsConfigStore.config?.password ?: "") }
-    var saved by remember { mutableStateOf(false) }
-
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
             title = { Text("Settings") }
@@ -382,59 +294,7 @@ fun SettingsTab() {
                 .padding(24.dp)
                 .verticalScroll(rememberScrollState())
         ) {
-            Text(
-                "OPDS Catalog",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-            OutlinedTextField(
-                value = url,
-                onValueChange = { url = it; saved = false },
-                label = { Text("Catalog URL") },
-                placeholder = { Text("https://server/api/v1/opds") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-            OutlinedTextField(
-                value = username,
-                onValueChange = { username = it; saved = false },
-                label = { Text("Username") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
-            )
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it; saved = false },
-                label = { Text("Password") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
-            )
-            Button(
-                onClick = {
-                    OpdsConfigStore.config = OpdsServerConfig(
-                        catalogUrl = url,
-                        username = username,
-                        password = password
-                    )
-                    saved = true
-                },
-                modifier = Modifier.padding(top = 16.dp)
-            ) { Text("Save") }
-            if (saved) {
-                Text(
-                    "Saved. Go to the Catalog tab to browse.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-            }
-            Text(
-                "Credentials are stored only in memory for this session.",
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 16.dp)
-            )
-
-            KoreaderSyncSection(modifier = Modifier.padding(top = 40.dp))
+            KoreaderSyncSection(modifier = Modifier.fillMaxWidth())
         }
     }
 }

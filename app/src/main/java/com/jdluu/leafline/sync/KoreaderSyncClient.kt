@@ -5,7 +5,6 @@ import com.google.gson.JsonParser
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.Credentials
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
@@ -132,9 +131,15 @@ class KoreaderSyncClient(
         requestBody: okhttp3.RequestBody?
     ): Request {
         val url = endpointUrl(serverUrl, pathSegments)
+        // KOReader sync servers authenticate with X-Auth-User / X-Auth-Key headers,
+        // where the key is the MD5 hex digest of the user's key phrase.
+        val md5Key = java.security.MessageDigest.getInstance("MD5")
+            .digest(password.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
         return Request.Builder()
             .url(url)
-            .header("Authorization", Credentials.basic(username, password, Charsets.UTF_8))
+            .header("X-Auth-User", username)
+            .header("X-Auth-Key", md5Key)
             .apply {
                 if (requestBody == null) get() else put(requestBody)
             }

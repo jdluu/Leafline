@@ -45,7 +45,12 @@ class KoreaderSyncClientTest {
         assertTrue(result)
         val request = server.takeRequest()
         assertEquals("/api/koreader/users/auth", request.path)
-        assertEquals("Basic " + okHttpBasic("user", "pass"), request.getHeader("Authorization"))
+        // KOReader sync protocol: X-Auth-User + X-Auth-Key (md5 of the key phrase)
+        val expectedMd5 = java.security.MessageDigest.getInstance("MD5")
+            .digest("pass".toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+        assertEquals("user", request.getHeader("X-Auth-User"))
+        assertEquals(expectedMd5, request.getHeader("X-Auth-Key"))
     }
 
     @Test
@@ -165,9 +170,5 @@ class KoreaderSyncClientTest {
         assertEquals(7.0, progress.percentage!!, 0.0001)
         assertNull(progress.progress)
         assertNull(progress.timestamp)
-    }
-
-    private fun okHttpBasic(user: String, password: String): String {
-        return okhttp3.Credentials.basic(user, password, Charsets.UTF_8).removePrefix("Basic ")
     }
 }
