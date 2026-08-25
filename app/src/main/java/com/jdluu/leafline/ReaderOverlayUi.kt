@@ -537,7 +537,14 @@ internal fun ReaderTopBar(
         LocatorIdentity.key(it.locatorJson) == currentKey
     }
     TopAppBar(
-        title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        title = { 
+            Text(
+                title, 
+                maxLines = 1, 
+                overflow = TextOverflow.Ellipsis,
+                fontWeight = FontWeight.SemiBold
+            ) 
+        },
         navigationIcon = {
             IconButton(onClick = onBack) {
                 Icon(Icons.Default.ArrowBack, contentDescription = "Back")
