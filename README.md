@@ -1,10 +1,10 @@
 # Leafline
 
-[![CI](https://github.com/jdluu/Leafline/actions/workflows/ci.yml/badge.svg)](https://github.com/jdluu/Leafline/actions/workflows/ci.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/jdluu/Leafline/ci.yml?style=for-the-badge&label=CI&logo=githubactions)](https://github.com/jdluu/Leafline/actions/workflows/ci.yml)
 ![Android](https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)
 ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white)
-![Readium](https://img.shields.io/badge/Readium-FF6F00?style=for-the-badge&logo=readthedocs&logoColor=white)
+![EPUB](https://img.shields.io/badge/EPUB-8B4513?style=for-the-badge&logo=bookreader&logoColor=white)
 
 Leafline is a free, open-source EPUB reader for Android. It keeps your books,
 highlights, and reading progress entirely on your device, and connects to any
