@@ -45,7 +45,9 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -70,6 +72,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -102,9 +105,16 @@ fun LibraryScreen(
     var detailSheetBook by remember { mutableStateOf<LibraryBook?>(null) }
     var showDeleteConfirm by remember { mutableStateOf<LibraryBook?>(null) }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        TopAppBar(
-            title = { Text("Library") },
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            TopAppBar(
+            title = {
+                Text(
+                    "Leafline",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+            },
             actions = {
                 IconButton(
                     onClick = {
@@ -159,12 +169,6 @@ fun LibraryScreen(
                     }
                 }
             )
-        }
-        Button(
-            onClick = onImportEpub,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-        ) {
-            Text("Import EPUB")
         }
 
         // Collection filter chips
@@ -255,14 +259,54 @@ fun LibraryScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                if (query.isNotBlank()) {
-                    Text("No books match")
-                } else if (selectedCollection != null) {
-                    Text("No books in this collection")
-                } else if (readingStatusFilter != null) {
-                    Text("No books with this status")
-                } else {
-                    Text("No books imported yet")
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (query.isNotBlank()) {
+                        Text("No books match", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "Try a different search term",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else if (selectedCollection != null) {
+                        Text("Collection is empty", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "Books added to this collection will appear here",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else if (readingStatusFilter != null) {
+                        Text("No books with this status", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "Try a different filter",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.MenuBook,
+                            contentDescription = null,
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            "Your library awaits",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            "Import an EPUB to start reading",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                        Spacer(Modifier.height(24.dp))
+                        FilledTonalButton(onClick = onImportEpub) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Import EPUB")
+                        }
+                    }
                 }
             }
         } else {
@@ -290,6 +334,18 @@ fun LibraryScreen(
                 }
             }
         }
+    }
+
+    // Import FAB — always in reach, never blocks content
+    FloatingActionButton(
+        onClick = onImportEpub,
+        modifier = Modifier
+            .align(Alignment.BottomEnd)
+            .padding(16.dp)
+            .padding(bottom = if (books.isEmpty()) 0.dp else 64.dp)
+    ) {
+        Icon(Icons.Default.Add, contentDescription = "Import EPUB")
+    }
     }
 
     // Collection management sheet
@@ -667,7 +723,7 @@ private fun CoverPlaceholder(title: String) {
         Icon(
             imageVector = Icons.Default.MenuBook,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
+            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
