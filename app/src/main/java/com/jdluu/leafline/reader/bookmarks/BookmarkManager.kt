@@ -17,7 +17,9 @@ class BookmarkManager(
     private val scope: CoroutineScope,
     private val repository: BookmarkRepository,
     private val navigatorLocator: () -> String?,
-    private val onBookmarkToggled: (String) -> Unit = {}
+    private val navigatorProvider: () -> org.readium.r2.navigator.epub.EpubNavigatorFragment?,
+    private val onBookmarkToggled: (String) -> Unit = {},
+    private val onSheetClosed: () -> Unit = {},
 ) {
 
     fun toggle(bookStableId: String?) {
@@ -49,6 +51,19 @@ class BookmarkManager(
                 Log.w(TAG, "Could not delete bookmark", e)
             }
         }
+    }
+
+    fun navigateTo(bookmark: Bookmark) {
+        val locator = try {
+            org.readium.r2.shared.publication.Locator.Companion.fromJSON(
+                org.json.JSONObject(bookmark.locatorJson)
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not parse bookmark locator", e)
+            null
+        } ?: return
+        navigatorProvider()?.go(locator, false)
+        onSheetClosed()
     }
 
     companion object {
