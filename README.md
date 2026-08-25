@@ -7,6 +7,11 @@ Leafline is a free, open-source EPUB reader for Android. It keeps your books,
 highlights, and reading progress entirely on your device, and connects to any
 OPDS-compatible library server to browse and download books.
 
+<p align="center">
+  <img src="docs/assets/screenshot-library.png" alt="Library view" width="280" />
+  <img src="docs/assets/screenshot-reader.png" alt="Reader view" width="280" />
+</p>
+
 ## Highlights
 
 - Read EPUB 2 and EPUB 3 books in a paginated or scrolled view
@@ -61,11 +66,6 @@ See [docs/release-builds.md](docs/release-builds.md) for signed release builds
 and F-Droid/Acres packaging notes. Continuous integration runs on every pull
 request; tagged releases (`v*`) produce signed APKs attached to GitHub
 Releases when signing secrets are configured.
-
-## Contributing
-
-Leafline is maintained by its author. Issues and bug reports are welcome via
-the issue tracker; code contributions are accepted case by case.
 
 ## License
 
