@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!--
+      Leafline brand background: deep green-teal.
+      Named "brand" (not "background") because it is the brand
+      field the leaf mark sits on, used by the adaptive icon and
+      the splash screen alike.
+    -->
     <color name="splash_background">#315C52</color>
+    <color name="ic_launcher_background">#315C52</color>
 </resources>
