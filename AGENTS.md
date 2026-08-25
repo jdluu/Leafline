@@ -49,6 +49,21 @@ docs: document opds authentication boundary
   (`phase-1-reading-polish` ... `phase-7-distribution`). Do not keep roadmap or
   planning documents inside the repository.
 
+## Task management (GitHub Projects)
+
+All work is tracked on the GitHub Project board "Leafline Development"
+(https://github.com/users/jdluu/projects/7) and its backing issues. Rules:
+
+- Every unit of work gets a GitHub Issue with concrete acceptance criteria and,
+  where applicable, a verification command. No work starts without one.
+- Each task runs on its own branch (`feat/...`, `fix/...`, `chore/...`,
+  `docs/...`, `refactor/...`) referenced in the PR; "Closes #N" in the PR body
+  auto-closes the issue on merge.
+- Board statuses: Todo -> In Progress -> Done. Move an item to In Progress when
+  its branch is pushed, to Done only after CI is green and the PR merges.
+- Post-freeze work uses the `refactoring` label; deferred feature ideas use the
+  `backlog` label and stay out of Todo.
+
 ## App boundaries
 
 Leafline and ShelfSync are two separate apps with strictly separated concerns.
@@ -259,10 +274,28 @@ LEAFLINE_KEY_PASSWORD=...
 - Versioning: `versionCode` increments monotonically per release, `versionName`
   follows semver. Releases are cut from `main` and tagged `v<versionName>`.
 
+## Feature freeze
+
+A feature freeze is in effect as of 2026-08-25. All roadmap phases
+(phase-1 through phase-7) are complete and closed; no new user-facing features
+are accepted until the first public release ships.
+
+- In scope: refactoring (notably the ongoing ReaderActivity split), stability,
+  performance, accessibility fixes, dependency updates, test coverage, docs.
+- Out of scope: new reader or library capabilities, new sync behaviors, new
+  settings, OPDS in any form, and any feature that would touch the Room schema
+  without a concrete bug to justify it.
+- Exceptions require an explicit user decision recorded on a GitHub issue
+  labeled `feature-freeze-exception` before implementation starts.
+- The freeze lifts when the project exits pre-release: after the v0.1.0 tag is
+  cut from `main`, the CHANGELOG Unreleased section is emptied, and Obtainium
+  users receive the update.
+
 ### Open architecture items
 
-- Optional follow-ups on top of highlights: note editing UI, per-color tints,
-  swipe-to-delete in the highlights sheet.
+- Optional follow-ups deferred past the freeze: note editing UI, per-color
+  highlight tints, swipe-to-delete in the highlights sheet. These are recorded
+  as backlog issues and must not be started while the freeze holds.
 
 ### Quality gates
 
