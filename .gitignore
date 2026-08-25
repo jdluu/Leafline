@@ -44,3 +44,6 @@ scripts/opencode-bws.local
 /build-tmp/
 .kotlin
 .build-tmp/
+
+# Agent-local planning files
+.hermes/
