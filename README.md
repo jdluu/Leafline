@@ -1,6 +1,6 @@
 # Leafline
 
-[![Get it on Obtainium](https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png)](https://apps.obtainium.imranr.dev/redirect?url=https%3A%2F%2Fgithub.com%2Fjdluu%2FLeafline)
+[![Get it on Obtainium](https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png)](https://apps.obtainium.imranr.dev/redirect?r=obtainium%3A%2F%2Fadd%2Fhttps%3A%2F%2Fgithub.com%2Fjdluu%2FLeafline)
 [![CI](https://github.com/jdluu/Leafline/actions/workflows/ci.yml/badge.svg)](https://github.com/jdluu/Leafline/actions/workflows/ci.yml)
 
 Leafline is a free, open-source EPUB reader for Android. It keeps your books,
