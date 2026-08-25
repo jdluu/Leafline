@@ -269,95 +269,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     @Volatile
     private var activeSearchResultId: Int? = null
     private val snackbarHostState = SnackbarHostState()
-    private val pageTurnAnnouncement = mutableStateOf<String?>(null)
-    private var pageTurnAnnounceJob: Job? = null
-    private var pageTurnAnnouncePrimed = false
-    private var lastAnnouncedHref: String? = null
-    private var lastAnnouncedPercent = -1
-
-    /**
-     * Turns taps reported by the Readium navigator into tap zone actions. The
-     * listener consumes every tap except zones configured as none, which are
-     * left unconsumed so the publication webview keeps default handling.
-     * While scroll mode is on, page-turn actions resolve to none so taps stay
-     * unconsumed and vertical webview gestures own the navigation.
-     */
-    private val readerInputListener = object : InputListener {
-        override fun onTap(event: TapEvent): Boolean {
-            val width = navigator?.publicationView?.width ?: return false
-            if (width <= 0) return false
-            val settings = currentSettings.value
-            return when (
-                effectiveTapZoneAction(
-                    tapZoneAt(event.point.x / width),
-                    settings.tapZoneConfig,
-                    settings.epub.scroll == true
-                )
-            ) {
-                TapZoneAction.NONE -> false
-                TapZoneAction.TOGGLE_MENU -> {
-                    toolbarVisible.value = !toolbarVisible.value
-                    true
-                }
-                TapZoneAction.NEXT_PAGE -> {
-                    navigator?.goForward(pageTurnAnimated(settings))
-                    true
-                }
-                TapZoneAction.PREVIOUS_PAGE -> {
-                    navigator?.goBackward(pageTurnAnimated(settings))
-                    true
-                }
-            }
-        }
-    }
-
-    /**
-     * Resolves the effective page turn animation against the system animator
-     * duration scale so turns snap instantly while the OS has animations
-     * removed, regardless of the stored preference.
-     */
-    private fun pageTurnAnimated(settings: ReaderSettings): Boolean {
-        val animatorScale = android.provider.Settings.Global.getFloat(
-            contentResolver,
-            android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
-            1f
-        )
-        return pageTurnIsAnimated(settings.pageTurnAnimation, animatorScale, settings.reduceMotion)
-    }
-
-    /**
-     * Announces page turns to TalkBack through a state-backed Compose text
-     * node carrying a polite live region, rendered by the reader overlay.
-     * The first locator emission primes the tracker silently; later
-     * emissions announce when the resource changes or the reading percentage
-     * moves by at least one point. Rapid successive updates, such as
-     * continuous scrolling, collapse into one announcement through a short
-     * debounce.
-     */
-    private fun onReadingPositionChanged(locator: Locator) {
-        val percent = try {
-            ReadingProgressMath.percentageFromLocator(locator.toJSON().toString())
-        } catch (e: Exception) {
-            null
-        }?.roundToInt() ?: return
-        val href = locator.href.toString()
-        if (!pageTurnAnnouncePrimed) {
-            pageTurnAnnouncePrimed = true
-            lastAnnouncedHref = href
-            lastAnnouncedPercent = percent
-            return
-        }
-        val changedResource = href != lastAnnouncedHref
-        val changedPage = abs(percent - lastAnnouncedPercent) >= 1
-        if (!changedResource && !changedPage) return
-        lastAnnouncedHref = href
-        lastAnnouncedPercent = percent
-        pageTurnAnnounceJob?.cancel()
-        pageTurnAnnounceJob = lifecycleScope.launch {
-            delay(PAGE_TURN_ANNOUNCE_DEBOUNCE_MS)
-            pageTurnAnnouncement.value = "Page $percent%"
-        }
-    }
+    private lateinit var tapZoneHandler: com.jdluu.leafline.reader.navigation.TapZoneHandler
 
     @OptIn(ExperimentalReadiumApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -515,10 +427,18 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             }
 
             navigator = supportFragmentManager.findFragmentByTag(NAVIGATOR_TAG) as EpubNavigatorFragment
-            navigator?.addInputListener(readerInputListener)
+            tapZoneHandler = com.jdluu.leafline.reader.navigation.TapZoneHandler(
+                context = this,
+                scope = lifecycleScope,
+                navigatorProvider = { navigator },
+                settingsProvider = { currentSettings.value },
+                onToggleMenu = { toolbarVisible.value = !toolbarVisible.value },
+                onAnnouncement = {}
+            )
+            navigator?.addInputListener(tapZoneHandler.inputListener)
             lifecycleScope.launch {
                 navigator?.currentLocator?.collect { locator ->
-                    onReadingPositionChanged(locator)
+                    tapZoneHandler.onReadingPositionChanged(locator)
                 }
             }
 
@@ -682,7 +602,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
 
     override fun onDestroy() {
         super.onDestroy()
-        navigator?.removeInputListener(readerInputListener)
+        navigator?.removeInputListener(tapZoneHandler.inputListener)
     }
 
     private fun submitSearch(rawQuery: String) {
@@ -780,7 +700,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     highlightsSheetVisible = highlightsSheetVisible.value,
                     searchSheetVisible = searchSheetVisible.value,
                     searchState = searchState,
-                    pageAnnouncement = pageTurnAnnouncement.value,
+                    pageAnnouncement = tapZoneHandler.announcement,
                     snackbarHostState = snackbarHostState,
                     syncConflict = syncConflict,
                     onJumpToRemote = { syncConflict?.onJump?.invoke(); syncConflictState.value = null },
