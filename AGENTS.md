@@ -238,22 +238,13 @@ clients or manipulate EPUB archives directly.
 - `scripts/check_touch_targets.sh` and `scripts/check_dynamic_type.sh` guard
   against regressions in touch target sizing and font-scale compliance.
 
-### Release builds
+### Release builds (on hold)
 
-Generate a release keystore once:
+The project is pre-release: no versions are published and no release APKs are
+built. When releases resume:
 
-```bash
-keytool -genkeypair -v \
-  -keystore leafline-release.jks \
-  -alias leafline \
-  -keyalg RSA -keysize 4096 -validity 10000
-```
-
-Store it somewhere safe and back it up. Losing it means losing the ability to
-ship updates to existing installs under the same application id.
-
-Add credentials to `~/.gradle/gradle.properties` (never to the repo or any
-file under version control):
+- Generate a release keystore once and keep credentials in
+  `~/.gradle/gradle.properties` (never in the repo):
 
 ```properties
 LEAFLINE_STORE_FILE=/absolute/path/to/leafline-release.jks
@@ -262,45 +253,11 @@ LEAFLINE_KEY_ALIAS=leafline
 LEAFLINE_KEY_PASSWORD=...
 ```
 
-Then build:
-
-```bash
-./gradlew :app:assembleRelease
-```
-
-With properties present this produces a signed APK at
-`app/build/outputs/apk/release/`. Without them the build still succeeds and
-produces `app-release-unsigned.apk`.
-
-#### F-Droid / Acre recipe builds
-
-F-Droid and similar repositories build from source with **their own** signing
-keys, so the recipe needs no secrets at all:
-
-```yaml
-- versionName: 0.2.0
-  versionCode: 2
-  commit: v0.2.0
-  gradle:
-    - yes
-```
-
-Requirements this repo satisfies for such recipes:
-
-- All dependencies come from public Maven repositories (`mavenCentral`,
-  Google's Maven, and Readium's Maven host); no proprietary SDK blobs.
-- No prebuilt binaries are checked in; everything is built from source.
-- `./gradlew :app:assembleRelease` works without any signing credentials,
-  producing an unsigned APK the packager signs itself.
-- The baseline profile in `app/src/main/baseline-prof.txt` is a plain text
-  artifact compiled by the Android Gradle Plugin during the normal build;
-  no extra tooling is needed.
-
-#### Versioning
-
-Versions follow the scheme documented in CHANGELOG.md: `versionCode` increments
-monotonically per release, `versionName` follows semver. Releases are cut from
-`main` and tagged `v<versionName>`.
+- `./gradlew :app:assembleRelease` produces a signed APK when the properties
+  exist, `app-release-unsigned.apk` otherwise. The build never fails for lack
+  of signing credentials.
+- Versioning: `versionCode` increments monotonically per release, `versionName`
+  follows semver. Releases are cut from `main` and tagged `v<versionName>`.
 
 ### Open architecture items
 

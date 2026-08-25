@@ -15,8 +15,8 @@ android {
         // current platform. Revisit only with a concrete device requirement.
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 1
+        versionName = "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }

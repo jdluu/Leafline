@@ -39,20 +39,8 @@ own server.
 
 **Requirements:** Android 8.0 (API 26) or newer.
 
-## Installation
-
-### Obtainium
-
-[![Get it on Obtainium](https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png)](https://apps.obtainium.imranr.dev/redirect?r=obtainium%3A%2F%2Fadd%2Fhttps%3A%2F%2Fgithub.com%2Fjdluu%2FLeafline)
-
-Tap the badge to add Leafline to
-[Obtainium](https://github.com/ImranR98/Obtainium), which installs it straight
-from this repository's releases and keeps it up to date automatically.
-
-### Manual APK
-
-Download an APK from the [Releases](https://github.com/jdluu/Leafline/releases)
-page and install it. You may need to allow installation from unknown sources.
+**Note:** Leafline is pre-release. No APKs are published yet; install by
+building from source below.
 
 ## Building from source
 
@@ -64,10 +52,7 @@ Requirements: JDK 17+ and the Android SDK.
 ./gradlew lintDebug            # run lint checks
 ```
 
-See [docs/release-builds.md](docs/release-builds.md) for signed release builds
-and F-Droid/Acres packaging notes. Continuous integration runs on every pull
-request; tagged releases (`v*`) produce signed APKs attached to GitHub
-Releases when signing secrets are configured.
+Continuous integration runs on every pull request.
 
 ## License
 

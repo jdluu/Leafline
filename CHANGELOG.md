@@ -18,49 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   resets and is independent of versionName.
 - Pre-1.0 (0.y.z): the API is unstable; MINOR bumps may contain breaking
   changes, which are called out explicitly in the changelog entries.
-- Releases are cut from `main` and tagged `v<versionName>` (e.g. `v0.2.0`).
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-08-24
-
-### Added
-
-- User-defined collections/tags with filter chip row (#16)
-- Reading status flags (unread/reading/finished) with auto-suggested transitions (#17)
-- Continue-reading shelf with recently-read books (#18)
-- Bulk EPUB import from SAF with per-file error reporting (#19)
-- Book detail sheet with metadata, file info, and actions (#20)
-- Sync conflict bottom sheet comparing local vs remote progress (#24)
-- Background sync via WorkManager for periodic progress push (#23)
-- Adaptive app icon and SplashScreen API integration (#15)
-
-### Fixed
-
-- KOReader partial-MD5 hash now matches KOReader master's exponential-sampling
-  algorithm exactly; Room index declarations added to fix migration crash (#22)
-- Settings page is now scrollable so all KOReader Sync fields are reachable
-- Cleartext HTTP permitted for local server connections (Grimmory on LAN)
-- Comprehensive brand and UI redesign (#77)
-- Warm paper-toned background and activity transitions (#78)
-
-## [0.1.0] - 2026-08-22
-
-### Added
-
-- EPUB reader built on Readium Kotlin Toolkit: paginated and scrolled modes,
-  configurable tap zones, page-turn animations, continuous scroll
-- Reading settings with live preview: font catalog, style modes, margins,
-  themes (light/sepia/dark/OLED/e-ink high-contrast), brightness quick control
-- Sepia quick control in reader overlay with restore memory
-- Bookmarks, highlights with curated tint palette and swatch picker, in-book search
-- Table of contents navigation
-- Local library: grid with cover thumbnails, sorting, search
-- KOReader-compatible reading position sync (push/pull with conflict detection)
-- Accessibility: TalkBack audit with content descriptions and page announcements,
-  dynamic type up to 200%, 48dp touch targets, reduced-motion support
-- Dynamic color theme support and full palette refresh
-
-[Unreleased]: https://github.com/jdluu/Leafline/compare/v0.2.0...HEAD
-[0.2.0]: https://github.com/jdluu/Leafline/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/jdluu/Leafline/releases/tag/v0.1.0
+The project is pre-release: no versions have been published. Release builds
+and tagging are on hold until the feature set stabilizes.
