@@ -319,10 +319,13 @@ fun LeaflineApp(activity: MainActivity) {
                         viewModel = libraryViewModel,
                         onImportEpub = { importEpubLauncher.launch(arrayOf(MainActivity.EPUB_MIME_TYPE)) },
                         onOpenBook = { book ->
-                            activity.startActivity(
-                                ReaderActivity.newIntent(activity, book.filePath)
-                            )
-                        }
+                                                      activity.startActivity(
+                                                          ReaderActivity.newIntent(activity, book.filePath)
+                                                      )
+                                                      activity.overridePendingTransition(
+                                                          android.R.anim.fade_in, 0
+                                                      )
+                                                  }
                     )
                     LeaflineTab.Catalog -> {
                         LaunchedEffect(selectedTab) {
