@@ -270,6 +270,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     private var activeSearchResultId: Int? = null
     private val snackbarHostState = SnackbarHostState()
     private lateinit var tapZoneHandler: com.jdluu.leafline.reader.navigation.TapZoneHandler
+    private lateinit var bookmarkManager: com.jdluu.leafline.reader.bookmarks.BookmarkManager
 
     @OptIn(ExperimentalReadiumApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -359,6 +360,17 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             onSnackbar = { msg -> lifecycleScope.launch { snackbarHostState.showSnackbar(msg) } },
             onAnnotationNavigated = {
                 highlightsSheetVisible.value = false
+                toolbarVisible.value = false
+            }
+        )
+        bookmarkManager = com.jdluu.leafline.reader.bookmarks.BookmarkManager(
+            scope = lifecycleScope,
+            repository = bookmarkRepository,
+            navigatorLocator = { navigator?.currentLocator?.value?.toJSON()?.toString() },
+            navigatorProvider = { navigator },
+            onBookmarkToggled = { msg -> lifecycleScope.launch { snackbarHostState.showSnackbar(msg) } },
+            onSheetClosed = {
+                bookmarkSheetVisible.value = false
                 toolbarVisible.value = false
             }
         )
@@ -530,48 +542,6 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         toolbarVisible.value = false
     }
 
-    private fun toggleBookmark() {
-        val stableId = bookStableId ?: return
-        val locator = navigator?.currentLocator?.value ?: return
-        lifecycleScope.launch {
-            try {
-                val result = bookmarkRepository.toggleBookmark(
-                    bookId = stableId,
-                    locatorJson = locator.toJSON().toString()
-                )
-                snackbarHostState.showSnackbar(
-                    when (result) {
-                        is BookmarkToggleResult.Added -> "Bookmark added"
-                        is BookmarkToggleResult.Removed -> "Bookmark removed"
-                    }
-                )
-            } catch (e: Exception) {
-                Log.w(TAG, "Could not toggle bookmark", e)
-            }
-        }
-    }
-
-    private fun deleteBookmark(bookmark: Bookmark) {
-        lifecycleScope.launch {
-            try {
-                bookmarkRepository.removeBookmark(bookmark.id)
-            } catch (e: Exception) {
-                Log.w(TAG, "Could not delete bookmark", e)
-            }
-        }
-    }
-
-    private fun navigateToBookmark(bookmark: Bookmark) {
-        val locator = try {
-            Locator.Companion.fromJSON(org.json.JSONObject(bookmark.locatorJson))
-        } catch (e: Exception) {
-            Log.w(TAG, "Could not parse bookmark locator", e)
-            null
-        } ?: return
-        navigator?.go(locator, false)
-        bookmarkSheetVisible.value = false
-        toolbarVisible.value = false
-    }
 
 
 
@@ -709,11 +679,11 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     onOpenToc = { scope.launch { drawerState.open() } },
                     onOpenSettings = { settingsSheetVisible.value = true },
                     onDismissSettings = { settingsSheetVisible.value = false },
-                    onToggleBookmark = { toggleBookmark() },
+                    onToggleBookmark = { bookmarkManager.toggle(bookStableId) },
                     onOpenBookmarks = { bookmarkSheetVisible.value = true },
                     onDismissBookmarks = { bookmarkSheetVisible.value = false },
-                    onBookmarkClick = { navigateToBookmark(it) },
-                    onDeleteBookmark = { deleteBookmark(it) },
+                    onBookmarkClick = { bookmarkManager.navigateTo(it) }, // TODO: delegate to bookmarkManager
+                    onDeleteBookmark = { bookmarkManager.delete(it) },
                     onOpenHighlights = { highlightsSheetVisible.value = true },
                     onDismissHighlights = { highlightsSheetVisible.value = false },
                     onAnnotationClick = { annotationManager.navigateTo(it) },
