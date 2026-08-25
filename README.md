@@ -1,60 +1,75 @@
 # Leafline
 
 [![Get it on Obtainium](https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png)](https://apps.obtainium.imranr.dev/redirect?url=https%3A%2F%2Fgithub.com%2Fjdluu%2FLeafline)
+[![CI](https://github.com/jdluu/Leafline/actions/workflows/ci.yml/badge.svg)](https://github.com/jdluu/Leafline/actions/workflows/ci.yml)
 
-Leafline is an Android EPUB reader built for focused reading on phones,
-tablets, and e-ink devices. It keeps your books and reading progress on your
-device, and connects to any OPDS-compatible library server to browse and
-download books.
+Leafline is a free, open-source EPUB reader for Android. It keeps your books,
+highlights, and reading progress entirely on your device, and connects to any
+OPDS-compatible library server to browse and download books.
 
-## Features
+## Highlights
 
-- Render EPUB 2 and EPUB 3 books with a paginated reader from the Readium
-  Kotlin Toolkit
-- Import local EPUB files into an on-device library with cover thumbnails
-- Sort by recent, title, or author; filter as you type
-- Browse authenticated OPDS 1.2 catalogs and download books into the library
-- Table of contents, adjustable fonts, themes, margins, and line height
-- Reading position is remembered and restored when you reopen a book
-- Bookmarks, highlights, and in-book search
-- Configurable tap zones and page-turn animation
-- Sync reading progress across devices with KOReader-compatible servers
-- No telemetry: Leafline collects no analytics, crash reports, or usage data.
-  Everything stays on your device except the progress sync you configure
-  yourself against your own server.
+- Read EPUB 2 and EPUB 3 books in a paginated or scrolled view
+- Import your own EPUB files into an on-device library with cover thumbnails
+- Browse authenticated OPDS catalogs and download books over the network
+- Sync reading progress between your devices using any KOReader-compatible
+  sync server you host yourself
+- Bookmarks, multi-color highlights, and full-text in-book search
+- Adjustable fonts, themes (including sepia), margins, line height, tap zones,
+  page-turn animation, and per-book brightness
 
-Leafline pairs naturally with self-hosted library software such as
-[Grimmory](https://grimmory.org/), but works fully offline once books are on
-the device.
+Leafline collects no analytics, crash reports, or usage data. Everything stays
+on your device except the progress sync you configure yourself against your
+own server.
 
 ## Requirements
 
 - Android 8.0 (API 26) or newer
 
-## Building from source
+## Installing
 
-Requirements: JDK 17+, Android SDK.
+### Obtainium
 
-```bash
-./gradlew assembleDebug   # build debug APK
-./gradlew test            # run unit tests
-./gradlew lint            # run lint checks
-```
+Tap the "Get it on Obtainium" badge above to add Leafline to
+[Obtainium](https://github.com/ImranR98/Obtainium), which installs it straight
+from this repository's releases and keeps it up to date automatically.
 
-The debug APK is written to `app/build/outputs/apk/debug/`.
+### Manual APK
 
-## OPDS setup
+Download an APK from the [Releases](https://github.com/jdluu/Leafline/releases)
+page and install it. You may need to allow installation from unknown sources.
+
+## Using OPDS catalogs
 
 Open the app, add your catalog URL, and sign in with HTTP Basic credentials.
-Credentials are held in memory for the session only and never leave the
-device. The catalog server must expose OPDS access for your account.
+Credentials are held in memory for the session only and never leave the device.
+Any OPDS 1.2 catalog works; self-hosted library software such as
+[Grimmory](https://grimmory.org/) pairs naturally with Leafline, but it also
+works fully offline once books are on the device.
 
-## Status
+## Building from source
 
-Active development. See [CHANGELOG.md](CHANGELOG.md) for release history and
-the versioning policy. Current version: 0.2.0.
+Requirements: JDK 17+ and the Android SDK.
 
-Leafline is released under the [MIT License](LICENSE).
+```bash
+./gradlew assembleDebug        # build debug APK
+./gradlew testDebugUnitTest    # run unit tests
+./gradlew lintDebug            # run lint checks
+```
+
+See [docs/release-builds.md](docs/release-builds.md) for signed release builds
+and F-Droid/Acres packaging notes. Continuous integration runs on every pull
+request; tagged releases (`v*`) produce signed APKs attached to GitHub
+Releases when signing secrets are configured.
+
+## Contributing
+
+Leafline is maintained by its author. Issues and bug reports are welcome via
+the issue tracker; code contributions are accepted case by case.
+
+## License
+
+[MIT](LICENSE)
 
 ## Name
 
