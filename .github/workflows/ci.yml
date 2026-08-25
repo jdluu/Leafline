@@ -26,24 +26,18 @@ jobs:
         run: ./gradlew :app:compileDebugKotlin
 
       - name: Run unit tests
-        # Known pre-existing Readium JVM failures (Theme class-init on JVM)
-        # are tracked separately; CI gates on everything else passing.
-        run: |
-          set +e
-          ./gradlew :app:testDebugUnitTest --continue > test_output.txt 2>&1
-          status=$?
-          grep -E "tests completed" test_output.txt || true
-          # Extract failure count; allow exactly the known baseline of 8
-          failed=$(grep -oE "[0-9]+ tests completed, [0-9]+ failed" test_output.txt | grep -oE "[0-9]+ failed" | grep -oE "[0-9]+" || echo 0)
-          if [ "$failed" -gt 8 ]; then
-            echo "::error::Unit tests regressed: $failed failures (baseline is 8 pre-existing Readium JVM failures)"
-            exit 1
-          elif [ "$status" -ne 0 ] && [ "$failed" -eq 0 ]; then
-            echo "::error::Test task failed without producing a count"
-            exit 1
-          else
-            echo "Test failures ($failed) within known baseline (8)"
-          fi
+        # The Readium Theme JVM class-init failures were fixed at the root by
+        # isolating the theme behind a pure Kotlin type (#90). The gate is now
+        # strict: any test failure fails CI.
+        run: ./gradlew :app:testDebugUnitTest
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-reports
+          path: app/build/reports/tests/testDebugUnitTest/
+          if-no-files-found: ignore
 
   lint:
     name: Android lint
