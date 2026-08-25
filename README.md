@@ -8,33 +8,39 @@
 
 Leafline is a free, open-source EPUB reader for Android. It keeps your books,
 highlights, and reading progress entirely on your device, and connects to any
-OPDS-compatible library server to browse and download books.
+OPDS-compatible library server to browse and download books. The name refers to
+both the leaves of a book and a continuous reading line across devices.
+
+Leafline collects no analytics, crash reports, or usage data. Everything stays
+on your device except the progress sync you configure yourself against your
+own server.
+
+## Screenshots
 
 <p align="center">
   <img src="docs/assets/screenshot-library.png" alt="Library view" width="280" />
   <img src="docs/assets/screenshot-reader.png" alt="Reader view" width="280" />
 </p>
 
-## Highlights
+## Features
 
-- Read EPUB 2 and EPUB 3 books in a paginated or scrolled view
-- Import your own EPUB files into an on-device library with cover thumbnails
-- Browse authenticated OPDS catalogs and download books over the network
-- Sync reading progress between your devices using any KOReader-compatible
-  sync server you host yourself
-- Bookmarks, multi-color highlights, and full-text in-book search
-- Adjustable fonts, themes (including sepia), margins, line height, tap zones,
-  page-turn animation, and per-book brightness
+- **EPUB reading** — Read EPUB 2 and EPUB 3 books in a paginated or scrolled view
+- **On-device library** — Import your own EPUB files with cover thumbnails
+- **OPDS catalogs** — Browse authenticated OPDS catalogs and download books over
+  the network. Any OPDS 1.2 catalog works; self-hosted library software such as
+  [Grimmory](https://grimmory.org/) pairs naturally.
+- **Progress sync** — Sync reading progress between your devices using any
+  KOReader-compatible sync server you host yourself
+- **Bookmarks & annotations** — Multi-color highlights and full-text in-book
+  search
+- **Customizable reading** — Adjustable fonts, themes (including sepia),
+  margins, line height, tap zones, page-turn animation, and per-book brightness
+- **Offline-first** — Works fully offline once books are on the device
+- **No telemetry** — No analytics, crash reports, or usage data collected
 
-Leafline collects no analytics, crash reports, or usage data. Everything stays
-on your device except the progress sync you configure yourself against your
-own server.
+**Requirements:** Android 8.0 (API 26) or newer.
 
-## Requirements
-
-- Android 8.0 (API 26) or newer
-
-## Installing
+## Installation
 
 ### Obtainium
 
@@ -48,14 +54,6 @@ from this repository's releases and keeps it up to date automatically.
 
 Download an APK from the [Releases](https://github.com/jdluu/Leafline/releases)
 page and install it. You may need to allow installation from unknown sources.
-
-## Using OPDS catalogs
-
-Open the app, add your catalog URL, and sign in with HTTP Basic credentials.
-Credentials are held in memory for the session only and never leave the device.
-Any OPDS 1.2 catalog works; self-hosted library software such as
-[Grimmory](https://grimmory.org/) pairs naturally with Leafline, but it also
-works fully offline once books are on the device.
 
 ## Building from source
 
@@ -75,8 +73,3 @@ Releases when signing secrets are configured.
 ## License
 
 [MIT](LICENSE)
-
-## Name
-
-Leafline refers to both the leaves of a book and a continuous reading line
-across devices.
