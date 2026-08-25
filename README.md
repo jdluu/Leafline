@@ -1,5 +1,7 @@
 # Leafline
 
+[![Get it on Obtainium](https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png)](https://apps.obtainium.imranr.dev/redirect?url=https%3A%2F%2Fgithub.com%2Fjdluu%2FLeafline)
+
 Leafline is an Android EPUB reader built for focused reading on phones,
 tablets, and e-ink devices. It keeps your books and reading progress on your
 device, and connects to any OPDS-compatible library server to browse and
