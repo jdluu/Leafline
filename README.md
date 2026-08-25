@@ -17,6 +17,9 @@ download books.
 - Bookmarks, highlights, and in-book search
 - Configurable tap zones and page-turn animation
 - Sync reading progress across devices with KOReader-compatible servers
+- No telemetry: Leafline collects no analytics, crash reports, or usage data.
+  Everything stays on your device except the progress sync you configure
+  yourself against your own server.
 
 Leafline pairs naturally with self-hosted library software such as
 [Grimmory](https://grimmory.org/), but works fully offline once books are on
