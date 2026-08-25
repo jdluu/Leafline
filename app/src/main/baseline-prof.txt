@@ -1,57 +1,57 @@
-HSPL com/jdluu/leafline/LeaflineApplication
-HSPL com/jdluu/leafline/MainActivity
-HSPL com/jdluu/leafline/LibraryViewModel
-HSPL com/jdluu/leafline/library/LeaflineDependencyHolder
-HSPL com/jdluu/leafline/library/data/LibraryRepositoryImpl
-HSPL com/jdluu/leafline/library/data/local/LeaflineDatabase
-HSPL com/jdluu/leafline/library/data/local/BookDao
-HSPL com/jdluu/leafline/library/data/local/BookDao_Impl
-HSPL com/jdluu/leafline/library/data/local/RoomBookDataSource
-HSPL com/jdluu/leafline/library/LibraryScreen
-HSPL com/jdluu/leafline/library/data/LibraryBook
-HSPL com/jdluu/leafline/library/data/BookModel
-HSPL com/jdluu/leafline/library/cover/EpubCoverLoader
-HSPL com/jdluu/leafline/library/cover/CoverCache
-HSPL com/jdluu/leafline/library/cover/PublicationCoverWriter
-HSPL com/jdluu/leafline/ReaderActivity
-HSPL com/jdluu/leafline/reader/ReaderSettings
-HSPL com/jdluu/leafline/reader/ReaderPreferencesStore
-HSPL com/jdluu/leafline/sync/ProgressSyncer
-HSPL com/jdluu/leafline/sync/KoreaderSyncClient
-HSPL com/jdluu/leafline/sync/FileHashUtil
-HSPL com/jdluu/leafline/opds/OpdsConfigStore
-HSPL com/jdluu/leafline/theme/Theme
-HSPL com/jdluu/leafline/theme/Color
-HSPL org/readium/r2/streamer/PublicationOpener
-HSPL org/readium/r2/streamer/parser/DefaultPublicationParser
-HSPL org/readium/r2/shared/publication/Publication
-HSPL org/readium/r2/shared/util/asset/AssetRetriever
-HSPL org/readium/r2/shared/util/http/DefaultHttpClient
-HSPL androidx/room/Room
-HSPL androidx/room/QueryInterceptorOpenHelper
-HSPL androidx/room/QueryInterceptorDatabase
-HSPL androidx/room/CoroutinesRoom
-HSPL androidx/room/InvalidationTracker
-HSPL androidx/compose/foundation/lazy/grid/LazyVerticalGrid
-HSPL androidx/compose/foundation/lazy/LazyColumn
-HSPL androidx/compose/foundation/lazy/grid/LazyGridState
-HSPL androidx/compose/foundation/lazy/LazyListState
-HSPL androidx/compose/foundation/lazy/grid/GridCells
-HSPL androidx/compose/material3/Card
-HSPL androidx/compose/material3/NavigationBar
-HSPL androidx/compose/material3/NavigationBarItem
-HSPL androidx/compose/material3/TopAppBar
-HSPL androidx/compose/material3/SearchBar
-HSPL androidx/compose/material3/SuggestionChip
-HSPL androidx/compose/material3/FilterChip
-HSPL androidx/compose/material3/BottomSheetScaffold
-HSPL androidx/compose/ui/focus/FocusRequester
-HSPL androidx/work/impl/WorkManagerImpl
-HSPL androidx/work/impl/background/systemjob/SystemJobScheduler
-HSPL kotlinx/coroutines/flow/FlowKt
-HSPL kotlinx/coroutines/flow/StateFlow
-HSPL kotlinx/coroutines/Dispatchers
-HSPL okhttp3/OkHttpClient
-HSPL okhttp3/OkHttpClient$Builder
-HSPL okhttp3/Request$Builder
-HSPL android/graphics/BitmapFactory
+Lcom/jdluu/leafline/LeaflineApplication/**
+Lcom/jdluu/leafline/MainActivity/**
+Lcom/jdluu/leafline/LibraryViewModel/**
+Lcom/jdluu/leafline/library/LeaflineDependencyHolder/**
+Lcom/jdluu/leafline/library/data/LibraryRepositoryImpl/**
+Lcom/jdluu/leafline/library/data/local/LeaflineDatabase/**
+Lcom/jdluu/leafline/library/data/local/BookDao/**
+Lcom/jdluu/leafline/library/data/local/BookDao_Impl/**
+Lcom/jdluu/leafline/library/data/local/RoomBookDataSource/**
+Lcom/jdluu/leafline/library/LibraryScreen/**
+Lcom/jdluu/leafline/library/data/LibraryBook/**
+Lcom/jdluu/leafline/library/data/BookModel/**
+Lcom/jdluu/leafline/library/cover/EpubCoverLoader/**
+Lcom/jdluu/leafline/library/cover/CoverCache/**
+Lcom/jdluu/leafline/library/cover/PublicationCoverWriter/**
+Lcom/jdluu/leafline/ReaderActivity/**
+Lcom/jdluu/leafline/reader/ReaderSettings/**
+Lcom/jdluu/leafline/reader/ReaderPreferencesStore/**
+Lcom/jdluu/leafline/sync/ProgressSyncer/**
+Lcom/jdluu/leafline/sync/KoreaderSyncClient/**
+Lcom/jdluu/leafline/sync/FileHashUtil/**
+Lcom/jdluu/leafline/opds/OpdsConfigStore/**
+Lcom/jdluu/leafline/theme/Theme/**
+Lcom/jdluu/leafline/theme/Color/**
+Lorg/readium/r2/streamer/PublicationOpener/**
+Lorg/readium/r2/streamer/parser/DefaultPublicationParser/**
+Lorg/readium/r2/shared/publication/Publication/**
+Lorg/readium/r2/shared/util/asset/AssetRetriever/**
+Lorg/readium/r2/shared/util/http/DefaultHttpClient/**
+Landroidx/room/Room/**
+Landroidx/room/QueryInterceptorOpenHelper/**
+Landroidx/room/QueryInterceptorDatabase/**
+Landroidx/room/CoroutinesRoom/**
+Landroidx/room/InvalidationTracker/**
+Landroidx/compose/foundation/lazy/grid/LazyVerticalGrid/**
+Landroidx/compose/foundation/lazy/LazyColumn/**
+Landroidx/compose/foundation/lazy/grid/LazyGridState/**
+Landroidx/compose/foundation/lazy/LazyListState/**
+Landroidx/compose/foundation/lazy/grid/GridCells/**
+Landroidx/compose/material3/Card/**
+Landroidx/compose/material3/NavigationBar/**
+Landroidx/compose/material3/NavigationBarItem/**
+Landroidx/compose/material3/TopAppBar/**
+Landroidx/compose/material3/SearchBar/**
+Landroidx/compose/material3/SuggestionChip/**
+Landroidx/compose/material3/FilterChip/**
+Landroidx/compose/material3/BottomSheetScaffold/**
+Landroidx/compose/ui/focus/FocusRequester/**
+Landroidx/work/impl/WorkManagerImpl/**
+Landroidx/work/impl/background/systemjob/SystemJobScheduler/**
+Lkotlinx/coroutines/flow/FlowKt/**
+Lkotlinx/coroutines/flow/StateFlow/**
+Lkotlinx/coroutines/Dispatchers/**
+Lokhttp3/OkHttpClient/**
+Lokhttp3/OkHttpClient$Builder/**
+Lokhttp3/Request$Builder/**
+Landroid/graphics/BitmapFactory/**

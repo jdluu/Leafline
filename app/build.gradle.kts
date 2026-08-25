@@ -22,13 +22,38 @@ android {
         vectorDrawables { useSupportLibrary = true }
     }
 
-    buildTypes {
+buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            // Release signing (#32): credentials never live in this repo.
+            // Set these in ~/.gradle/gradle.properties (or CI secrets):
+            //   LEAFLINE_STORE_FILE=/absolute/path/to/leafline-release.jks
+            //   LEAFLINE_STORE_PASSWORD=...
+            //   LEAFLINE_KEY_ALIAS=leafline
+            //   LEAFLINE_KEY_PASSWORD=...
+            // Unsigned release builds still work without them.
+            signingConfigs.findByName("release")?.let { config ->
+                val storeFile = project.findProperty("LEAFLINE_STORE_FILE") as? String
+                if (storeFile != null) {
+                    config.storeFile = file(storeFile)
+                    config.storePassword = project.findProperty("LEAFLINE_STORE_PASSWORD") as? String
+                    config.keyAlias = project.findProperty("LEAFLINE_KEY_ALIAS") as? String
+                    config.keyPassword = project.findProperty("LEAFLINE_KEY_PASSWORD") as? String
+                }
+            }
+        }
+    }
+
+    signingConfigs {
+        create("release") {
+            // Populated from gradle properties above when present; the build
+            // falls back to an unsigned release APK otherwise, which is what
+            // F-Droid/Acres recipe builds produce anyway (they sign with
+            // their own keys at packaging time).
         }
     }
 
