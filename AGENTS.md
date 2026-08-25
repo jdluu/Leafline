@@ -13,7 +13,8 @@ hosting outside this repository.
 - Use Readium Kotlin Toolkit for EPUB publication handling; do not write a new
   EPUB renderer without an explicit architecture decision.
 - Use Room for durable local state and WorkManager for deferred network work.
-- Treat OPDS as the public library integration boundary.
+- Treat OPDS as out of scope: catalog fetching belongs to ShelfSync. Leafline
+  opens EPUB files already on the device.
 - Never put credentials, tokens, signing keys, or `local.properties` in Git.
 - Prefer small vertical slices with tests before broad refactors.
 - Verify every change with the narrowest relevant Gradle test/check, then run the
@@ -57,7 +58,7 @@ Leafline and ShelfSync are two separate apps with strictly separated concerns.
 | Purpose | EPUB reading app | Grimmory/Calibre-compatible sync client |
 | Platform | Native Android (Kotlin, Jetpack Compose) | Tauri (React frontend, Rust backend) |
 | Rendering | Readium Kotlin Toolkit (EPUB rendering) | None. Never renders or opens books for reading |
-| Catalog | OPDS browse + download into local library (client role only) | OPDS browse, authenticated download, offline reconciliation (primary domain) |
+| Catalog | Out of scope. Books arrive via local import or ShelfSync handoff | OPDS browse, authenticated download, offline reconciliation (primary domain) |
 | Local data | Room DB: library metadata, reading position, bookmarks, highlights, covers | SQLite (rusqlite): provider-scoped publications, acquisitions, file revisions, download jobs |
 | Sync/progress | Reads locally; pushes/pulls KOReader-compatible progress | Future: library reconciliation against the Grimmory server |
 | Calibre | Out of scope entirely | Legacy compatibility layer exists; new work uses OPDS instead |
@@ -67,12 +68,12 @@ Leafline owns:
 - Reading experience: paginated/scrolled EPUB rendering, themes, fonts, tap zones
 - Reader features: bookmarks, highlights/annotations, in-book search
 - Local reading state: last-read locator, per-book preferences
-- Its own small on-device library of imported/downloaded EPUBs
+- Its own small on-device library of locally imported EPUBs
 
 Leafline must never do:
 
 - Host a server, act as a Calibre replacement, or mutate a Calibre `metadata.db`
-- Implement OPDS server logic (it is an OPDS *client* only)
+- Implement OPDS browsing or downloading (that is ShelfSync's job entirely)
 - Duplicate ShelfSync's download-job/persistence model beyond what reading needs
 
 ShelfSync owns catalog connection/authentication/browsing, safe verified
@@ -94,7 +95,6 @@ coupling between the two apps.
 app/src/main/java/com/jdluu/leafline/
 ├── library/            # Library screen, ViewModels, settings, DI holder
 │   └── data/           # Book models, repositories, Room DAOs/entities
-├── opds/               # OPDS client: catalog browsing, download coordination
 ├── sync/               # KOReader-compatible progress sync (pure Kotlin)
 └── reader/             # In-book search support; ReaderActivity hosts Readium
 ```
@@ -110,7 +110,7 @@ clients or manipulate EPUB archives directly.
   Decorator API used for highlight and match decorations
 - Room for durable local state (library, bookmarks, annotations, reading
   positions), with explicit migrations per schema change
-- OkHttp for OPDS and progress-sync networking
+- OkHttp for KOReader progress-sync networking
 - Kotlin coroutines and Flow for asynchronous work
 
 ### Progress sync decisions
@@ -132,9 +132,8 @@ clients or manipulate EPUB archives directly.
 - Timestamps: remote timestamps are normalized from seconds or milliseconds
   before comparison against the locally stamped last-read time; when a server
   omits the timestamp the comparison falls back to percentages.
-- Credentials: `KoreaderSyncConfig` mirrors `OpdsServerConfig`. Values live
-  only in the session-scoped config stores and are never written to disk, git,
-  or logs.
+- Credentials: `KoreaderSyncConfig` values live only in the session-scoped
+  config store and are never written to disk, git, or logs.
 - Reader integration: opening a book pulls remote progress and offers a jump
   when the remote timestamp is newer; leaving the reader pushes the current
   locator. Success is silent, failures surface as toasts.
@@ -218,8 +217,8 @@ clients or manipulate EPUB archives directly.
   it alongside `git diff --check`; it needs only POSIX sh and grep.
 - Sheets and long forms reflow instead of clipping: the reader settings sheet
   scrolls vertically; book search results size to content up to the remaining
-  sheet height (`weight(1f, fill = false)`) instead of a fixed dp cap; the
-  OPDS config form, acquisition details, and error panel scroll vertically.
+  sheet height (`weight(1f, fill = false)`) instead of a fixed dp cap. The
+  KOReader sync settings section scrolls vertically.
   Bookmark and highlight sheets, the TOC drawer, dropdown menus, and search
   result lists already scroll through LazyColumn; the framework progress-sync
   dialog scrolls its message internally.
@@ -328,8 +327,8 @@ acceptance criteria, and verification command. Review the diff before commit.
 
 ## Current baseline
 
-Leafline is a working EPUB reader client: OPDS browsing and download, local
-library with covers, sorting, and search, a full reader (TOC, themes, reading
+Leafline is a working EPUB reader client: local library with covers, sorting,
+and search, a full reader (TOC, themes, reading
 positions, bookmarks, in-book search, highlights), and KOReader-compatible
 progress sync. Before adding dependencies, confirm current versions from the
 official Android, Kotlin, Gradle, and Readium documentation.

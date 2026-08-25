@@ -56,7 +56,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bookmarks, highlights with curated tint palette and swatch picker, in-book search
 - Table of contents navigation
 - Local library: grid with cover thumbnails, sorting, search
-- OPDS catalog browsing and authenticated download from Grimmory-compatible servers
 - KOReader-compatible reading position sync (push/pull with conflict detection)
 - Accessibility: TalkBack audit with content descriptions and page announcements,
   dynamic type up to 200%, 48dp touch targets, reduced-motion support

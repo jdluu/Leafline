@@ -48,16 +48,6 @@ class MainActivityTest {
     }
 
     @Test
-    fun bottomNav_catalogTab_showsCatalogTitle() {
-        val catalogTab = uiDevice.findObject(By.text("Catalog"))
-        catalogTab.click()
-        uiDevice.waitForIdle()
-
-        val title = uiDevice.wait(Until.findObject(By.text("OPDS Catalog")), 5000L)
-        assert(title != null) { "OPDS Catalog title should be visible after tapping Catalog tab" }
-    }
-
-    @Test
     fun clickImportEpubButton_opensDocumentsUi_andCancel_returnsToLibrary() {
         val importButton = uiDevice.findObject(By.text("Import EPUB"))
         importButton.click()
