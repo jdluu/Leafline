@@ -1,12 +1,12 @@
 package com.jdluu.leafline.reader
 
+import com.jdluu.leafline.reader.theme.ReaderTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.readium.r2.navigator.epub.EpubPreferences
 import org.readium.r2.navigator.preferences.FontFamily
-import org.readium.r2.navigator.preferences.Theme
 import org.readium.r2.shared.ExperimentalReadiumApi
 
 @OptIn(ExperimentalReadiumApi::class)
@@ -57,7 +57,6 @@ class ReaderSettingsTest {
     @Test
     fun `publisher mode clears custom typography and keeps appearance`() {
         val preferences = EpubPreferences(
-            theme = Theme.DARK,
             scroll = true,
             fontFamily = FontFamily.SERIF,
             lineHeight = 1.8,
@@ -71,8 +70,14 @@ class ReaderSettingsTest {
         assertNull(switched.fontFamily)
         assertNull(switched.lineHeight)
         assertNull(switched.pageMargins)
-        assertEquals(Theme.DARK, switched.theme)
         assertEquals(true, switched.scroll)
+    }
+
+    @Test
+    fun `reader theme names match the persisted preference strings`() {
+        assertEquals("LIGHT", ReaderTheme.LIGHT.name)
+        assertEquals("DARK", ReaderTheme.DARK.name)
+        assertEquals("SEPIA", ReaderTheme.SEPIA.name)
     }
 
     @Test

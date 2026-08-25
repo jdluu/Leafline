@@ -148,6 +148,7 @@ import com.jdluu.leafline.reader.search.BookSearchState
 import com.jdluu.leafline.reader.search.BookSearchStatus
 import com.jdluu.leafline.reader.search.BookSearcher
 import com.jdluu.leafline.reader.tapZoneAt
+import com.jdluu.leafline.reader.theme.ReaderTheme
 import com.jdluu.leafline.reader.withStyleMode
 import com.jdluu.leafline.sync.BookRef
 import com.jdluu.leafline.sync.KoreaderSyncClient
@@ -178,7 +179,6 @@ import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.navigator.epub.EpubPreferences
 import org.readium.r2.navigator.input.InputListener
 import org.readium.r2.navigator.input.TapEvent
-import org.readium.r2.navigator.preferences.Theme
 import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.publication.Link
 import org.readium.r2.shared.publication.Locator
@@ -292,7 +292,7 @@ internal fun ReaderOverlay(
                         onReset = onBrightnessReset
                     )
                     SepiaQuickControl(
-                        selected = currentSettings.epub.theme == Theme.SEPIA,
+                        selected = currentSettings.theme == ReaderTheme.SEPIA,
                         onToggle = onToggleSepia
                     )
                 }
@@ -971,14 +971,14 @@ internal fun ReaderSettingsSheet(
             Text("Theme", style = MaterialTheme.typography.labelLarge)
             Row(modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)) {
                 listOf(
-                    Theme.LIGHT to "Light",
-                    Theme.SEPIA to "Sepia",
-                    Theme.DARK to "Dark"
+                    ReaderTheme.LIGHT to "Light",
+                    ReaderTheme.SEPIA to "Sepia",
+                    ReaderTheme.DARK to "Dark"
                 ).forEach { (theme, label) ->
                     FilterChip(
-                        selected = preferences.theme == theme,
+                        selected = settings.theme == theme,
                         onClick = {
-                            onSettingsChange(settings.copy(epub = preferences.copy(theme = theme)))
+                            onSettingsChange(settings.copy(theme = theme))
                         },
                         label = { Text(label) },
                         modifier = Modifier.padding(end = 8.dp)

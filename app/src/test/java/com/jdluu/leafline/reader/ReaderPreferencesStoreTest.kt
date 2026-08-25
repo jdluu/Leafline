@@ -10,9 +10,9 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import com.jdluu.leafline.reader.theme.ReaderTheme
 import org.readium.r2.navigator.epub.EpubPreferences
 import org.readium.r2.navigator.preferences.FontFamily
-import org.readium.r2.navigator.preferences.Theme
 import org.readium.r2.shared.ExperimentalReadiumApi
 
 @OptIn(ExperimentalReadiumApi::class)
@@ -36,7 +36,7 @@ class ReaderPreferencesStoreTest {
 
         val loaded = store.load()
 
-        assertNull(loaded.epub.theme)
+        assertNull(loaded.theme)
         assertNull(loaded.epub.fontFamily)
         assertNull(loaded.epub.lineHeight)
         assertNull(loaded.epub.pageMargins)
@@ -55,13 +55,13 @@ class ReaderPreferencesStoreTest {
         store.save(
             ReaderSettings(
                 epub = EpubPreferences(
-                    theme = Theme.SEPIA,
                     fontFamily = FontFamily.SERIF,
                     lineHeight = 1.6,
                     pageMargins = 0.75,
                     publisherStyles = false,
                     scroll = true
                 ),
+                theme = ReaderTheme.SEPIA,
                 tapZoneConfig = TapZoneConfig(
                     leftZone = TapZoneAction.NEXT_PAGE,
                     centerZone = TapZoneAction.NONE,
@@ -69,13 +69,13 @@ class ReaderPreferencesStoreTest {
                 ),
                 pageTurnAnimation = PageTurnAnimation.NONE,
                 brightness = 0.42f,
-                preSepiaTheme = Theme.LIGHT
+                preSepiaTheme = ReaderTheme.LIGHT
             )
         )
 
         val loaded = store.load()
 
-        assertEquals(Theme.SEPIA, loaded.epub.theme)
+        assertEquals(ReaderTheme.SEPIA, loaded.theme)
         assertEquals(FontFamily.SERIF, loaded.epub.fontFamily)
         assertEquals(1.6, loaded.epub.lineHeight!!, 1e-9)
         assertEquals(0.75, loaded.epub.pageMargins!!, 1e-9)
@@ -86,7 +86,7 @@ class ReaderPreferencesStoreTest {
         assertEquals(TapZoneAction.TOGGLE_MENU, loaded.tapZoneConfig.rightZone)
         assertEquals(PageTurnAnimation.NONE, loaded.pageTurnAnimation)
         assertEquals(0.42f, loaded.brightness!!)
-        assertEquals(Theme.LIGHT, loaded.preSepiaTheme)
+        assertEquals(ReaderTheme.LIGHT, loaded.preSepiaTheme)
     }
 
     @Test
@@ -96,13 +96,13 @@ class ReaderPreferencesStoreTest {
         store.save(
             ReaderSettings(
                 epub = EpubPreferences(
-                    theme = Theme.DARK,
                     fontFamily = FontFamily.SANS_SERIF,
                     lineHeight = 1.4,
                     pageMargins = 1.0,
                     publisherStyles = false,
                     scroll = true
                 ),
+                theme = ReaderTheme.DARK,
                 tapZoneConfig = TapZoneConfig.REVERSED,
                 pageTurnAnimation = PageTurnAnimation.NONE,
                 brightness = 0.3f
@@ -112,7 +112,7 @@ class ReaderPreferencesStoreTest {
 
         val loaded = store.load()
 
-        assertNull(loaded.epub.theme)
+        assertNull(loaded.theme)
         assertNull(loaded.epub.fontFamily)
         assertNull(loaded.epub.lineHeight)
         assertNull(loaded.epub.pageMargins)
@@ -130,14 +130,16 @@ class ReaderPreferencesStoreTest {
 
         store.save(
             ReaderSettings(
-                epub = EpubPreferences(theme = Theme.LIGHT, lineHeight = 1.0),
+                epub = EpubPreferences(lineHeight = 1.0),
+                theme = ReaderTheme.LIGHT,
                 tapZoneConfig = TapZoneConfig.REVERSED,
                 pageTurnAnimation = PageTurnAnimation.NONE
             )
         )
         store.save(
             ReaderSettings(
-                epub = EpubPreferences(theme = Theme.DARK, lineHeight = 2.0),
+                epub = EpubPreferences(lineHeight = 2.0),
+                theme = ReaderTheme.DARK,
                 tapZoneConfig = TapZoneConfig(
                     leftZone = TapZoneAction.TOGGLE_MENU,
                     centerZone = TapZoneAction.PREVIOUS_PAGE,
@@ -149,7 +151,7 @@ class ReaderPreferencesStoreTest {
 
         val loaded = store.load()
 
-        assertEquals(Theme.DARK, loaded.epub.theme)
+        assertEquals(ReaderTheme.DARK, loaded.theme)
         assertEquals(2.0, loaded.epub.lineHeight!!, 1e-9)
         assertEquals(TapZoneAction.TOGGLE_MENU, loaded.tapZoneConfig.leftZone)
         assertEquals(TapZoneAction.PREVIOUS_PAGE, loaded.tapZoneConfig.centerZone)
@@ -304,23 +306,24 @@ class ReaderPreferencesStoreTest {
         store.save(
             ReaderSettings(
                 epub = EpubPreferences(
-                    theme = Theme.SEPIA,
                     fontFamily = FontFamily.SERIF,
                     lineHeight = 1.8,
                     pageMargins = 1.25,
                     scroll = true,
                     publisherStyles = true
-                )
+                ),
+                theme = ReaderTheme.SEPIA
             )
         )
 
-        val loaded = store.load().epub
+        val loadedSettings = store.load()
+        val loaded = loadedSettings.epub
 
         assertEquals(true, loaded.publisherStyles)
         assertNull(loaded.fontFamily)
         assertNull(loaded.lineHeight)
         assertNull(loaded.pageMargins)
-        assertEquals(Theme.SEPIA, loaded.theme)
+        assertEquals(ReaderTheme.SEPIA, loadedSettings.theme)
         assertEquals(true, loaded.scroll)
     }
 
