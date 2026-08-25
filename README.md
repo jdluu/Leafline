@@ -1,6 +1,5 @@
 # Leafline
 
-[![Get it on Obtainium](https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png)](https://apps.obtainium.imranr.dev/redirect?r=obtainium%3A%2F%2Fadd%2Fhttps%3A%2F%2Fgithub.com%2Fjdluu%2FLeafline)
 [![CI](https://github.com/jdluu/Leafline/actions/workflows/ci.yml/badge.svg)](https://github.com/jdluu/Leafline/actions/workflows/ci.yml)
 ![Android](https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)
@@ -39,7 +38,9 @@ own server.
 
 ### Obtainium
 
-Tap the "Get it on Obtainium" badge above to add Leafline to
+[![Get it on Obtainium](https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png)](https://apps.obtainium.imranr.dev/redirect?r=obtainium%3A%2F%2Fadd%2Fhttps%3A%2F%2Fgithub.com%2Fjdluu%2FLeafline)
+
+Tap the badge to add Leafline to
 [Obtainium](https://github.com/ImranR98/Obtainium), which installs it straight
 from this repository's releases and keeps it up to date automatically.
 
