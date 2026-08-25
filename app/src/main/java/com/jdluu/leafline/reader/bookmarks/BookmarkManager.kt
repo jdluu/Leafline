@@ -1,9 +1,9 @@
 package com.jdluu.leafline.reader.bookmarks
 
 import android.util.Log
-import com.jdluu.leafline.reader.Bookmark
-import com.jdluu.leafline.reader.BookmarkRepository
-import com.jdluu.leafline.reader.BookmarkToggleResult
+import com.jdluu.leafline.library.data.Bookmark
+import com.jdluu.leafline.library.data.BookmarkRepository
+import com.jdluu.leafline.library.data.BookmarkToggleResult
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
