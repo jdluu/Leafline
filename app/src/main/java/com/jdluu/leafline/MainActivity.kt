@@ -45,7 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.jdluu.leafline.library.LeaflineDependencyHolder
+import com.jdluu.leafline.di.appContainer
 import com.jdluu.leafline.library.LibraryBook
 import com.jdluu.leafline.library.LibraryScreen
 import com.jdluu.leafline.library.LibrarySortStore
@@ -76,7 +76,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
-        LeaflineDependencyHolder.initialize(this)
         setContent { LeaflineApp(this as MainActivity) }
     }
 
@@ -183,7 +182,7 @@ private enum class LeaflineTab(val label: String) {
 fun LeaflineApp(activity: MainActivity) {
     val libraryViewModel: LibraryViewModel = viewModel(
         factory = LibraryViewModelFactory(
-            repository = LeaflineDependencyHolder.getRepository(activity),
+            repository = activity.appContainer.libraryRepository,
             coverLoader = EpubCoverLoader(activity.applicationContext),
             sortStore = LibrarySortStore.fromContext(activity)
         )

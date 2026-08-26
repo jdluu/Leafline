@@ -1,7 +1,7 @@
 Lcom/jdluu/leafline/LeaflineApplication/**
 Lcom/jdluu/leafline/MainActivity/**
 Lcom/jdluu/leafline/LibraryViewModel/**
-Lcom/jdluu/leafline/library/LeaflineDependencyHolder/**
+Lcom/jdluu/leafline/di/AppContainer/**
 Lcom/jdluu/leafline/library/data/LibraryRepositoryImpl/**
 Lcom/jdluu/leafline/library/data/local/LeaflineDatabase/**
 Lcom/jdluu/leafline/library/data/local/BookDao/**

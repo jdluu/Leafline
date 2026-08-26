@@ -2,6 +2,7 @@ package com.jdluu.leafline
 
 import android.app.Application
 import android.util.Log
+import com.jdluu.leafline.di.AppContainer
 import com.jdluu.leafline.sync.KoreaderSyncConfigStore
 import com.jdluu.leafline.sync.SyncWorker
 import kotlinx.coroutines.CoroutineScope
@@ -19,8 +20,12 @@ import kotlinx.coroutines.launch
  */
 class LeaflineApplication : Application() {
 
+    lateinit var appContainer: AppContainer
+        private set
+
     override fun onCreate() {
         super.onCreate()
+        appContainer = AppContainer(this)
         val app = this
         CoroutineScope(Dispatchers.Default).launch {
             try {

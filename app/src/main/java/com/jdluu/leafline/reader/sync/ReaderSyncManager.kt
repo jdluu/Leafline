@@ -7,8 +7,8 @@ import android.util.Log
 import android.widget.Toast
 import androidx.lifecycle.LifecycleCoroutineScope
 import com.jdluu.leafline.library.LibrarySortStore
-import com.jdluu.leafline.library.LeaflineDependencyHolder
 import com.jdluu.leafline.library.ReadingStatus
+import com.jdluu.leafline.library.data.LibraryRepository
 import com.jdluu.leafline.sync.BookRef
 import com.jdluu.leafline.sync.KoreaderSyncClient
 import com.jdluu.leafline.sync.KoreaderSyncConfigStore
@@ -33,6 +33,7 @@ import java.util.UUID
 class ReaderSyncManager(
     private val context: Context,
     private val scope: LifecycleCoroutineScope,
+    private val libraryRepository: LibraryRepository,
     private val currentBookProvider: () -> com.jdluu.leafline.library.LibraryBook?,
     private val currentLocatorProvider: () -> Locator?,
     private val goToLocator: (Locator) -> Unit,
@@ -54,7 +55,7 @@ class ReaderSyncManager(
         return ProgressSyncer(
             api = KoreaderSyncClient(),
             configSource = { KoreaderSyncConfigStore.config },
-            repository = LeaflineDependencyHolder.getRepository(context),
+            repository = libraryRepository,
             deviceName = Build.MODEL ?: "Leafline",
             deviceId = deviceId
         )
@@ -143,9 +144,7 @@ class ReaderSyncManager(
             .setMessage("You're at ${progress.toInt()}% — looks like you've finished this book. Would you like to mark it as finished?")
             .setPositiveButton("Mark finished") { _, _ ->
                 scope.launch {
-                    LeaflineDependencyHolder
-                        .getRepository(context)
-                        .setReadingStatus(book.stableId, ReadingStatus.FINISHED)
+                    libraryRepository.setReadingStatus(book.stableId, ReadingStatus.FINISHED)
                 }
             }
             .setNegativeButton("Keep reading") { _, _ -> }
