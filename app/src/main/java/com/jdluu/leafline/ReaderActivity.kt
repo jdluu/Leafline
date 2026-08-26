@@ -152,7 +152,6 @@ import com.jdluu.leafline.reader.tapZoneAt
 import com.jdluu.leafline.reader.theme.toReadiumTheme
 import com.jdluu.leafline.reader.withStyleMode
 import com.jdluu.leafline.sync.BookRef
-import com.jdluu.leafline.sync.KoreaderSyncClient
 import com.jdluu.leafline.sync.KoreaderSyncConfigStore
 import com.jdluu.leafline.sync.ProgressSyncer
 import com.jdluu.leafline.sync.PullOutcome
@@ -375,6 +374,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             context = this,
             scope = lifecycleScope,
             libraryRepository = libraryRepository,
+            syncApi = appContainer.koreaderSyncApi,
             currentBookProvider = { currentBook },
             currentLocatorProvider = { currentLocation.value },
             goToLocator = goToLocator,

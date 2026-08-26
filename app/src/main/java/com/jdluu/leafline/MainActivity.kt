@@ -51,7 +51,6 @@ import com.jdluu.leafline.library.LibraryScreen
 import com.jdluu.leafline.library.LibrarySortStore
 import com.jdluu.leafline.library.LibraryViewModelFactory
 import com.jdluu.leafline.library.cover.EpubCoverLoader
-import com.jdluu.leafline.sync.KoreaderSyncClient
 import com.jdluu.leafline.sync.KoreaderSyncConfig
 import com.jdluu.leafline.sync.KoreaderSyncConfigStore
 import com.jdluu.leafline.sync.SyncWorker
@@ -122,8 +121,7 @@ class MainActivity : ComponentActivity() {
 
             val fileHash = FileHashUtil.computeSha256(targetFile)
 
-            val importer = EpubImporter(context)
-            val libraryBook = importer.importEpub(targetFile, fileHash)
+            val libraryBook = context.appContainer.epubImporter.importEpub(targetFile, fileHash)
 
             return libraryBook
         } catch (e: Exception) {
@@ -385,7 +383,7 @@ private fun KoreaderSyncSection(modifier: Modifier = Modifier) {
                     testResult = null
                     scope.launch {
                         testResult = try {
-                            val ok = KoreaderSyncClient()
+                            val ok = context.appContainer.koreaderSyncApi
                                 .auth(serverUrl.trim(), syncUsername.trim(), syncPassword)
                             if (ok) "Connection OK" else "Authentication failed"
                         } catch (e: Exception) {
