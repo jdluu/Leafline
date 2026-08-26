@@ -128,6 +128,28 @@ clients or manipulate EPUB archives directly.
 - OkHttp for KOReader progress-sync networking
 - Kotlin coroutines and Flow for asynchronous work
 
+### Testable seams
+
+- Interfaces exist only where a caller needs substitution: `KoreaderSyncApi`
+  (in `sync/KoreaderSyncClient.kt`) is the sync HTTP seam, and `EpubImporter`
+  (package root) is the import seam, implemented by `ReadiumEpubImporter`.
+  Both are provided application-scoped by `AppContainer` as lazy vals
+  (`koreaderSyncApi`, `epubImporter`), preserving the previous construction
+  timing. `ProgressSyncer`, `SyncWorker`, `ReaderSyncManager` (constructor
+  parameter), and the MainActivity connection test consume the interfaces,
+  never the concrete classes.
+- Test coverage of the sync seam: `ProgressSyncerTest` drives `ProgressSyncer`
+  against a hand-rolled `FakeApi : KoreaderSyncApi`; `KoreaderSyncClientTest`
+  covers the real client against MockWebServer. The import seam has no
+  JVM-testable caller yet (MainActivity is its only consumer and needs
+  contentResolver plus Readium); the interface exists so the later-phase
+  extraction of import orchestration can inject fakes.
+- Deliberately left concrete: `FileHashUtil` (stateless pure functions in an
+  object, JVM-tested directly; an interface would add nothing) and `CoverCache`
+  (its tests point the real class at temp directories, so no caller needs a
+  fake). `ImportUtils.sanitizeFileName` stays a pure top-level function for
+  the same reason.
+
 ### Progress sync decisions
 
 - Transport: OkHttp with HTTP Basic auth on every call

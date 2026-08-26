@@ -10,7 +10,7 @@ import com.jdluu.leafline.library.LibrarySortStore
 import com.jdluu.leafline.library.ReadingStatus
 import com.jdluu.leafline.library.data.LibraryRepository
 import com.jdluu.leafline.sync.BookRef
-import com.jdluu.leafline.sync.KoreaderSyncClient
+import com.jdluu.leafline.sync.KoreaderSyncApi
 import com.jdluu.leafline.sync.KoreaderSyncConfigStore
 import com.jdluu.leafline.sync.ProgressSyncer
 import com.jdluu.leafline.sync.PullOutcome
@@ -34,6 +34,7 @@ class ReaderSyncManager(
     private val context: Context,
     private val scope: LifecycleCoroutineScope,
     private val libraryRepository: LibraryRepository,
+    private val syncApi: KoreaderSyncApi,
     private val currentBookProvider: () -> com.jdluu.leafline.library.LibraryBook?,
     private val currentLocatorProvider: () -> Locator?,
     private val goToLocator: (Locator) -> Unit,
@@ -53,7 +54,7 @@ class ReaderSyncManager(
                 preferences.edit().putString(KEY_SYNC_DEVICE_ID, generated).apply()
             }
         return ProgressSyncer(
-            api = KoreaderSyncClient(),
+            api = syncApi,
             configSource = { KoreaderSyncConfigStore.config },
             repository = libraryRepository,
             deviceName = Build.MODEL ?: "Leafline",

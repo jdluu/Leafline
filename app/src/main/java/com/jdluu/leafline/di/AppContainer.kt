@@ -1,7 +1,9 @@
 package com.jdluu.leafline.di
 
 import android.content.Context
+import com.jdluu.leafline.EpubImporter
 import com.jdluu.leafline.LeaflineApplication
+import com.jdluu.leafline.ReadiumEpubImporter
 import com.jdluu.leafline.library.data.AnnotationRepository
 import com.jdluu.leafline.library.data.AnnotationRepositoryImpl
 import com.jdluu.leafline.library.data.BookmarkRepository
@@ -10,6 +12,8 @@ import com.jdluu.leafline.library.data.LibraryRepository
 import com.jdluu.leafline.library.data.LibraryRepositoryImpl
 import com.jdluu.leafline.library.data.local.LeaflineDatabase
 import com.jdluu.leafline.library.data.local.RoomBookDataSource
+import com.jdluu.leafline.sync.KoreaderSyncApi
+import com.jdluu.leafline.sync.KoreaderSyncClient
 
 /**
  * Application-wide dependency graph, built eagerly at construction. Room
@@ -29,6 +33,15 @@ class AppContainer(context: Context) {
 
     val annotationRepository: AnnotationRepository =
         AnnotationRepositoryImpl(database.annotationDao())
+
+    /**
+     * Lazy like-for-like with the previous call-site construction: the OkHttp
+     * client and cover directory are only created once sync or import is
+     * actually used.
+     */
+    val epubImporter: EpubImporter by lazy { ReadiumEpubImporter(context) }
+
+    val koreaderSyncApi: KoreaderSyncApi by lazy { KoreaderSyncClient() }
 }
 
 val Context.appContainer: AppContainer

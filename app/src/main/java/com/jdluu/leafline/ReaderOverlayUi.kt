@@ -150,7 +150,6 @@ import com.jdluu.leafline.reader.tapZoneAt
 import com.jdluu.leafline.reader.theme.ReaderTheme
 import com.jdluu.leafline.reader.withStyleMode
 import com.jdluu.leafline.sync.BookRef
-import com.jdluu.leafline.sync.KoreaderSyncClient
 import com.jdluu.leafline.sync.KoreaderSyncConfigStore
 import com.jdluu.leafline.sync.ProgressSyncer
 import com.jdluu.leafline.sync.PullOutcome

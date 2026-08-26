@@ -50,7 +50,7 @@ class SyncWorker(
             return Result.success()
         }
 
-        val api = KoreaderSyncClient()
+        val api = applicationContext.appContainer.koreaderSyncApi
         val deviceId = getDeviceId(applicationContext)
         val deviceName = android.os.Build.MODEL ?: "Leafline"
         var pushed = 0
