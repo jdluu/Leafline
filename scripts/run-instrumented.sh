@@ -5,11 +5,33 @@ set -euo pipefail
 RESULTS_DIR="app/build/outputs/androidTest-results/connected"
 ARCHIVE_DIR=".build-tmp/androidTest-results"
 
-attached=$(adb devices 2>/dev/null | awk 'NR > 1 && $2 == "device"') || attached=""
+attached=$(adb devices 2>/dev/null | awk 'NR > 1 && $2 == "device" {print $1}') || attached=""
 if [ -z "$attached" ]; then
     echo "No adb device attached" >&2
     exit 1
 fi
+
+# UiAutomator sees an empty accessibility tree while a device sleeps or shows a
+# keyguard (#96), which fails every UI-dependent test. Wake and unlock each
+# device, and keep the screen on via USB for the duration of the run.
+declare -a SERIALS=()
+declare -a SAVED_STAY_ON=()
+for serial in $attached; do
+    saved=$(adb -s "$serial" shell settings get global stay_on_while_plugged_in 2>/dev/null | tr -d '\r')
+    SERIALS+=("$serial")
+    SAVED_STAY_ON+=("$saved")
+    adb -s "$serial" shell input keyevent KEYCODE_WAKEUP >/dev/null 2>&1 || true
+    adb -s "$serial" shell wm dismiss-keyguard >/dev/null 2>&1 || true
+    adb -s "$serial" shell settings put global stay_on_while_plugged_in 7 >/dev/null 2>&1 || true
+done
+
+restore_device_settings() {
+    for i in "${!SERIALS[@]}"; do
+        adb -s "${SERIALS[$i]}" shell settings put global \
+            stay_on_while_plugged_in "${SAVED_STAY_ON[$i]}" >/dev/null 2>&1 || true
+    done
+}
+trap restore_device_settings EXIT
 
 status=0
 ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:connectedDebugAndroidTest || status=$?
