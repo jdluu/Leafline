@@ -1,12 +1,16 @@
 package com.jdluu.leafline
 
+import android.os.SystemClock
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
+import androidx.test.uiautomator.BySelector
 import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
-import org.junit.After
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -25,42 +29,82 @@ class MainActivityTest {
     @Before
     fun setUp() {
         uiDevice = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+        // The instrumentation's accessibility view of the app is empty while the
+        // screen is off or a keyguard is up, which makes every findObject return
+        // null (#96). Bring the device to a ready state before querying.
+        if (!uiDevice.isScreenOn) {
+            uiDevice.wakeUp()
+        }
+        uiDevice.executeShellCommand("wm dismiss-keyguard")
     }
 
-    @After
-    fun tearDown() {
+    /** Polls for the first selector that matches, instead of a single-shot findObject. */
+    private fun waitForAny(timeoutMillis: Long, vararg selectors: BySelector): UiObject2? {
+        val deadline = SystemClock.elapsedRealtime() + timeoutMillis
+        while (SystemClock.elapsedRealtime() < deadline) {
+            for (selector in selectors) {
+                uiDevice.findObject(selector)?.let { return it }
+            }
+            SystemClock.sleep(200)
+        }
+        return null
     }
+
+    /**
+     * The library always shows an Import EPUB affordance: a labeled button in the
+     * empty state and a FAB with a matching content description once books exist.
+     */
+    private fun importControlSelector(): Array<BySelector> = arrayOf(
+        By.text("Import EPUB"),
+        By.desc("Import EPUB")
+    )
 
     @Test
     fun libraryTab_showsImportButton() {
-        val importButton = uiDevice.findObject(By.text("Import EPUB"))
-        assert(importButton != null) { "Import EPUB button should be visible on Library tab" }
+        val importControl = waitForAny(timeout, *importControlSelector())
+        assertNotNull("Import EPUB control should be visible on Library tab", importControl)
     }
 
     @Test
     fun bottomNav_settingsTab_showsSettingsTitle() {
-        val settingsTab = uiDevice.findObject(By.text("Settings"))
+        val settingsTab = checkNotNull(waitForAny(timeout, By.text("Settings"), By.desc("Settings"))) {
+            "Settings tab should be visible in bottom navigation"
+        }
         settingsTab.click()
         uiDevice.waitForIdle()
 
-        val title = uiDevice.wait(Until.findObject(By.text("Settings")), 5000L)
-        assert(title != null) { "Settings title should be visible after tapping Settings tab" }
+        assertTrue("Settings title should be visible after tapping Settings tab",
+            uiDevice.wait(Until.hasObject(By.text("Settings")), 5000L))
+        // Real Settings-screen content proves the tab switch rendered.
+        assertTrue("KOReader Sync section should be visible on Settings tab",
+            uiDevice.wait(Until.hasObject(By.text("KOReader Sync")), 5000L))
     }
 
     @Test
     fun clickImportEpubButton_opensDocumentsUi_andCancel_returnsToLibrary() {
-        val importButton = uiDevice.findObject(By.text("Import EPUB"))
+        val importButton = checkNotNull(waitForAny(timeout, *importControlSelector())) {
+            "Import EPUB control should be visible before clicking"
+        }
         importButton.click()
 
         uiDevice.waitForIdle()
 
-        uiDevice.wait(Until.findObject(By.res("android:id/list")), 10000L)
-        uiDevice.wait(Until.findObject(By.res("android:id/content_picker_title")), 10000L)
+        val documentsUiShown = waitForAny(
+            10000L,
+            By.res("android:id/list"),
+            By.res("android:id/content_picker_title"),
+            By.pkg("com.android.documentsui")
+        ) != null
+        assertTrue("Documents UI should open after tapping Import EPUB", documentsUiShown)
 
         uiDevice.pressBack()
         uiDevice.waitForIdle()
 
-        val libraryVisible = uiDevice.wait(Until.hasObject(By.text("Library")), 5000L)
-        assert(libraryVisible) { "Should return to Library tab after cancel" }
+        val backOnLibrary = waitForAny(
+            5000L,
+            By.text("Leafline"),
+            *importControlSelector()
+        ) != null
+        assertTrue("Should return to Library tab after cancel", backOnLibrary)
     }
 }
