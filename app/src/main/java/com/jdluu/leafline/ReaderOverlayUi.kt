@@ -111,7 +111,6 @@ import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.commitNow
 import androidx.lifecycle.lifecycleScope
-import com.jdluu.leafline.library.LeaflineDependencyHolder
 import com.jdluu.leafline.library.ReadingStatus
 import com.jdluu.leafline.library.data.Annotation
 import com.jdluu.leafline.library.data.AnnotationRepository

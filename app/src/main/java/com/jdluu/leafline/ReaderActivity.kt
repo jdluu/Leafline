@@ -111,13 +111,14 @@ import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.commitNow
 import androidx.lifecycle.lifecycleScope
-import com.jdluu.leafline.library.LeaflineDependencyHolder
+import com.jdluu.leafline.di.appContainer
 import com.jdluu.leafline.library.ReadingStatus
 import com.jdluu.leafline.library.data.Annotation
 import com.jdluu.leafline.library.data.AnnotationRepository
 import com.jdluu.leafline.library.data.Bookmark
 import com.jdluu.leafline.library.data.BookmarkRepository
 import com.jdluu.leafline.library.data.BookmarkToggleResult
+import com.jdluu.leafline.library.data.LibraryRepository
 import com.jdluu.leafline.library.data.LocatorIdentity
 import com.jdluu.leafline.library.LibrarySortStore
 import com.jdluu.leafline.reader.BRIGHTNESS_MAX
@@ -235,6 +236,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     private var bookStableId: String? = null
     private lateinit var bookmarkRepository: BookmarkRepository
     private lateinit var annotationRepository: AnnotationRepository
+    private lateinit var libraryRepository: LibraryRepository
     private lateinit var readerPreferencesStore: ReaderPreferencesStore
     private lateinit var bookSearcher: BookSearcher
     private lateinit var syncManager: com.jdluu.leafline.reader.sync.ReaderSyncManager
@@ -275,10 +277,9 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     @OptIn(ExperimentalReadiumApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        bookmarkRepository =
-            com.jdluu.leafline.library.LeaflineDependencyHolder.getBookmarkRepository(this)
-        annotationRepository =
-            com.jdluu.leafline.library.LeaflineDependencyHolder.getAnnotationRepository(this)
+        bookmarkRepository = appContainer.bookmarkRepository
+        annotationRepository = appContainer.annotationRepository
+        libraryRepository = appContainer.libraryRepository
         readerPreferencesStore = ReaderPreferencesStore.fromContext(this)
 
         val importedPath = intent?.getStringExtra(EXTRA_FILE_PATH)
@@ -324,9 +325,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             try {
                 val lookupPath = epubFile!!.absolutePath
                 savedBook = runBlocking {
-                    com.jdluu.leafline.library.LeaflineDependencyHolder
-                        .getRepository(this@ReaderActivity)
-                        .getBookByFilePath(lookupPath)
+                    libraryRepository.getBookByFilePath(lookupPath)
                 }
                 if (savedBook == null) {
                     Log.w(TAG, "No library book found for path: $lookupPath")
@@ -336,10 +335,8 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                 // Update reading status to READING when opening
                 savedBook?.let { book ->
                     if (book.readingStatus == ReadingStatus.UNREAD) {
-                        val repo = com.jdluu.leafline.library.LeaflineDependencyHolder
-                            .getRepository(this@ReaderActivity)
                         lifecycleScope.launch {
-                            repo.setReadingStatus(book.stableId, ReadingStatus.READING)
+                            libraryRepository.setReadingStatus(book.stableId, ReadingStatus.READING)
                         }
                     }
                 }
@@ -377,6 +374,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         syncManager = com.jdluu.leafline.reader.sync.ReaderSyncManager(
             context = this,
             scope = lifecycleScope,
+            libraryRepository = libraryRepository,
             currentBookProvider = { currentBook },
             currentLocatorProvider = { currentLocation.value },
             goToLocator = goToLocator,
@@ -460,9 +458,11 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                         val locatorJson = locator.toJSON().toString()
                         currentLocation.value = locator
                         try {
-                            com.jdluu.leafline.library.LeaflineDependencyHolder
-                                .getRepository(this@ReaderActivity)
-                                .saveLastLocator(stableId, locatorJson, System.currentTimeMillis())
+                            libraryRepository.saveLastLocator(
+                                stableId,
+                                locatorJson,
+                                System.currentTimeMillis()
+                            )
                         } catch (e: Exception) {
                             Log.w(TAG, "Could not save reading position", e)
                         }

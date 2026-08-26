@@ -10,7 +10,7 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import com.jdluu.leafline.library.LeaflineDependencyHolder
+import com.jdluu.leafline.di.appContainer
 import kotlinx.coroutines.flow.first
 import java.util.UUID
 import java.util.concurrent.TimeUnit
@@ -31,7 +31,7 @@ class SyncWorker(
             return Result.success()
         }
         val repository = try {
-            LeaflineDependencyHolder.getRepository(applicationContext)
+            applicationContext.appContainer.libraryRepository
         } catch (e: Exception) {
             Log.w(TAG, "Could not get repository", e)
             return Result.retry()
