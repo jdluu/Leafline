@@ -181,6 +181,18 @@ class AnnotationManager(
         onAnnotationNavigated()
     }
 
+    fun updateNote(annotation: Annotation, note: String?) {
+        val trimmed = note?.trim()
+        val normalized = if (trimmed?.isNotBlank() == true) trimmed else null
+        scope.launch {
+            try {
+                repository.updateAnnotationNote(annotation.id, normalized)
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not update note", e)
+            }
+        }
+    }
+
     /** Excerpt shown in the annotation-activated toast and highlights sheet. */
     fun excerptOf(annotation: Annotation): String {
         return try {

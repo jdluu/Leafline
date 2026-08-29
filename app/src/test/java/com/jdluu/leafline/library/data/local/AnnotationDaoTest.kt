@@ -137,4 +137,42 @@ class AnnotationDaoTest {
     fun deleteById_returns_zero_for_missing_row() = runTest {
         assertEquals(0, annotationDao.deleteById(999L))
     }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun updateNote_changes_only_note_field() = runTest {
+        val id = annotationDao.insert(entity(note = "original"))
+        annotationDao.insert(entity())
+
+        val updated = annotationDao.updateNote(id, "new note")
+
+        assertEquals(1, updated)
+        val stored = annotationDao.getForBook("book-1")
+        assertEquals(2, stored.size)
+        val target = stored.first { it.id == id }
+        assertEquals("new note", target.note)
+        assertEquals("#55E65100", target.colorHex)
+        assertEquals("book-1", target.bookId)
+        assertEquals("""{"href": "/OEBPS/chapter01.xhtml"}""", target.locatorJson)
+        assertEquals(1000L, target.createdAt)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun updateNote_clears_note_when_null() = runTest {
+        val id = annotationDao.insert(entity(note = "existing"))
+
+        annotationDao.updateNote(id, null)
+
+        val stored = annotationDao.getForBook("book-1")
+        assertEquals(null, stored[0].note)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun updateNote_returns_zero_for_missing_id() = runTest {
+        annotationDao.insert(entity())
+
+        assertEquals(0, annotationDao.updateNote(999L, "note"))
+    }
 }

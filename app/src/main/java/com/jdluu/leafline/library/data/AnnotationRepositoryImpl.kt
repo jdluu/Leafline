@@ -46,4 +46,13 @@ class AnnotationRepositoryImpl(
         annotationDao.deleteById(id)
         Unit
     }
+
+    override suspend fun updateAnnotationNote(id: Long, note: String?): Int = withContext(ioDispatcher) {
+        val normalizedNote = normalizeNote(note)
+        annotationDao.updateNote(id, normalizedNote)
+    }
+
+    private fun normalizeNote(note: String?): String? {
+        return note?.trim()?.takeIf { it.isNotBlank() }
+    }
 }

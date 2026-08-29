@@ -1,6 +1,6 @@
 package com.jdluu.leafline
 
-import android.app.AlertDialog
+import androidx.compose.material3.AlertDialog
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -48,6 +48,7 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Brightness6
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FormatColorFill
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
@@ -63,6 +64,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -226,6 +228,7 @@ internal fun ReaderOverlay(
     onDismissHighlights: () -> Unit,
     onAnnotationClick: (Annotation) -> Unit,
     onDeleteAnnotation: (Annotation) -> Unit,
+    onEditAnnotation: (Annotation, String?) -> Unit,
     onTocClick: (Link) -> Unit,
     onSettingsChange: (ReaderSettings) -> Unit,
     onBrightnessChange: (Float) -> Unit,
@@ -318,6 +321,7 @@ internal fun ReaderOverlay(
                     annotations = annotations,
                     onAnnotationClick = onAnnotationClick,
                     onDeleteAnnotation = onDeleteAnnotation,
+                    onEditAnnotation = onEditAnnotation,
                     onDismiss = onDismissHighlights
                 )
             }
@@ -715,9 +719,15 @@ internal fun AnnotationListSheet(
     annotations: List<Annotation>,
     onAnnotationClick: (Annotation) -> Unit,
     onDeleteAnnotation: (Annotation) -> Unit,
+    onEditAnnotation: (Annotation, String?) -> Unit,
     onDismiss: () -> Unit,
     excerptFor: (Annotation) -> String = { annotationExcerpt(it) }
-) {    ModalBottomSheet(onDismissRequest = onDismiss) {
+) {
+    var editDialogAnnotation by remember { mutableStateOf<Annotation?>(null) }
+    var editNoteText by remember { mutableStateOf("") }
+    val focusRequester = remember { FocusRequester() }
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
         Text(
             "Highlights",
             style = MaterialTheme.typography.titleMedium,
@@ -762,6 +772,14 @@ internal fun AnnotationListSheet(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
+                            IconButton(
+                                onClick = {
+                                    editDialogAnnotation = annotation
+                                    editNoteText = annotation.note.orEmpty()
+                                }
+                            ) {
+                                Icon(Icons.Default.Edit, contentDescription = "Edit note")
+                            }
                             IconButton(onClick = { onDeleteAnnotation(annotation) }) {
                                 Icon(Icons.Default.Delete, contentDescription = "Delete highlight")
                             }
@@ -771,6 +789,37 @@ internal fun AnnotationListSheet(
             }
         }
         Spacer(modifier = Modifier.height(32.dp))
+    }
+
+    editDialogAnnotation?.let { annotation ->
+        AlertDialog(
+            onDismissRequest = { editDialogAnnotation = null },
+            title = { Text("Edit note") },
+            text = {
+                OutlinedTextField(
+                    value = editNoteText,
+                    onValueChange = { editNoteText = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                        .focusRequester(focusRequester),
+                    singleLine = false,
+                    maxLines = 5,
+                    placeholder = { Text("Add a note...") },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    label = { Text("Note") }
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onEditAnnotation(annotation, editNoteText)
+                    editDialogAnnotation = null
+                }) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { editDialogAnnotation = null }) { Text("Cancel") }
+            }
+        )
     }
 }
 

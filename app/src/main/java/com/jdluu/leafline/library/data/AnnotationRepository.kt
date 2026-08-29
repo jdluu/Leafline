@@ -12,4 +12,5 @@ interface AnnotationRepository {
         note: String? = null
     ): Long
     suspend fun removeAnnotation(id: Long)
+    suspend fun updateAnnotationNote(id: Long, note: String?): Int
 }
