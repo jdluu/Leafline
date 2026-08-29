@@ -687,6 +687,9 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     onDismissHighlights = { highlightsSheetVisible.value = false },
                     onAnnotationClick = { annotationManager.navigateTo(it) },
                     onDeleteAnnotation = { annotationManager.delete(it) },
+                    onEditAnnotation = { annotation, note ->
+                        annotationManager.updateNote(annotation, note)
+                    },
                     onTocClick = { link ->
                         navigateToTocLink(link)
                         scope.launch { drawerState.close() }
