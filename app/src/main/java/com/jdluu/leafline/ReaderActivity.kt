@@ -131,15 +131,14 @@ import com.jdluu.leafline.reader.READER_FONT_FAMILIES
 import com.jdluu.leafline.reader.PageTurnAnimation
 import com.jdluu.leafline.reader.ReaderPreferencesStore
 import com.jdluu.leafline.reader.ReaderSettings
+import com.jdluu.leafline.reader.ReaderSettingsController
 import com.jdluu.leafline.reader.StyleMode
 import com.jdluu.leafline.reader.TapZoneAction
 import com.jdluu.leafline.reader.TapZoneConfig
-import com.jdluu.leafline.reader.clampBrightness
 import com.jdluu.leafline.reader.effectiveTapZoneAction
 import com.jdluu.leafline.reader.snapPageMargins
 import com.jdluu.leafline.reader.styleModeFor
 import com.jdluu.leafline.reader.pageTurnIsAnimated
-import com.jdluu.leafline.reader.toggleSepia
 import com.jdluu.leafline.reader.search.BookSearchQuery
 import com.jdluu.leafline.theme.DEFAULT_HIGHLIGHT_TINT
 import com.jdluu.leafline.theme.HIGHLIGHT_TINTS
@@ -262,7 +261,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     /** Sync conflict state for the bottom sheet. */
     private val syncConflictState = MutableStateFlow<SyncConflictState?>(null)
     private var tocLinks = mutableStateOf<List<Pair<Link, Int>>>(emptyList())
-    private var currentSettings = mutableStateOf(ReaderSettings())
+    private lateinit var settingsController: ReaderSettingsController
     private var bookmarks = mutableStateOf<List<Bookmark>>(emptyList())
     private var annotations = mutableStateOf<List<Annotation>>(emptyList())
     private var currentLocation = mutableStateOf<Locator?>(null)
@@ -414,7 +413,12 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                 1f
             )
             val savedSettings = readerPreferencesStore.load(initialReduceMotion = animatorScale == 0f)
-            currentSettings.value = savedSettings
+            settingsController = ReaderSettingsController(
+                initialSettings = savedSettings,
+                submitToNavigator = { navigator?.submitPreferences(it.toNavigatorPreferences()) },
+                applyWindowBrightness = ::applyBrightnessToWindow,
+                save = readerPreferencesStore::save
+            )
             applyBrightnessToWindow(savedSettings.brightness)
 
             val navigatorFactory = EpubNavigatorFactory(publication)
@@ -440,7 +444,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                 context = this,
                 scope = lifecycleScope,
                 navigatorProvider = { navigator },
-                settingsProvider = { currentSettings.value },
+                settingsProvider = { settingsController.settings.value },
                 onToggleMenu = { toolbarVisible.value = !toolbarVisible.value },
                 onAnnouncement = {}
             )
@@ -541,15 +545,6 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         toolbarVisible.value = false
     }
 
-
-
-
-    private fun submitSettings(settings: ReaderSettings) {
-        currentSettings.value = settings
-        navigator?.submitPreferences(settings.toNavigatorPreferences())
-        readerPreferencesStore.save(settings)
-    }
-
     /**
      * Builds the preferences handed to the Readium navigator, mapping the pure
      * Kotlin [com.jdluu.leafline.reader.theme.ReaderTheme] onto the Readium
@@ -560,17 +555,10 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     }
 
     /**
-     * Applies a brightness change to this activity's window and persists it.
+     * Applies a brightness override to this activity's window.
      * A null value restores the system default; the system-wide brightness
      * setting is never modified.
      */
-    private fun submitBrightness(value: Float?) {
-        val updated = currentSettings.value.copy(brightness = value?.let { clampBrightness(it) })
-        currentSettings.value = updated
-        applyBrightnessToWindow(updated.brightness)
-        readerPreferencesStore.save(updated)
-    }
-
     private fun applyBrightnessToWindow(brightness: Float?) {
         val attributes = window.attributes
         attributes.screenBrightness =
@@ -662,11 +650,12 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                 val scope = rememberCoroutineScope()
                 val searchState by bookSearcher.state.collectAsState()
                 val syncConflict by syncConflictState.collectAsState()
+                val currentSettings by settingsController.settings.collectAsState()
                 ReaderOverlay(
                     title = bookTitle.value,
                     toolbarVisible = toolbarVisible.value,
                     tocLinks = tocLinks.value,
-                    currentSettings = currentSettings.value,
+                    currentSettings = currentSettings,
                     drawerState = drawerState,
                     settingsSheetVisible = settingsSheetVisible.value,
                     bookmarks = bookmarks.value,
@@ -702,10 +691,10 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                         navigateToTocLink(link)
                         scope.launch { drawerState.close() }
                     },
-                    onSettingsChange = { settings -> submitSettings(settings) },
-                    onBrightnessChange = { value -> submitBrightness(value) },
-                    onBrightnessReset = { submitBrightness(null) },
-                    onToggleSepia = { submitSettings(toggleSepia(currentSettings.value)) },
+                    onSettingsChange = { settings -> settingsController.submit(settings) },
+                    onBrightnessChange = { value -> settingsController.submitBrightness(value) },
+                    onBrightnessReset = { settingsController.submitBrightness(null) },
+                    onToggleSepia = { settingsController.toggleSepia() },
                     onOpenSearch = { searchSheetVisible.value = true },
                     onDismissSearch = { searchSheetVisible.value = false },
                     onSubmitSearch = { query -> submitSearch(query) },

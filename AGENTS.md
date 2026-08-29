@@ -144,6 +144,12 @@ clients or manipulate EPUB archives directly.
   JVM-testable caller yet (MainActivity is its only consumer and needs
   contentResolver plus Readium); the interface exists so the later-phase
   extraction of import orchestration can inject fakes.
+- Reader settings orchestration: `ReaderSettingsController` (in `reader/`)
+  owns the settings state flow and the submit/persist order. The Readium
+  navigator and window-brightness calls are injected lambdas wired at the
+  `ReaderActivity` boundary, so the controller is plain-JVM testable;
+  `ReaderSettingsControllerTest` records ordering with fakes, and the pure
+  `withBrightness` transform is covered in `BrightnessTest`.
 - Deliberately left concrete: `FileHashUtil` (stateless pure functions in an
   object, JVM-tested directly; an interface would add nothing) and `CoverCache`
   (its tests point the real class at temp directories, so no caller needs a
