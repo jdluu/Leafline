@@ -146,6 +146,16 @@ fun clampBrightness(value: Float): Float {
 }
 
 /**
+ * Returns a copy of these settings with the brightness override replaced by
+ * [value], clamped into [BRIGHTNESS_MIN]..[BRIGHTNESS_MAX]. A null value
+ * restores the system default; the system-wide brightness setting is never
+ * modified.
+ */
+fun ReaderSettings.withBrightness(value: Float?): ReaderSettings {
+    return copy(brightness = value?.let(::clampBrightness))
+}
+
+/**
  * Toggles the sepia quick control shown next to the brightness slider in the
  * reader overlay. Engaging it switches the theme to sepia and records the
  * current theme so disengaging restores exactly what the user had, including

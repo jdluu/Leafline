@@ -25,4 +25,25 @@ class BrightnessTest {
     fun `brightness defaults to following the system`() {
         assertNull(ReaderSettings().brightness)
     }
+
+    @Test
+    fun `withBrightness keeps in range values unchanged`() {
+        val updated = ReaderSettings(brightness = 0.2f).withBrightness(0.7f)
+        assertEquals(0.7f, updated.brightness!!)
+    }
+
+    @Test
+    fun `withBrightness clamps out of range values into bounds`() {
+        val high = ReaderSettings().withBrightness(1.5f)
+        assertEquals(BRIGHTNESS_MAX, high.brightness!!)
+
+        val low = ReaderSettings().withBrightness(-1f)
+        assertEquals(BRIGHTNESS_MIN, low.brightness!!)
+    }
+
+    @Test
+    fun `withBrightness null restores the system default`() {
+        val reset = ReaderSettings(brightness = 0.5f).withBrightness(null)
+        assertNull(reset.brightness)
+    }
 }
