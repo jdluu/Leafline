@@ -1284,7 +1284,7 @@ internal fun HighlightTintPickerSheet(
                         leadingIcon = {
                             Box(
                                 modifier = Modifier
-                                    .size(16.dp)
+                                    .size(16.dp) // touch-target-ok: decorative color swatch in leading icon
                                     .background(
                                         tint.swatchColor,
                                         RoundedCornerShape(4.dp)
