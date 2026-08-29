@@ -63,7 +63,7 @@ class LibraryRepositoryImpl(
     override fun getAllCollections(): Flow<List<Collection>> {
         val dao = collectionDao ?: return emptyFlow()
         return dao.getAllCollections().map { entities ->
-            entities.map { Collection(it.id, it.name, it.createdAtEpochMillis) }
+            entities.map { it.toCollection() }
         }
     }
 
@@ -92,7 +92,7 @@ class LibraryRepositoryImpl(
         val dao = collectionDao ?: return emptyFlow()
         return dao.getCollectionIdsForBook(bookStableId).map { ids ->
             ids.mapNotNull { id -> runCatching { dao.getCollectionById(id) }.getOrNull() }
-                .map { Collection(it.id, it.name, it.createdAtEpochMillis) }
+                .map { it.toCollection() }
         }
     }
 

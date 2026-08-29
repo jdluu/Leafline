@@ -57,14 +57,4 @@ class BookmarkRepositoryImpl(
         bookmarkDao.deleteForBook(bookId)
         Unit
     }
-
-    private fun BookmarkEntity.toBookmark(): Bookmark {
-        return Bookmark(
-            id = id,
-            bookId = bookId,
-            locatorJson = locatorJson,
-            createdAt = createdAt,
-            label = label
-        )
-    }
 }
