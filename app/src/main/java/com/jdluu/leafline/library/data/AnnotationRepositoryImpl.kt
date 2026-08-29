@@ -46,15 +46,4 @@ class AnnotationRepositoryImpl(
         annotationDao.deleteById(id)
         Unit
     }
-
-    private fun AnnotationEntity.toAnnotation(): Annotation {
-        return Annotation(
-            id = id,
-            bookId = bookId,
-            locatorJson = locatorJson,
-            colorHex = colorHex,
-            note = note,
-            createdAt = createdAt
-        )
-    }
 }
