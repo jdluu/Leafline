@@ -44,6 +44,18 @@ class AnnotationRepositoryTest {
             stored.value = current.filterNot { it.id == id }
             return removed
         }
+
+        override suspend fun updateNote(id: Long, note: String?): Int {
+            val current = stored.value.toMutableList()
+            val index = current.indexOfFirst { it.id == id }
+            if (index >= 0) {
+                val updated = current[index].copy(note = note)
+                current[index] = updated
+                stored.value = current
+                return 1
+            }
+            return 0
+        }
     }
 
     private fun newRepository(ticks: MutableList<Long>): Pair<AnnotationRepositoryImpl, FakeAnnotationDao> {
@@ -180,5 +192,69 @@ class AnnotationRepositoryTest {
         val (repository, _) = newRepository(clockTicks())
 
         assertTrue(repository.getAnnotations("missing").isEmpty())
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `updateAnnotationNote trims whitespace`() = runTest {
+        val (repository, dao) = newRepository(clockTicks())
+        val id = repository.addAnnotation("book-1", chapterOne, note = "  original  ")
+
+        repository.updateAnnotationNote(id, "  updated note  ")
+
+        val updated = repository.getAnnotations("book-1").first { it.id == id }
+        assertEquals("updated note", updated.note)
+        // Other fields preserved
+        assertEquals("book-1", updated.bookId)
+        assertEquals(chapterOne, updated.locatorJson)
+        assertEquals(Annotation.DEFAULT_COLOR_HEX, updated.colorHex)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `updateAnnotationNote clears note when blank or null`() = runTest {
+        val (repository, dao) = newRepository(clockTicks())
+        val id = repository.addAnnotation("book-1", chapterOne, note = "existing")
+
+        repository.updateAnnotationNote(id, "   ")
+        assertEquals(null, repository.getAnnotations("book-1").first { it.id == id }.note)
+
+        repository.updateAnnotationNote(id, null)
+        assertEquals(null, repository.getAnnotations("book-1").first { it.id == id }.note)
+
+        repository.updateAnnotationNote(id, "")
+        assertEquals(null, repository.getAnnotations("book-1").first { it.id == id }.note)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `updateAnnotationNote preserves other fields`() = runTest {
+        val (repository, dao) = newRepository(clockTicks())
+        val id = repository.addAnnotation(
+            bookId = "book-1",
+            locatorJson = chapterOne,
+            colorHex = "#80B39DDB",
+            note = "old"
+        )
+
+        repository.updateAnnotationNote(id, "new note")
+
+        val updated = repository.getAnnotations("book-1").first { it.id == id }
+        assertEquals("new note", updated.note)
+        assertEquals("book-1", updated.bookId)
+        assertEquals(chapterOne, updated.locatorJson)
+        assertEquals("#80B39DDB", updated.colorHex)
+        assertEquals(1000L, updated.createdAt)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `updateAnnotationNote returns zero for missing id`() = runTest {
+        val (repository, _) = newRepository(clockTicks())
+        repository.addAnnotation("book-1", chapterOne)
+
+        val result = repository.updateAnnotationNote(999L, "note")
+
+        assertEquals(0, result)
     }
 }
