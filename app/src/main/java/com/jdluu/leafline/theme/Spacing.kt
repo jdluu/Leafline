@@ -4,35 +4,41 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * Leafline spacing constants following a 4dp base unit.
+ * Leafline spacing constants on an 8dp rhythm.
  *
  * Use these instead of inline .dp values throughout the UI to keep
- * spacing consistent across screens and components.
+ * spacing consistent across screens and components. The 8dp rhythm governs
+ * padding, gaps between grid items, and vertical breathing room.
  */
 object Spacing {
-    val xs = 4.dp
-    val sm = 8.dp
-    val md = 12.dp
-    val lg = 16.dp
-    val xl = 24.dp
-    val xxl = 32.dp
-    val xxxl = 48.dp
+    val xs = 8.dp
+    val sm = 16.dp
+    val md = 24.dp
+    val lg = 32.dp
+    val xl = 48.dp
+    val xxl = 64.dp
 }
 
 /**
  * Leafline padding constants for common inset patterns.
+ *
+ * [compact] is the only value off the 8dp rhythm: it matches the 12dp
+ * container radius so card content sits inside a rounded surface.
  */
 object Padding {
-    val screenHorizontal = 16.dp
-    val screenVertical = 16.dp
-    val cardContent = 12.dp
+    val screen = 16.dp
+    val item = 16.dp
+    val compact = 12.dp
     val chipSpacing = 8.dp
     val sectionSpacing = 32.dp
-    val itemSpacing = 16.dp
 }
 
 /**
  * Leafline icon size constants.
+ *
+ * These are visual sizes for non-interactive glyphs. Interactive controls
+ * always carry the 48dp minimum touch target, which is separate from the
+ * drawn icon size.
  */
 object IconSize {
     val small = 18.dp

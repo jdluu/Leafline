@@ -35,6 +35,22 @@ class LibraryViewModel(
             initialValue = emptyList()
         )
 
+    /**
+     * True once the library has emitted at least one book list.
+     *
+     * The `books` and `sortedBooks` flows start at `emptyList()`, which is
+     * indistinguishable from a genuinely empty library. The Library screen
+     * shows a loading surface while this is false and only presents the
+     * empty state after the store has actually been read.
+     */
+    val isLibraryLoaded: StateFlow<Boolean> = repository.getAllBooks()
+        .map { true }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = false
+        )
+
     /** Books with saved progress, sorted by last-read time (newest first). */
     val continueReadingBooks: StateFlow<List<LibraryBook>> = repository.getRecentlyReadBooks()
         .stateIn(

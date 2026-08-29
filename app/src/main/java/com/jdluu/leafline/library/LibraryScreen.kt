@@ -36,12 +36,14 @@ import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Eco
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -72,6 +74,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -80,6 +84,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jdluu.leafline.LibraryViewModel
 import com.jdluu.leafline.library.ReadingStatus
 import com.jdluu.leafline.library.data.Collection
+import com.jdluu.leafline.theme.IconSize
+import com.jdluu.leafline.theme.Spacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -92,6 +98,7 @@ fun LibraryScreen(
     onOpenBook: (LibraryBook) -> Unit
 ) {
     val books by viewModel.sortedBooks.collectAsStateWithLifecycle()
+    val isLibraryLoaded by viewModel.isLibraryLoaded.collectAsStateWithLifecycle()
     val currentSort by viewModel.sort.collectAsStateWithLifecycle()
     val query by viewModel.query.collectAsStateWithLifecycle()
     val collections by viewModel.collections.collectAsStateWithLifecycle()
@@ -109,11 +116,21 @@ fun LibraryScreen(
         Column(modifier = Modifier.fillMaxSize()) {
             TopAppBar(
             title = {
-                Text(
-                    "Leafline",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Filled.Eco,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .size(20.dp) // touch-target-ok: decorative leaf glyph
+                            .padding(end = 4.dp)
+                    )
+                    Text(
+                        "Leafline",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             },
             actions = {
                 IconButton(
@@ -194,7 +211,7 @@ fun LibraryScreen(
                                 Icon(
                                     Icons.Default.Close,
                                     contentDescription = "Clear filter",
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(16.dp) // touch-target-ok: decorative chip icon
                                 )
                             }
                         } else null
@@ -255,59 +272,26 @@ fun LibraryScreen(
         }
 
         if (books.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    if (query.isNotBlank()) {
-                        Text("No books match", style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            "Try a different search term",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    } else if (selectedCollection != null) {
-                        Text("Collection is empty", style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            "Books added to this collection will appear here",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    } else if (readingStatusFilter != null) {
-                        Text("No books with this status", style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            "Try a different filter",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.MenuBook,
-                            contentDescription = null,
-                            modifier = Modifier.size(64.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                        )
-                        Spacer(Modifier.height(16.dp))
-                        Text(
-                            "Your library awaits",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            "Import an EPUB to start reading",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
-                        Spacer(Modifier.height(24.dp))
-                        FilledTonalButton(onClick = onImportEpub) {
-                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Import EPUB")
-                        }
-                    }
-                }
+            when {
+                !isLibraryLoaded -> LibraryLoadingState()
+                query.isNotBlank() -> LibraryEmptyState(
+                    title = "No books match",
+                    body = "Try a different search term"
+                )
+                selectedCollection != null -> LibraryEmptyState(
+                    title = "Collection is empty",
+                    body = "Books added to this collection will appear here"
+                )
+                readingStatusFilter != null -> LibraryEmptyState(
+                    title = "No books with this status",
+                    body = "Try a different filter"
+                )
+                else -> LibraryEmptyState(
+                    title = "Your library awaits",
+                    body = "Import an EPUB to start reading",
+                    actionLabel = "Import EPUB",
+                    onAction = onImportEpub
+                )
             }
         } else {
             LazyVerticalGrid(
@@ -432,6 +416,84 @@ fun LibraryScreen(
     }
 }
 
+/**
+ * Loading surface shown until the library store has produced its first book
+ * list. Kept separate from the empty state so a real empty library is never
+ * confused with one that is still being read.
+ */
+@Composable
+private fun LibraryLoadingState() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        CircularProgressIndicator(
+            modifier = Modifier.semantics { contentDescription = "Loading library" }
+        )
+    }
+}
+
+/**
+ * Branded empty surface: the leaf mark on the soft container tone, a short
+ * heading, a one-line explanation, and one optional primary action.
+ */
+@Composable
+private fun LibraryEmptyState(
+    title: String,
+    body: String,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null
+) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(
+                modifier = Modifier
+                    .size(88.dp)
+                    .clip(MaterialTheme.shapes.large)
+                    .background(MaterialTheme.colorScheme.primaryContainer)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Eco,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(40.dp) // touch-target-ok: decorative leaf glyph
+                )
+            }
+            Spacer(Modifier.height(Spacing.md))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(Spacing.xs))
+            Text(
+                text = body,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+            if (actionLabel != null && onAction != null) {
+                Spacer(Modifier.height(Spacing.md))
+                FilledTonalButton(onClick = onAction) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(IconSize.small) // touch-target-ok: decorative icon in button
+                    )
+                    Spacer(Modifier.width(Spacing.xs))
+                    Text(actionLabel)
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CollectionManagementSheet(
@@ -452,7 +514,8 @@ private fun CollectionManagementSheet(
                     style = MaterialTheme.typography.titleLarge
                 )
                 TextButton(onClick = onCreate) {
-                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp) // touch-target-ok: decorative icon in button
+                    )
                     Spacer(Modifier.width(4.dp))
                     Text("New")
                 }
@@ -478,7 +541,7 @@ private fun CollectionManagementSheet(
                                 Icons.Default.CollectionsBookmark,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(24.dp) // touch-target-ok: decorative icon in row
                             )
                             Spacer(Modifier.width(12.dp))
                             Text(
@@ -542,7 +605,7 @@ private fun BookCollectionPickerSheet(
                                     if (isMember) Icons.Default.Bookmark
                                     else Icons.Default.BookmarkBorder,
                                     contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(18.dp) // touch-target-ok: decorative chip icon
                                 )
                             },
                             modifier = Modifier.padding(vertical = 4.dp)
@@ -668,14 +731,13 @@ fun BookGridTile(
                 )
                 if (collections.isNotEmpty()) {
                     IconButton(
-                        onClick = { showCollectionPicker = true },
-                        modifier = Modifier.size(28.dp)
+                        onClick = { showCollectionPicker = true }
                     ) {
                         Icon(
                             Icons.Default.CollectionsBookmark,
                             contentDescription = "Collections",
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(18.dp) // touch-target-ok: decorative glyph inside icon button
                         )
                     }
                 }

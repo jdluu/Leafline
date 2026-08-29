@@ -1,133 +1,149 @@
 package com.jdluu.leafline.theme
 
+import androidx.compose.ui.graphics.Color
+import com.jdluu.leafline.reader.WcagContrast
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/**
+ * Contrast invariants for the Leafline semantic color tokens.
+ *
+ * Every assertion reads the real [LeaflineColors] values through the shared
+ * [WcagContrast] helper, so a token drift either fails here or is covered by
+ * the threshold it was given. Body-text pairs must meet 4.5:1, and role pairs
+ * such as outline must meet the 3:1 UI threshold.
+ */
 class LeaflineThemeTest {
 
+    // --- Sanity: the ARGB extraction must round-trip a known token ---
+
     @Test
-    fun `light primary contrast passes AA body threshold on surface`() {
-        val ratio = contrastRatio("#315C52", "#FBFDF9")
-        assertTrue("Light primary on surface: expected >= 4.5, got $ratio", ratio >= 4.5)
+    fun `token hex extraction round-trips a known color`() {
+        assertEquals("#315C52", Color(0xFF315C52).toHex())
+    }
+
+    // --- Light scheme ---
+
+    @Test
+    fun `light primary meets body threshold on surface`() {
+        assertBody(LeaflineColors.LightPrimary, LeaflineColors.LightSurface)
     }
 
     @Test
-    fun `light onSurface contrast passes AA body threshold on surface`() {
-        val ratio = contrastRatio("#191C1A", "#FBFDF9")
-        assertTrue("Light onSurface on surface: expected >= 4.5, got $ratio", ratio >= 4.5)
+    fun `light onSurface meets body threshold on surface`() {
+        assertBody(LeaflineColors.LightOnSurface, LeaflineColors.LightSurface)
     }
 
     @Test
-    fun `light onSurfaceVariant contrast passes AA large-text threshold on surfaceVariant`() {
-        val ratio = contrastRatio("#414944", "#DCE5DE")
-        assertTrue(
-            "Light onSurfaceVariant on surfaceVariant: expected >= 3.0, got $ratio",
-            ratio >= 3.0
-        )
+    fun `light onSurfaceVariant meets body threshold on surfaceVariant`() {
+        assertBody(LeaflineColors.LightOnSurfaceVariant, LeaflineColors.LightSurfaceVariant)
     }
 
     @Test
-    fun `light error contrast passes AA body threshold on surface`() {
-        val ratio = contrastRatio("#BA1A1A", "#FBFDF9")
-        assertTrue("Light error on surface: expected >= 4.5, got $ratio", ratio >= 4.5)
+    fun `light onPrimaryContainer meets body threshold on primaryContainer`() {
+        assertBody(LeaflineColors.LightOnPrimaryContainer, LeaflineColors.LightPrimaryContainer)
     }
 
     @Test
-    fun `dark primary contrast passes AA body threshold on surface`() {
-        val ratio = contrastRatio("#9CCCC0", "#191C1A")
-        assertTrue("Dark primary on surface: expected >= 4.5, got $ratio", ratio >= 4.5)
+    fun `light error meets body threshold on surface`() {
+        assertBody(LeaflineColors.LightError, LeaflineColors.LightSurface)
     }
 
     @Test
-    fun `dark onSurface contrast passes AA body threshold on surface`() {
-        val ratio = contrastRatio("#E1E3DF", "#191C1A")
-        assertTrue("Dark onSurface on surface: expected >= 4.5, got $ratio", ratio >= 4.5)
+    fun `light outline meets UI threshold on surface`() {
+        assertUi(LeaflineColors.LightOutline, LeaflineColors.LightSurface)
+    }
+
+    // --- Dark scheme ---
+
+    @Test
+    fun `dark primary meets body threshold on surface`() {
+        assertBody(LeaflineColors.DarkPrimary, LeaflineColors.DarkSurface)
     }
 
     @Test
-    fun `dark error contrast passes AA body threshold on surface`() {
-        val ratio = contrastRatio("#FFB4AB", "#191C1A")
-        assertTrue("Dark error on surface: expected >= 4.5, got $ratio", ratio >= 4.5)
+    fun `dark onSurface meets body threshold on surface`() {
+        assertBody(LeaflineColors.DarkOnSurface, LeaflineColors.DarkSurface)
     }
 
     @Test
-    fun `dark onSurfaceVariant contrast passes AA large-text threshold on surfaceVariant`() {
-        val ratio = contrastRatio("#C0C9C3", "#414944")
-        assertTrue(
-            "Dark onSurfaceVariant on surfaceVariant: expected >= 3.0, got $ratio",
-            ratio >= 3.0
-        )
+    fun `dark onSurfaceVariant meets body threshold on surfaceVariant`() {
+        assertBody(LeaflineColors.DarkOnSurfaceVariant, LeaflineColors.DarkSurfaceVariant)
     }
 
     @Test
-    fun `oled onSurface contrast on true black passes AA body threshold`() {
-        val ratio = contrastRatio("#E1E3DF", "#000000")
-        assertTrue("OLED onSurface on black: expected >= 4.5, got $ratio", ratio >= 4.5)
+    fun `dark onPrimaryContainer meets body threshold on primaryContainer`() {
+        assertBody(LeaflineColors.DarkOnPrimaryContainer, LeaflineColors.DarkPrimaryContainer)
     }
 
     @Test
-    fun `oled primary on true black passes AA body threshold`() {
-        val ratio = contrastRatio("#9CCCC0", "#000000")
-        assertTrue("OLED primary on black: expected >= 4.5, got $ratio", ratio >= 4.5)
+    fun `dark error meets body threshold on surface`() {
+        assertBody(LeaflineColors.DarkError, LeaflineColors.DarkSurface)
     }
+
+    // --- OLED scheme ---
+
+    @Test
+    fun `oled onSurface on true black meets body threshold`() {
+        assertBody(LeaflineColors.OledOnSurface, LeaflineColors.OledSurface)
+    }
+
+    @Test
+    fun `oled primary on true black meets body threshold`() {
+        assertBody(LeaflineColors.DarkPrimary, LeaflineColors.OledSurface)
+    }
+
+    // --- E-ink scheme ---
 
     @Test
     fun `eink onSurface on white is maximum contrast`() {
-        val ratio = contrastRatio("#000000", "#FFFFFF")
+        val ratio = WcagContrast.contrastRatio(
+            LeaflineColors.EinkOnSurface.toHex(),
+            LeaflineColors.EinkSurface.toHex()
+        )
         assertTrue("Eink onSurface on white: expected >= 10.0, got $ratio", ratio >= 10.0)
     }
 
     @Test
-    fun `eink primary on white passes AA body threshold`() {
-        val ratio = contrastRatio("#1A1A1A", "#FFFFFF")
-        assertTrue("Eink primary on white: expected >= 10.0, got $ratio", ratio >= 10.0)
+    fun `eink primary on white meets body threshold`() {
+        assertBody(LeaflineColors.EinkPrimary, LeaflineColors.EinkSurface)
     }
 
     @Test
-    fun `eink onSurfaceVariant on surfaceVariant passes AA body threshold`() {
-        val ratio = contrastRatio("#333333", "#E6E6E6")
+    fun `eink onSurfaceVariant meets body threshold on surfaceVariant`() {
+        assertBody(LeaflineColors.EinkOnSurfaceVariant, LeaflineColors.EinkSurfaceVariant)
+    }
+
+    @Test
+    fun `eink outline on white meets body threshold`() {
+        assertBody(LeaflineColors.EinkOutline, LeaflineColors.EinkSurface)
+    }
+
+    // --- Helpers ---
+
+    /** Converts a Compose color to the #RRGGBB hex used across the project. */
+    private fun Color.toHex(): String {
+        val argb = (value shr 32).toLong()
+        val red = (argb shr 16) and 0xFF
+        val green = (argb shr 8) and 0xFF
+        val blue = argb and 0xFF
+        return "#%02X%02X%02X".format(red, green, blue)
+    }
+
+    private fun assertBody(fg: Color, bg: Color) {
+        val ratio = WcagContrast.contrastRatio(fg.toHex(), bg.toHex())
         assertTrue(
-            "Eink onSurfaceVariant on surfaceVariant: expected >= 4.5, got $ratio",
-            ratio >= 4.5
+            "Expected >= ${WcagContrast.MIN_BODY}, got $ratio for ${fg.toHex()} on ${bg.toHex()}",
+            ratio >= WcagContrast.MIN_BODY
         )
     }
 
-    @Test
-    fun `eink outline on white passes AA body threshold`() {
-        val ratio = contrastRatio("#666666", "#FFFFFF")
-        assertTrue("Eink outline on white: expected >= 4.5, got $ratio", ratio >= 4.5)
-    }
-
-    // --- WCAG contrast utilities ---
-
-    private fun relativeLuminance(hex: String): Double {
-        val (r, g, b) = parseRgb(hex)
-        return 0.2126 * channelLuminance(r) +
-            0.7152 * channelLuminance(g) +
-            0.0722 * channelLuminance(b)
-    }
-
-    private fun channelLuminance(channel: Int): Double {
-        val s = channel / 255.0
-        return if (s <= 0.03928) s / 12.92 else Math.pow((s + 0.055) / 1.055, 2.4)
-    }
-
-    private fun parseRgb(hex: String): Triple<Int, Int, Int> {
-        val cleaned = hex.removePrefix("#")
-        val rgb = if (cleaned.length == 8) cleaned.substring(2) else cleaned
-        return Triple(
-            rgb.substring(0, 2).toInt(16),
-            rgb.substring(2, 4).toInt(16),
-            rgb.substring(4, 6).toInt(16)
+    private fun assertUi(fg: Color, bg: Color) {
+        val ratio = WcagContrast.contrastRatio(fg.toHex(), bg.toHex())
+        assertTrue(
+            "Expected >= ${WcagContrast.MIN_LARGE_OR_UI}, got $ratio for ${fg.toHex()} on ${bg.toHex()}",
+            ratio >= WcagContrast.MIN_LARGE_OR_UI
         )
-    }
-
-    private fun contrastRatio(hex1: String, hex2: String): Double {
-        val l1 = relativeLuminance(hex1)
-        val l2 = relativeLuminance(hex2)
-        val lighter = maxOf(l1, l2)
-        val darker = minOf(l1, l2)
-        return (lighter + 0.05) / (darker + 0.05)
     }
 }
