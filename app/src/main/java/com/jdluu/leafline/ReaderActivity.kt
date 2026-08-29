@@ -148,6 +148,7 @@ import com.jdluu.leafline.reader.search.BookSearchResult
 import com.jdluu.leafline.reader.search.BookSearchState
 import com.jdluu.leafline.reader.search.BookSearchStatus
 import com.jdluu.leafline.reader.search.BookSearcher
+import com.jdluu.leafline.reader.search.SearchDecorationPlanner
 import com.jdluu.leafline.reader.tapZoneAt
 import com.jdluu.leafline.reader.theme.toReadiumTheme
 import com.jdluu.leafline.reader.withStyleMode
@@ -212,9 +213,6 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         private const val NAVIGATOR_TAG = "EpubNavigatorFragment"
         private const val EXTRA_FILE_PATH = "extra_file_path"
         private const val SEARCH_DECORATION_GROUP = "leafline-search"
-        private const val MAX_SEARCH_DECORATIONS = 200
-        private const val SEARCH_MATCH_TINT = 0x55FFD54F.toInt()
-        private const val SEARCH_ACTIVE_TINT = 0xCCFF8F00.toInt()
         private const val ANNOTATION_DECORATION_GROUP = "leafline-annotations"
         private const val ANNOTATION_DECORATION_PREFIX = "annotation-"
         private const val DEFAULT_ANNOTATION_TINT = 0x55E65100.toInt()
@@ -238,6 +236,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     private lateinit var libraryRepository: LibraryRepository
     private lateinit var readerPreferencesStore: ReaderPreferencesStore
     private lateinit var bookSearcher: BookSearcher
+    private val searchDecorationPlanner = SearchDecorationPlanner()
     private lateinit var syncManager: com.jdluu.leafline.reader.sync.ReaderSyncManager
     private lateinit var annotationManager: com.jdluu.leafline.reader.annotations.AnnotationManager
 
@@ -624,17 +623,16 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         lifecycleScope.launch {
             try {
                 val state = bookSearcher.state.value
-                val decorations = state.results
-                    .take(MAX_SEARCH_DECORATIONS)
-                    .mapNotNull { result ->
-                        val locator = bookSearcher.locatorFor(result.id) ?: return@mapNotNull null
-                        val active = result.id == activeSearchResultId
+                val decorations = searchDecorationPlanner
+                    .planFor(state = state, activeResultId = activeSearchResultId)
+                    .mapNotNull { spec ->
+                        val locator = bookSearcher.locatorFor(spec.resultId) ?: return@mapNotNull null
                         Decoration(
-                            id = "search-${result.id}",
+                            id = "search-${spec.resultId}",
                             locator = locator,
                             style = Decoration.Style.Highlight(
-                                tint = if (active) SEARCH_ACTIVE_TINT else SEARCH_MATCH_TINT,
-                                isActive = active
+                                tint = spec.tint,
+                                isActive = spec.isActive
                             )
                         )
                     }
