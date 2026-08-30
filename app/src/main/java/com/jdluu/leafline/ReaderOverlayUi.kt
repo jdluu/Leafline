@@ -140,6 +140,8 @@ import com.jdluu.leafline.reader.snapPageMargins
 import com.jdluu.leafline.reader.styleModeFor
 import com.jdluu.leafline.reader.pageTurnIsAnimated
 import com.jdluu.leafline.reader.toggleSepia
+import com.jdluu.leafline.reader.annotations.HighlightUndoCoordinator
+import com.jdluu.leafline.reader.annotations.confirmHighlightDismiss
 import com.jdluu.leafline.reader.search.BookSearchQuery
 import com.jdluu.leafline.theme.DEFAULT_HIGHLIGHT_TINT
 import com.jdluu.leafline.theme.HIGHLIGHT_TINTS
@@ -228,6 +230,7 @@ internal fun ReaderOverlay(
     onDismissHighlights: () -> Unit,
     onAnnotationClick: (Annotation) -> Unit,
     onDeleteAnnotation: (Annotation) -> Unit,
+    onRestoreAnnotation: (Annotation) -> Unit,
     onEditAnnotation: (Annotation, String?) -> Unit,
     onChangeColor: (Annotation, HighlightTint) -> Unit,
     onTocClick: (Link) -> Unit,
@@ -322,6 +325,7 @@ internal fun ReaderOverlay(
                     annotations = annotations,
                     onAnnotationClick = onAnnotationClick,
                     onDeleteAnnotation = onDeleteAnnotation,
+                    onRestoreAnnotation = onRestoreAnnotation,
                     onEditAnnotation = onEditAnnotation,
                     onChangeColor = onChangeColor,
                     onDismiss = onDismissHighlights
@@ -721,6 +725,7 @@ internal fun AnnotationListSheet(
     annotations: List<Annotation>,
     onAnnotationClick: (Annotation) -> Unit,
     onDeleteAnnotation: (Annotation) -> Unit,
+    onRestoreAnnotation: (Annotation) -> Unit,
     onEditAnnotation: (Annotation, String?) -> Unit,
     onChangeColor: (Annotation, HighlightTint) -> Unit,
     onDismiss: () -> Unit,
@@ -730,6 +735,20 @@ internal fun AnnotationListSheet(
     var editNoteText by remember { mutableStateOf("") }
     var colorPickerAnnotation by remember { mutableStateOf<Annotation?>(null) }
     val focusRequester = remember { FocusRequester() }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val undoCoordinator = remember {
+        HighlightUndoCoordinator(
+            delete = onDeleteAnnotation,
+            restore = onRestoreAnnotation,
+            showUndoSnackbar = {
+                snackbarHostState.showSnackbar(
+                    message = "Highlight deleted",
+                    actionLabel = "Undo"
+                )
+            }
+        )
+    }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Text(
@@ -746,53 +765,86 @@ internal fun AnnotationListSheet(
         } else {
             LazyColumn(modifier = Modifier.fillMaxWidth()) {
                 items(annotations, key = { it.id }) { annotation ->
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(
-                                onClickLabel = "Open highlight",
-                                onClick = { onAnnotationClick(annotation) }
-                            )
+                    SwipeToDismissBox(
+                        state = rememberSwipeToDismissBoxState(
+                            confirmValueChange = { value ->
+                                if (confirmHighlightDismiss(value)) {
+                                    scope.launch { undoCoordinator.deleteWithUndo(annotation) }
+                                    true
+                                } else {
+                                    false
+                                }
+                            }
+                        ),
+                        enableDismissFromStartToEnd = false,
+                        backgroundContent = {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.errorContainer),
+                                contentAlignment = Alignment.CenterEnd
+                            ) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onErrorContainer,
+                                    modifier = Modifier.padding(end = 24.dp)
+                                )
+                            }
+                        }
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(
-                                start = 16.dp,
-                                top = 12.dp,
-                                bottom = 12.dp,
-                                end = 4.dp
-                            )
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(
+                                    onClickLabel = "Open highlight",
+                                    onClick = { onAnnotationClick(annotation) }
+                                )
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = excerptFor(annotation),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    maxLines = 3,
-                                    overflow = TextOverflow.Ellipsis
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(
+                                    start = 16.dp,
+                                    top = 12.dp,
+                                    bottom = 12.dp,
+                                    end = 4.dp
                                 )
-                                Text(
-                                    text = formatCreatedAt(annotation.createdAt),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            IconButton(
-                                onClick = {
-                                    editDialogAnnotation = annotation
-                                    editNoteText = annotation.note.orEmpty()
-                                }
                             ) {
-                                Icon(Icons.Default.Edit, contentDescription = "Edit note")
-                            }
-                            IconButton(
-                                onClick = {
-                                    colorPickerAnnotation = annotation
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = excerptFor(annotation),
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        maxLines = 3,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = formatCreatedAt(annotation.createdAt),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
-                            ) {
-                                Icon(Icons.Default.FormatColorFill, contentDescription = "Change highlight color")
-                            }
-                            IconButton(onClick = { onDeleteAnnotation(annotation) }) {
-                                Icon(Icons.Default.Delete, contentDescription = "Delete highlight")
+                                IconButton(
+                                    onClick = {
+                                        editDialogAnnotation = annotation
+                                        editNoteText = annotation.note.orEmpty()
+                                    }
+                                ) {
+                                    Icon(Icons.Default.Edit, contentDescription = "Edit note")
+                                }
+                                IconButton(
+                                    onClick = {
+                                        colorPickerAnnotation = annotation
+                                    }
+                                ) {
+                                    Icon(Icons.Default.FormatColorFill, contentDescription = "Change highlight color")
+                                }
+                                IconButton(
+                                    onClick = {
+                                        scope.launch { undoCoordinator.deleteWithUndo(annotation) }
+                                    }
+                                ) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Delete highlight")
+                                }
                             }
                         }
                     }
@@ -800,6 +852,9 @@ internal fun AnnotationListSheet(
             }
         }
         Spacer(modifier = Modifier.height(32.dp))
+        // The sheet renders in its own window above the overlay, so its undo
+        // snackbar must be hosted here to stay visible over the sheet scrim.
+        SnackbarHost(hostState = snackbarHostState)
     }
 
     editDialogAnnotation?.let { annotation ->
