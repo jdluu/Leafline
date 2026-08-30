@@ -140,6 +140,58 @@ class AnnotationDaoTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
+    fun insert_preserves_explicit_nonzero_id() = runTest {
+        annotationDao.insert(entity(id = 42))
+
+        val stored = annotationDao.getForBook("book-1")
+        assertEquals(42L, stored[0].id)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun delete_then_restore_with_same_id_round_trips_fields() = runTest {
+        val id = annotationDao.insert(
+            entity(bookId = "book-1", createdAt = 5000L, colorHex = "#80B39DDB", note = "restore me")
+        )
+        annotationDao.deleteById(id)
+
+        annotationDao.insert(
+            AnnotationEntity(
+                id = id,
+                bookId = "book-1",
+                locatorJson = """{"href": "/OEBPS/chapter01.xhtml"}""",
+                colorHex = "#80B39DDB",
+                note = "restore me",
+                createdAt = 5000L
+            )
+        )
+
+        val restored = annotationDao.getForBook("book-1").single()
+        assertEquals(id, restored.id)
+        assertEquals("book-1", restored.bookId)
+        assertEquals("""{"href": "/OEBPS/chapter01.xhtml"}""", restored.locatorJson)
+        assertEquals("#80B39DDB", restored.colorHex)
+        assertEquals("restore me", restored.note)
+        assertEquals(5000L, restored.createdAt)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun autoincrement_keeps_increasing_after_explicit_id_insert() = runTest {
+        val created = annotationDao.insert(entity())
+        annotationDao.deleteById(created)
+        // Restore the deleted id explicitly, then insert fresh rows normally.
+        annotationDao.insert(AnnotationEntity(id = created, bookId = "book-1",
+            locatorJson = """{"href": "/OEBPS/chapter01.xhtml"}""",
+            colorHex = "#55E65100", note = null, createdAt = 1000L))
+
+        val fresh = annotationDao.insert(entity())
+
+        assertTrue(fresh > created)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
     fun updateNote_changes_only_note_field() = runTest {
         val id = annotationDao.insert(entity(note = "original"))
         annotationDao.insert(entity())

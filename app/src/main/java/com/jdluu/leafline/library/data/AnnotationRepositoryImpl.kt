@@ -47,6 +47,22 @@ class AnnotationRepositoryImpl(
         Unit
     }
 
+    override suspend fun restoreAnnotation(annotation: Annotation) = withContext(ioDispatcher) {
+        // Reuses the normal insert path so autoincrement and defaults behave
+        // identically; Room preserves an explicit non-zero autoGenerate id.
+        annotationDao.insert(
+            AnnotationEntity(
+                id = annotation.id,
+                bookId = annotation.bookId,
+                locatorJson = annotation.locatorJson,
+                colorHex = annotation.colorHex,
+                note = annotation.note,
+                createdAt = annotation.createdAt
+            )
+        )
+        Unit
+    }
+
     override suspend fun updateAnnotationNote(id: Long, note: String?): Int = withContext(ioDispatcher) {
         val normalizedNote = normalizeNote(note)
         annotationDao.updateNote(id, normalizedNote)

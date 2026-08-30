@@ -687,6 +687,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     onDismissHighlights = { highlightsSheetVisible.value = false },
                     onAnnotationClick = { annotationManager.navigateTo(it) },
                     onDeleteAnnotation = { annotationManager.delete(it) },
+                    onRestoreAnnotation = { annotationManager.restore(it) },
                     onEditAnnotation = { annotation, note ->
                         annotationManager.updateNote(annotation, note)
                     },

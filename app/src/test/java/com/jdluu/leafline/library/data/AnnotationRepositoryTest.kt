@@ -201,6 +201,72 @@ class AnnotationRepositoryTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
+    fun `restoreAnnotation returns the exact deleted annotation including id`() = runTest {
+        val (repository, dao) = newRepository(clockTicks())
+        val id = repository.addAnnotation(
+            bookId = "book-1",
+            locatorJson = chapterOne,
+            colorHex = "#80B39DDB",
+            note = "Key passage"
+        )
+        val before = repository.getAnnotations("book-1").single()
+
+        repository.removeAnnotation(id)
+        val afterDelete = repository.getAnnotations("book-1")
+        repository.restoreAnnotation(before)
+
+        val restored = repository.getAnnotations("book-1").single()
+        assertEquals(0, afterDelete.size)
+        assertEquals(before.id, restored.id)
+        assertEquals(before.bookId, restored.bookId)
+        assertEquals(before.locatorJson, restored.locatorJson)
+        assertEquals(before.colorHex, restored.colorHex)
+        assertEquals(before.note, restored.note)
+        assertEquals(before.createdAt, restored.createdAt)
+        assertEquals(1, dao.stored.value.size)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `restoreAnnotation restores exact annotation without id when fields default`() =
+        runTest {
+            val (repository, _) = newRepository(clockTicks())
+            val id = repository.addAnnotation("book-1", chapterOne)
+            val before = repository.getAnnotations("book-1").single()
+
+            repository.removeAnnotation(id)
+            repository.restoreAnnotation(before)
+
+            val restored = repository.getAnnotations("book-1").single()
+            assertEquals(before, restored)
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `restoreAnnotation keeps original sort position among sibling annotations`() =
+        runTest {
+            val (repository, _) = newRepository(clockTicks())
+            repository.addAnnotation(
+                "book-1",
+                """{"href": "/OEBPS/older.xhtml", "locations": {}}""".trimIndent()
+            )
+            val middleId = repository.addAnnotation("book-1", chapterOne)
+            repository.addAnnotation(
+                "book-1",
+                """{"href": "/OEBPS/newer.xhtml", "locations": {}}""".trimIndent()
+            )
+            val middle = repository.getAnnotations("book-1")[1]
+
+            repository.removeAnnotation(middleId)
+            repository.restoreAnnotation(middle)
+
+            val restored = repository.getAnnotations("book-1")
+            assertEquals(3, restored.size)
+            assertEquals(middle.id, restored[1].id)
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
     fun `getAnnotations returns empty list for unknown book`() = runTest {
         val (repository, _) = newRepository(clockTicks())
 

@@ -171,6 +171,17 @@ class AnnotationManager(
         }
     }
 
+    /** Restores a previously deleted annotation with its original id and fields. */
+    fun restore(annotation: Annotation) {
+        scope.launch {
+            try {
+                repository.restoreAnnotation(annotation)
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not restore annotation", e)
+            }
+        }
+    }
+
     fun navigateTo(annotation: Annotation) {
         val locator = parseLocator(annotation.locatorJson)
         if (locator == null) {
