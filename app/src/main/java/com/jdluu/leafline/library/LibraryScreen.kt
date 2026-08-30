@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Eco
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sort
@@ -55,6 +56,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -96,6 +98,7 @@ import kotlinx.coroutines.withContext
 fun LibraryScreen(
     viewModel: LibraryViewModel,
     onImportEpub: () -> Unit,
+    onAddLibraryFolder: () -> Unit = {},
     onOpenBook: (LibraryBook) -> Unit
 ) {
     val books by viewModel.sortedBooks.collectAsStateWithLifecycle()
@@ -289,7 +292,7 @@ fun LibraryScreen(
                 )
                 else -> LibraryEmptyState(
                     title = "Your library awaits",
-                    body = "Import an EPUB to start reading",
+                    body = "Import an EPUB or add a local folder to start reading",
                     actionLabel = "Import EPUB",
                     onAction = onImportEpub
                 )
@@ -330,6 +333,17 @@ fun LibraryScreen(
             .padding(bottom = if (books.isEmpty()) 0.dp else Spacing.xxl)
     ) {
         Icon(Icons.Default.Add, contentDescription = "Import EPUB")
+    }
+    OutlinedButton(
+        onClick = onAddLibraryFolder,
+        modifier = Modifier
+            .align(Alignment.BottomStart)
+            .padding(Padding.screen)
+            .padding(bottom = if (books.isEmpty()) 0.dp else Spacing.xxl)
+    ) {
+        Icon(Icons.Default.FolderOpen, contentDescription = null)
+        Spacer(modifier = Modifier.width(Spacing.xs))
+        Text("Add folder")
     }
     }
 

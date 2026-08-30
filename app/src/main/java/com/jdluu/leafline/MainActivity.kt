@@ -2,6 +2,7 @@ package com.jdluu.leafline
 
 import android.content.Context
 import android.content.Intent
+import android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
 import android.net.Uri
 import android.os.Bundle
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -49,6 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.jdluu.leafline.di.appContainer
 import com.jdluu.leafline.library.LibraryBook
+import com.jdluu.leafline.library.LibraryFolderStore
 import com.jdluu.leafline.library.LibraryScreen
 import com.jdluu.leafline.library.LibrarySortStore
 import com.jdluu.leafline.library.LibraryViewModelFactory
@@ -98,6 +100,16 @@ class MainActivity : ComponentActivity() {
     fun showToast(message: String) {
         pendingToast = message
         handleToast()
+    }
+
+    fun saveLibraryFolder(uri: Uri, context: Context) {
+        try {
+            contentResolver.takePersistableUriPermission(uri, FLAG_GRANT_READ_URI_PERMISSION)
+        } catch (e: SecurityException) {
+            Log.w(TAG, "Folder permission could not be persisted", e)
+        }
+        LibraryFolderStore.fromContext(context).add(uri.toString())
+        showToast("Library folder added")
     }
 
     fun importEpub(contentUri: Uri, context: Context, onFailure: (String) -> Unit): LibraryBook? {
@@ -237,6 +249,14 @@ fun LeaflineApp(activity: MainActivity) {
         }
     }
 
+    val addLibraryFolderLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri: Uri? ->
+        uri?.let { selectedUri ->
+            (activity as MainActivity).saveLibraryFolder(selectedUri, context)
+        }
+    }
+
     LeaflineTheme(
             mode = appearance,
             darkSystem = isSystemInDarkTheme()
@@ -268,6 +288,7 @@ fun LeaflineApp(activity: MainActivity) {
                     LeaflineTab.Library -> LibraryScreen(
                         viewModel = libraryViewModel,
                         onImportEpub = { importEpubLauncher.launch(arrayOf(MainActivity.EPUB_MIME_TYPE)) },
+                        onAddLibraryFolder = { addLibraryFolderLauncher.launch(null) },
                         onOpenBook = { book ->
                             activity.startActivity(
                                 ReaderActivity.newIntent(activity, book.filePath)
