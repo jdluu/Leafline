@@ -193,6 +193,16 @@ class AnnotationManager(
         }
     }
 
+    fun updateColor(annotation: Annotation, colorHex: String) {
+        scope.launch {
+            try {
+                repository.updateAnnotationColor(annotation.id, colorHex)
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not update highlight color", e)
+            }
+        }
+    }
+
     /** Excerpt shown in the annotation-activated toast and highlights sheet. */
     fun excerptOf(annotation: Annotation): String {
         return try {

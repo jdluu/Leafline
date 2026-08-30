@@ -56,6 +56,19 @@ class AnnotationRepositoryTest {
             }
             return 0
         }
+
+        override suspend fun updateColor(id: Long, colorHex: String): Int {
+            val current = stored.value.toMutableList()
+            val index = current.indexOfFirst { it.id == id }
+            if (index >= 0) {
+                val updated = current[index].copy(colorHex = colorHex)
+                current[index] = updated
+                stored.value = current
+                return 1
+            }
+            return 0
+        }
+
     }
 
     private fun newRepository(ticks: MutableList<Long>): Pair<AnnotationRepositoryImpl, FakeAnnotationDao> {
@@ -256,5 +269,33 @@ class AnnotationRepositoryTest {
         val result = repository.updateAnnotationNote(999L, "note")
 
         assertEquals(0, result)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `updateAnnotationColor changes only color`() = runTest {
+        val (repository, _) = newRepository(clockTicks())
+        val id = repository.addAnnotation(
+            bookId = "book-1",
+            locatorJson = chapterOne,
+            colorHex = Annotation.DEFAULT_COLOR_HEX,
+            note = "Keep this note"
+        )
+
+        assertEquals(1, repository.updateAnnotationColor(id, "#5543A047"))
+
+        val updated = repository.getAnnotations("book-1").single()
+        assertEquals("#5543A047", updated.colorHex)
+        assertEquals("Keep this note", updated.note)
+        assertEquals(chapterOne, updated.locatorJson)
+        assertEquals(1000L, updated.createdAt)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `updateAnnotationColor returns zero for missing id`() = runTest {
+        val (repository, _) = newRepository(clockTicks())
+
+        assertEquals(0, repository.updateAnnotationColor(999L, "#5543A047"))
     }
 }
