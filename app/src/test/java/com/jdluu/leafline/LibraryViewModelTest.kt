@@ -16,6 +16,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -51,12 +52,71 @@ class LibraryViewModelTest {
                 observed
             )
         }
+
+    @Test
+    fun `adding an existing file hash updates its path instead of inserting a duplicate`() =
+        runTest(dispatcher) {
+            val existing = testBook(
+                stableId = "legacy-id",
+                filePath = "/old/book.epub",
+                fileHash = "same-hash",
+                lastLocatorJson = "{saved-locator}",
+                readingStatus = ReadingStatus.READING
+            )
+            val imported = testBook(
+                stableId = "identifier:book:hash:same-hash",
+                filePath = "/new/book.epub",
+                fileHash = "same-hash"
+            )
+            val repository = FakeLibraryRepository(
+                books = flowOf(listOf(existing)),
+                existingByHash = existing
+            )
+            val viewModel = LibraryViewModel(repository)
+
+            viewModel.addBook(imported)
+            advanceUntilIdle()
+
+            assertEquals(0, repository.addedBooks.size)
+            assertEquals(1, repository.updatedBooks.size)
+            assertEquals("legacy-id", repository.updatedBooks.single().stableId)
+            assertEquals("/new/book.epub", repository.updatedBooks.single().filePath)
+            assertEquals("{saved-locator}", repository.updatedBooks.single().lastLocatorJson)
+            assertEquals(ReadingStatus.READING, repository.updatedBooks.single().readingStatus)
+            assertTrue(repository.lookupHashes.contains("same-hash"))
+        }
 }
+
+private fun testBook(
+    stableId: String,
+    filePath: String,
+    fileHash: String,
+    lastLocatorJson: String? = null,
+    readingStatus: ReadingStatus = ReadingStatus.UNREAD
+) = LibraryBook(
+    stableId = stableId,
+    title = "Book",
+    authors = listOf("Author"),
+    language = "en",
+    description = null,
+    publisher = null,
+    publishedAtEpochMillis = null,
+    filePath = filePath,
+    fileHash = fileHash,
+    addedAtEpochMillis = 1L,
+    pageCount = null,
+    lastLocatorJson = lastLocatorJson,
+    readingStatus = readingStatus
+)
 
 /** Minimal [LibraryRepository] for ViewModel tests; only reads used here. */
 private class FakeLibraryRepository(
-    private val books: Flow<List<LibraryBook>>
+    private val books: Flow<List<LibraryBook>>,
+    private val existingByHash: LibraryBook? = null
 ) : LibraryRepository {
+    val addedBooks = mutableListOf<LibraryBook>()
+    val updatedBooks = mutableListOf<LibraryBook>()
+    val lookupHashes = mutableListOf<String>()
     override fun getAllBooks(): Flow<List<LibraryBook>> = books
 
     override fun searchBooks(query: String): Flow<List<LibraryBook>> = books
@@ -73,7 +133,10 @@ private class FakeLibraryRepository(
 
     override suspend fun getBookByStableId(stableId: String): LibraryBook? = error("not used")
 
-    override suspend fun getBookByFileHash(fileHash: String): LibraryBook? = error("not used")
+    override suspend fun getBookByFileHash(fileHash: String): LibraryBook? {
+        lookupHashes += fileHash
+        return existingByHash?.takeIf { it.fileHash == fileHash }
+    }
 
     override suspend fun getBookByFilePath(filePath: String): LibraryBook? = error("not used")
 
@@ -88,9 +151,14 @@ private class FakeLibraryRepository(
 
     override suspend fun setCoverPath(stableId: String, coverPath: String?) = error("not used")
 
-    override suspend fun addBook(book: LibraryBook): Long = error("not used")
+    override suspend fun addBook(book: LibraryBook): Long {
+        addedBooks += book
+        return 1L
+    }
 
-    override suspend fun updateBook(book: LibraryBook) = error("not used")
+    override suspend fun updateBook(book: LibraryBook) {
+        updatedBooks += book
+    }
 
     override suspend fun deleteBook(stableId: String) = error("not used")
 

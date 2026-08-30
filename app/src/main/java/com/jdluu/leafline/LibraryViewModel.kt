@@ -2,6 +2,7 @@ package com.jdluu.leafline
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.jdluu.leafline.library.ImportedBookReconciler
 import com.jdluu.leafline.library.LibraryBook
 import com.jdluu.leafline.library.LibrarySort
 import com.jdluu.leafline.library.LibrarySortStore
@@ -167,7 +168,13 @@ class LibraryViewModel(
 
     fun addBook(book: LibraryBook) {
         viewModelScope.launch {
-            repository.addBook(book)
+            val existing = repository.getBookByFileHash(book.fileHash)
+            val reconciled = existing?.let { ImportedBookReconciler.merge(it, book) }
+            if (reconciled != null) {
+                repository.updateBook(reconciled)
+            } else if (existing == null) {
+                repository.addBook(book)
+            }
         }
     }
 
