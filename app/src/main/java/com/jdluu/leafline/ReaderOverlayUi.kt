@@ -146,6 +146,8 @@ import com.jdluu.leafline.reader.search.BookSearchQuery
 import com.jdluu.leafline.theme.DEFAULT_HIGHLIGHT_TINT
 import com.jdluu.leafline.theme.HIGHLIGHT_TINTS
 import com.jdluu.leafline.theme.HighlightTint
+import com.jdluu.leafline.theme.Padding
+import com.jdluu.leafline.theme.Spacing
 import com.jdluu.leafline.reader.search.BookSearchResult
 import com.jdluu.leafline.reader.search.BookSearchState
 import com.jdluu.leafline.reader.search.BookSearchStatus
@@ -253,7 +255,7 @@ internal fun ReaderOverlay(
                 Text(
                     "Contents",
                     style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(16.dp)
+                    modifier = Modifier.padding(Padding.screen)
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 LazyColumn {
@@ -384,9 +386,9 @@ internal fun SyncConflictSheet(
     onDismiss: () -> Unit
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(modifier = Modifier.padding(24.dp)) {
+        Column(modifier = Modifier.padding(Spacing.md)) {
             Text("Progress sync", style = MaterialTheme.typography.titleLarge)
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(Spacing.sm))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -409,7 +411,7 @@ internal fun SyncConflictSheet(
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(Padding.compact))
 
             if (conflict.remoteDevice != null) {
                 MetadataRow("Device", conflict.remoteDevice)
@@ -422,7 +424,7 @@ internal fun SyncConflictSheet(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(Padding.compact)
             ) {
                 OutlinedButton(
                     onClick = onDismiss,
@@ -434,7 +436,7 @@ internal fun SyncConflictSheet(
                 ) { Text("Jump to remote") }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(Spacing.sm))
         }
     }
 }
@@ -451,13 +453,13 @@ internal fun BrightnessControl(
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
         tonalElevation = 6.dp
     ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+        Column(modifier = Modifier.padding(horizontal = Padding.screen)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     Icons.Default.Brightness6,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(end = 8.dp)
+                    modifier = Modifier.padding(end = Spacing.xs)
                 )
                 Text(
                     text = "Brightness",
@@ -508,7 +510,7 @@ internal fun SepiaQuickControl(
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            modifier = Modifier.padding(horizontal = Padding.screen, vertical = Spacing.xs)
         ) {
             FilterChip(
                 selected = selected,
@@ -629,13 +631,13 @@ internal fun BookmarkListSheet(
         Text(
             "Bookmarks",
             style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.padding(Padding.screen)
         )
         if (bookmarks.isEmpty()) {
             Text(
                 "No bookmarks yet",
                 style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier.padding(Padding.screen)
             )
         } else {
             LazyColumn(modifier = Modifier.fillMaxWidth()) {
@@ -663,7 +665,7 @@ internal fun BookmarkListSheet(
                                     Icons.Default.Delete,
                                     contentDescription = "Delete",
                                     tint = MaterialTheme.colorScheme.onErrorContainer,
-                                    modifier = Modifier.padding(end = 24.dp)
+                                    modifier = Modifier.padding(end = Spacing.md)
                                 )
                             }
                         }
@@ -677,7 +679,7 @@ internal fun BookmarkListSheet(
                                 )
                         ) {
                             Column(
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                                modifier = Modifier.padding(horizontal = Padding.screen, vertical = Padding.compact)
                             ) {
                                 Text(
                                     text = bookmark.label
@@ -698,7 +700,7 @@ internal fun BookmarkListSheet(
                 }
             }
         }
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(Spacing.lg))
     }
 }
 
@@ -754,13 +756,13 @@ internal fun AnnotationListSheet(
         Text(
             "Highlights",
             style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.padding(Padding.screen)
         )
         if (annotations.isEmpty()) {
             Text(
                 "No highlights yet",
                 style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier.padding(Padding.screen)
             )
         } else {
             LazyColumn(modifier = Modifier.fillMaxWidth()) {
@@ -788,7 +790,7 @@ internal fun AnnotationListSheet(
                                     Icons.Default.Delete,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.onErrorContainer,
-                                    modifier = Modifier.padding(end = 24.dp)
+                                    modifier = Modifier.padding(end = Spacing.md)
                                 )
                             }
                         }
@@ -804,9 +806,9 @@ internal fun AnnotationListSheet(
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.padding(
-                                    start = 16.dp,
-                                    top = 12.dp,
-                                    bottom = 12.dp,
+                                    start = Padding.screen,
+                                    top = Padding.compact,
+                                    bottom = Padding.compact,
                                     end = 4.dp
                                 )
                             ) {
@@ -851,7 +853,7 @@ internal fun AnnotationListSheet(
                 }
             }
         }
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(Spacing.lg))
         // The sheet renders in its own window above the overlay, so its undo
         // snackbar must be hosted here to stay visible over the sheet scrim.
         SnackbarHost(hostState = snackbarHostState)
@@ -867,7 +869,7 @@ internal fun AnnotationListSheet(
                     onValueChange = { editNoteText = it },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp)
+                        .padding(Padding.screen)
                         .focusRequester(focusRequester),
                     singleLine = false,
                     maxLines = 5,
@@ -916,7 +918,7 @@ internal fun BookSearchSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = Padding.screen)
         ) {
             Text(
                 "Search in book",
@@ -927,7 +929,7 @@ internal fun BookSearchSheet(
                 onValueChange = { query = it },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp)
+                    .padding(top = Spacing.xs)
                     .focusRequester(focusRequester)
                     .semantics { contentDescription = "Search in book" },
                 singleLine = true,
@@ -968,7 +970,7 @@ internal fun BookSearchSheet(
             }
         }
         Spacer(modifier = Modifier.navigationBarsPadding())
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(Spacing.sm))
     }
 }
 
@@ -1019,7 +1021,7 @@ internal fun SearchResultRow(
             .clickable(onClickLabel = "Open search result", onClick = onClick)
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+            modifier = Modifier.padding(horizontal = Padding.screen, vertical = Padding.compact)
         ) {
             if (!result.sectionTitle.isNullOrBlank()) {
                 Text(
@@ -1092,7 +1094,7 @@ internal fun ReaderSettingsSheet(
             )
 
             Text("Theme", style = MaterialTheme.typography.labelLarge)
-            Row(modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)) {
+            Row(modifier = Modifier.padding(top = Spacing.xs, bottom = Spacing.sm)) {
                 listOf(
                     ReaderTheme.LIGHT to "Light",
                     ReaderTheme.SEPIA to "Sepia",
@@ -1104,7 +1106,7 @@ internal fun ReaderSettingsSheet(
                             onSettingsChange(settings.copy(theme = theme))
                         },
                         label = { Text(label) },
-                        modifier = Modifier.padding(end = 8.dp)
+                        modifier = Modifier.padding(end = Spacing.xs)
                     )
                 }
             }
@@ -1118,7 +1120,7 @@ internal fun ReaderSettingsSheet(
                             applyCustomPreference { it.copy(fontFamily = family) }
                         },
                         label = { Text(label) },
-                        modifier = Modifier.padding(end = 8.dp)
+                        modifier = Modifier.padding(end = Spacing.xs)
                     )
                 }
             }
@@ -1126,7 +1128,7 @@ internal fun ReaderSettingsSheet(
             Text("Page margins", style = MaterialTheme.typography.labelLarge)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
+                modifier = Modifier.padding(top = 4.dp, bottom = Spacing.sm)
             ) {
                 IconButton(onClick = {
                     applyCustomPreference { prefs ->
@@ -1144,7 +1146,7 @@ internal fun ReaderSettingsSheet(
                 }
                 Text(
                     text = "%.2f".format(preferences.pageMargins ?: PAGE_MARGINS_DEFAULT),
-                    modifier = Modifier.padding(horizontal = 12.dp)
+                    modifier = Modifier.padding(horizontal = Padding.compact)
                 )
                 IconButton(onClick = {
                     applyCustomPreference { prefs ->
@@ -1165,7 +1167,7 @@ internal fun ReaderSettingsSheet(
             Text("Line height", style = MaterialTheme.typography.labelLarge)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
+                modifier = Modifier.padding(top = 4.dp, bottom = Spacing.sm)
             ) {
                 IconButton(onClick = {
                     applyCustomPreference { prefs ->
@@ -1181,7 +1183,7 @@ internal fun ReaderSettingsSheet(
                 }
                 Text(
                     text = "%.1f".format(preferences.lineHeight ?: 1.2),
-                    modifier = Modifier.padding(horizontal = 12.dp)
+                    modifier = Modifier.padding(horizontal = Padding.compact)
                 )
                 IconButton(onClick = {
                     applyCustomPreference { prefs ->
@@ -1211,7 +1213,7 @@ internal fun ReaderSettingsSheet(
                             )
                         },
                         label = { Text(label) },
-                        modifier = Modifier.padding(end = 8.dp)
+                        modifier = Modifier.padding(end = Spacing.xs)
                     )
                 }
             }
@@ -1221,7 +1223,7 @@ internal fun ReaderSettingsSheet(
                     StyleMode.CUSTOM -> "Your font, line height, and margins are applied."
                 },
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
+                modifier = Modifier.padding(top = 4.dp, bottom = Spacing.sm)
             )
 
             Row(
@@ -1253,7 +1255,7 @@ internal fun ReaderSettingsSheet(
                     "Content is paginated and tap zones can turn pages."
                 },
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
+                modifier = Modifier.padding(top = 4.dp, bottom = Spacing.sm)
             )
 
             Text("Tap zones", style = MaterialTheme.typography.labelLarge)
@@ -1290,10 +1292,10 @@ internal fun ReaderSettingsSheet(
                     )
                 }
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(Spacing.sm))
 
             Text("Page turn animation", style = MaterialTheme.typography.labelLarge)
-            Row(modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)) {
+            Row(modifier = Modifier.padding(top = Spacing.xs, bottom = Spacing.sm)) {
                 listOf(
                     PageTurnAnimation.SLIDE to "Slide",
                     PageTurnAnimation.NONE to "None"
@@ -1302,12 +1304,12 @@ internal fun ReaderSettingsSheet(
                         selected = settings.pageTurnAnimation == animation,
                         onClick = { onSettingsChange(settings.copy(pageTurnAnimation = animation)) },
                         label = { Text(label) },
-                        modifier = Modifier.padding(end = 8.dp)
+                        modifier = Modifier.padding(end = Spacing.xs)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(Spacing.sm))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1330,7 +1332,7 @@ internal fun ReaderSettingsSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(Spacing.lg))
         }
     }
 }
@@ -1357,7 +1359,7 @@ internal fun TapZoneActionRow(
                     selected = selected == action,
                     onClick = { onSelect(action) },
                     label = { Text(optionLabel) },
-                    modifier = Modifier.padding(end = 8.dp)
+                    modifier = Modifier.padding(end = Spacing.xs)
                 )
             }
         }
@@ -1390,7 +1392,7 @@ internal fun HighlightTintPickerSheet(
     onTintSelected: (HighlightTint) -> Unit
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(Padding.screen)) {
             Text(
                 "Choose highlight color",
                 style = MaterialTheme.typography.titleMedium,

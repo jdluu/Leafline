@@ -14,6 +14,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.rememberScrollState
@@ -25,6 +26,8 @@ import androidx.compose.material.icons.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -43,7 +46,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.jdluu.leafline.di.appContainer
 import com.jdluu.leafline.library.LibraryBook
@@ -54,7 +56,10 @@ import com.jdluu.leafline.library.cover.EpubCoverLoader
 import com.jdluu.leafline.sync.KoreaderSyncConfig
 import com.jdluu.leafline.sync.KoreaderSyncConfigStore
 import com.jdluu.leafline.sync.SyncWorker
+import com.jdluu.leafline.theme.AppearanceStore
 import com.jdluu.leafline.theme.LeaflineTheme
+import com.jdluu.leafline.theme.Padding
+import com.jdluu.leafline.theme.Spacing
 import com.jdluu.leafline.theme.ThemeMode
 import kotlinx.coroutines.launch
 import androidx.compose.material3.Switch
@@ -188,6 +193,8 @@ fun LeaflineApp(activity: MainActivity) {
 
     var selectedTab by remember { mutableIntStateOf(0) }
     val context = androidx.compose.ui.platform.LocalContext.current
+    val appearanceStore = remember { AppearanceStore.fromContext(context) }
+    var appearance by remember { mutableStateOf(appearanceStore.load()) }
 
     var pendingBook by remember { mutableStateOf<LibraryBook?>(null) }
 
@@ -231,7 +238,7 @@ fun LeaflineApp(activity: MainActivity) {
     }
 
     LeaflineTheme(
-            mode = ThemeMode.SYSTEM,
+            mode = appearance,
             darkSystem = isSystemInDarkTheme()
         ) {
         Scaffold(
@@ -271,7 +278,13 @@ fun LeaflineApp(activity: MainActivity) {
                             )
                         }
                     )
-                    LeaflineTab.Settings -> SettingsTab()
+                    LeaflineTab.Settings -> SettingsTab(
+                        appearance = appearance,
+                        onAppearanceChange = { selected ->
+                            appearance = selected
+                            appearanceStore.save(selected)
+                        }
+                    )
                     null -> {}
                 }
             }
@@ -281,20 +294,85 @@ fun LeaflineApp(activity: MainActivity) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsTab() {
+fun SettingsTab(
+    appearance: ThemeMode,
+    onAppearanceChange: (ThemeMode) -> Unit
+) {
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
             title = { Text("Settings") }
         )
         Column(
             modifier = Modifier
-                .padding(24.dp)
+                .padding(Spacing.md)
                 .verticalScroll(rememberScrollState())
         ) {
+            AppearanceSection(
+                appearance = appearance,
+                onAppearanceChange = onAppearanceChange,
+                modifier = Modifier.fillMaxWidth()
+            )
+            HorizontalDivider(modifier = Modifier.padding(vertical = Spacing.md))
             KoreaderSyncSection(modifier = Modifier.fillMaxWidth())
         }
     }
 }
+
+/**
+ * App appearance selector: System follows the OS dark/light setting with the
+ * fixed Leafline palette, Light and Dark pick the Leafline schemes directly,
+ * OLED uses the pure-black dark scheme, and E-ink uses the high-contrast
+ * monochrome scheme. Selections are applied immediately and persisted by
+ * [AppearanceStore].
+ */
+@Composable
+private fun AppearanceSection(
+    appearance: ThemeMode,
+    onAppearanceChange: (ThemeMode) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        Text(
+            "Appearance",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(bottom = Spacing.sm)
+        )
+        FlowRow(modifier = Modifier.fillMaxWidth()) {
+            ThemeMode.entries.forEach { mode ->
+                FilterChip(
+                    selected = appearance == mode,
+                    onClick = { onAppearanceChange(mode) },
+                    label = { Text(mode.label) },
+                    modifier = Modifier.padding(end = Spacing.xs, bottom = Spacing.xs)
+                )
+            }
+        }
+        Text(
+            text = appearance.description,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = Spacing.xs)
+        )
+    }
+}
+
+private val ThemeMode.label: String
+    get() = when (this) {
+        ThemeMode.SYSTEM -> "System"
+        ThemeMode.LIGHT -> "Light"
+        ThemeMode.DARK -> "Dark"
+        ThemeMode.OLED -> "OLED"
+        ThemeMode.E_INK -> "E-ink"
+    }
+
+private val ThemeMode.description: String
+    get() = when (this) {
+        ThemeMode.SYSTEM -> "Follows the system light or dark setting using the Leafline palette."
+        ThemeMode.LIGHT -> "Always uses the Leafline light scheme."
+        ThemeMode.DARK -> "Always uses the Leafline dark scheme."
+        ThemeMode.OLED -> "Uses the pure-black dark scheme for OLED displays."
+        ThemeMode.E_INK -> "Uses the high-contrast monochrome scheme for e-ink displays."
+    }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -312,7 +390,7 @@ private fun KoreaderSyncSection(modifier: Modifier = Modifier) {
         Text(
             "KOReader Sync",
             style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(bottom = 16.dp)
+            modifier = Modifier.padding(bottom = Spacing.sm)
         )
         OutlinedTextField(
             value = serverUrl,
@@ -327,18 +405,18 @@ private fun KoreaderSyncSection(modifier: Modifier = Modifier) {
             onValueChange = { syncUsername = it; testResult = null },
             label = { Text("Username") },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
+            modifier = Modifier.fillMaxWidth().padding(top = Padding.compact)
         )
         OutlinedTextField(
             value = syncPassword,
             onValueChange = { syncPassword = it; testResult = null },
             label = { Text("Password") },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
+            modifier = Modifier.fillMaxWidth().padding(top = Padding.compact)
         )
         Row(
             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+            modifier = Modifier.fillMaxWidth().padding(top = Spacing.xs)
         ) {
             Text(
                 "Enable progress sync",
@@ -364,7 +442,7 @@ private fun KoreaderSyncSection(modifier: Modifier = Modifier) {
                 }
             )
         }
-        Row(modifier = Modifier.padding(top = 16.dp)) {
+        Row(modifier = Modifier.padding(top = Spacing.sm)) {
             Button(
                 onClick = {
                     val config = KoreaderSyncConfig(
@@ -393,7 +471,7 @@ private fun KoreaderSyncSection(modifier: Modifier = Modifier) {
                     }
                 },
                 enabled = !testing,
-                modifier = Modifier.padding(start = 12.dp)
+                modifier = Modifier.padding(start = Padding.compact)
             ) { Text(if (testing) "Testing..." else "Test connection") }
         }
         testResult?.let { message ->
@@ -405,13 +483,13 @@ private fun KoreaderSyncSection(modifier: Modifier = Modifier) {
                     message == "Saved." -> MaterialTheme.colorScheme.onSurfaceVariant
                     else -> MaterialTheme.colorScheme.error
                 },
-                modifier = Modifier.padding(top = 8.dp)
+                modifier = Modifier.padding(top = Spacing.xs)
             )
         }
         Text(
             "Syncs reading positions with a KOReader-compatible server using the book content hash. Credentials are stored only in memory for this session.",
             style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(top = 16.dp)
+            modifier = Modifier.padding(top = Spacing.sm)
         )
     }
 }

@@ -85,6 +85,7 @@ import com.jdluu.leafline.LibraryViewModel
 import com.jdluu.leafline.library.ReadingStatus
 import com.jdluu.leafline.library.data.Collection
 import com.jdluu.leafline.theme.IconSize
+import com.jdluu.leafline.theme.Padding
 import com.jdluu.leafline.theme.Spacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -172,7 +173,7 @@ fun LibraryScreen(
                 onValueChange = viewModel::setQuery,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                    .padding(horizontal = Padding.screen, vertical = 4.dp),
                 placeholder = { Text("Search title or author") },
                 singleLine = true,
                 trailingIcon = {
@@ -191,8 +192,8 @@ fun LibraryScreen(
         // Collection filter chips
         if (collections.isNotEmpty()) {
             androidx.compose.foundation.lazy.LazyRow(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier.padding(horizontal = Padding.screen, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
             ) {
                 item {
                     FilterChip(
@@ -222,8 +223,8 @@ fun LibraryScreen(
 
         // Reading status filter chips
         androidx.compose.foundation.lazy.LazyRow(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.padding(horizontal = Padding.screen, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
         ) {
             item {
                 FilterChip(
@@ -254,15 +255,15 @@ fun LibraryScreen(
         // Continue reading shelf
         val continueReadingBooks by viewModel.continueReadingBooks.collectAsStateWithLifecycle()
         if (continueReadingBooks.isNotEmpty()) {
-            Column(modifier = Modifier.padding(top = 8.dp)) {
+            Column(modifier = Modifier.padding(top = Spacing.xs)) {
                 Text(
                     "Continue reading",
                     style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(horizontal = 16.dp)
+                    modifier = Modifier.padding(horizontal = Padding.screen)
                 )
                 androidx.compose.foundation.lazy.LazyRow(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier.padding(horizontal = Padding.compact, vertical = Spacing.xs),
+                    horizontalArrangement = Arrangement.spacedBy(Padding.compact)
                 ) {
                     items(continueReadingBooks, key = { it.stableId }) { book ->
                         ContinueReadingTile(book = book, onClick = { onOpenBook(book) })
@@ -297,9 +298,9 @@ fun LibraryScreen(
             LazyVerticalGrid(
                 columns = GridCells.Fixed(rememberLibraryGridColumns()),
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                contentPadding = PaddingValues(Padding.screen),
+                verticalArrangement = Arrangement.spacedBy(Padding.compact),
+                horizontalArrangement = Arrangement.spacedBy(Padding.compact)
             ) {
                 items(items = books, key = { it.stableId }) { book ->
                     BookGridTile(
@@ -325,8 +326,8 @@ fun LibraryScreen(
         onClick = onImportEpub,
         modifier = Modifier
             .align(Alignment.BottomEnd)
-            .padding(16.dp)
-            .padding(bottom = if (books.isEmpty()) 0.dp else 64.dp)
+            .padding(Padding.screen)
+            .padding(bottom = if (books.isEmpty()) 0.dp else Spacing.xxl)
     ) {
         Icon(Icons.Default.Add, contentDescription = "Import EPUB")
     }
@@ -503,7 +504,7 @@ private fun CollectionManagementSheet(
     onDelete: (Collection) -> Unit
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(Padding.screen)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -520,13 +521,13 @@ private fun CollectionManagementSheet(
                     Text("New")
                 }
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(Padding.compact))
             if (collections.isEmpty()) {
                 Text(
                     "No collections yet. Create one to start organizing your books.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 24.dp)
+                    modifier = Modifier.padding(vertical = Spacing.md)
                 )
             } else {
                 LazyColumn {
@@ -534,7 +535,7 @@ private fun CollectionManagementSheet(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 8.dp),
+                                .padding(vertical = Spacing.xs),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
@@ -543,7 +544,7 @@ private fun CollectionManagementSheet(
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(24.dp) // touch-target-ok: decorative icon in row
                             )
-                            Spacer(Modifier.width(12.dp))
+                            Spacer(Modifier.width(Padding.compact))
                             Text(
                                 collection.name,
                                 style = MaterialTheme.typography.bodyLarge,
@@ -561,7 +562,7 @@ private fun CollectionManagementSheet(
                     }
                 }
             }
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(Spacing.sm))
         }
     }
 }
@@ -577,11 +578,11 @@ private fun BookCollectionPickerSheet(
     onRemoveFromCollection: (Long) -> Unit
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(Padding.screen)) {
             Text(
                 "Collections",
                 style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(bottom = 12.dp)
+                modifier = Modifier.padding(bottom = Padding.compact)
             )
             if (collections.isEmpty()) {
                 Text(
@@ -670,7 +671,7 @@ fun BookGridTile(
                 onLongClick = onLongClick
             )
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(Padding.compact)) {
             val bitmap = rememberCoverBitmap(book.coverPath)
             Box(
                 modifier = Modifier
@@ -703,7 +704,7 @@ fun BookGridTile(
                             },
                             MaterialTheme.shapes.small
                         )
-                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                        .padding(horizontal = Spacing.xs, vertical = 2.dp)
                 ) {
                     Text(
                         text = when (book.readingStatus) {
@@ -717,7 +718,7 @@ fun BookGridTile(
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(Spacing.xs))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -778,7 +779,7 @@ private fun CoverPlaceholder(title: String) {
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(12.dp),
+            .padding(Padding.compact),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -787,7 +788,7 @@ private fun CoverPlaceholder(title: String) {
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(Spacing.xs))
         Text(
             text = title,
             style = MaterialTheme.typography.bodyMedium,
@@ -844,7 +845,7 @@ private fun ContinueReadingTile(book: LibraryBook, onClick: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 8.dp)
+                modifier = Modifier.padding(horizontal = Spacing.xs)
             )
             Spacer(modifier = Modifier.height(4.dp))
         }
@@ -866,7 +867,7 @@ private fun BookDetailSheet(
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
-                .padding(24.dp)
+                .padding(Spacing.md)
                 .verticalScroll(rememberScrollState())
         ) {
             // Cover + title
@@ -902,7 +903,7 @@ private fun BookDetailSheet(
                         }
                     }
                 }
-                Spacer(Modifier.width(16.dp))
+                Spacer(Modifier.width(Spacing.sm))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(book.title, style = MaterialTheme.typography.titleLarge)
                     if (book.authors.isNotEmpty()) {
@@ -912,18 +913,18 @@ private fun BookDetailSheet(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(Spacing.xs))
                     Button(onClick = onOpen) { Text("Open book") }
                 }
             }
 
             Spacer(Modifier.height(20.dp))
             HorizontalDivider()
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(Padding.compact))
 
             // Metadata section
             Text("Metadata", style = MaterialTheme.typography.titleSmall)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(Spacing.xs))
             MetadataRow("Status", when (book.readingStatus) {
                 ReadingStatus.UNREAD -> "Unread"
                 ReadingStatus.READING -> "Reading"
@@ -942,30 +943,30 @@ private fun BookDetailSheet(
                 MetadataRow("Last read", formatEpochMillis(millis))
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(Spacing.sm))
             HorizontalDivider()
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(Padding.compact))
 
             // File info section
             Text("File info", style = MaterialTheme.typography.titleSmall)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(Spacing.xs))
             MetadataRow("Path", book.filePath)
             MetadataRow("Hash", book.fileHash.take(12) + "…")
             book.koreaderHash?.let { MetadataRow("KOReader hash", it.take(12) + "…") }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(Spacing.sm))
             HorizontalDivider()
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(Padding.compact))
 
             // Actions section
             Text("Actions", style = MaterialTheme.typography.titleSmall)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(Spacing.xs))
 
             // Reading status buttons
             Text("Mark as:", style = MaterialTheme.typography.labelMedium)
             Row(
-                modifier = Modifier.padding(top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier.padding(top = Spacing.xs),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
             ) {
                 ReadingStatus.entries.forEach { status ->
                     FilterChip(
@@ -982,7 +983,7 @@ private fun BookDetailSheet(
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(Spacing.sm))
 
             // Collection management
             if (collections.isNotEmpty()) {
@@ -1011,7 +1012,7 @@ private fun BookDetailSheet(
                 Text("Delete from library", color = MaterialTheme.colorScheme.error)
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(Spacing.sm))
         }
     }
 }
