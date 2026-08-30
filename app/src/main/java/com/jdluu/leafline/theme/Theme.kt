@@ -1,13 +1,10 @@
 package com.jdluu.leafline.theme
 
-import android.os.Build
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.ui.platform.LocalContext
 
 /**
  * App-level theme selection mode. This controls the Leafline *app UI* color
@@ -140,38 +137,32 @@ private val EinkColorScheme = lightColorScheme(
 )
 
 /**
- * Resolves the color scheme from [mode], with dynamic color on Android 12+
- * when [ThemeMode.SYSTEM] is selected.
+ * Resolves the color scheme for [mode]. [ThemeMode.SYSTEM] follows the system
+ * dark/light state but always uses the fixed Leafline light and dark schemes;
+ * the brand palette is never replaced by dynamic wallpaper colors. The other
+ * modes map to their own fixed schemes regardless of the system setting.
  */
-@Composable
-private fun themeScheme(mode: ThemeMode, darkSystem: Boolean) = when {
-    mode == ThemeMode.LIGHT -> LightColorScheme
-    mode == ThemeMode.DARK -> DarkColorScheme
-    mode == ThemeMode.OLED -> OledColorScheme
-    mode == ThemeMode.E_INK -> EinkColorScheme
-    // SYSTEM: use dynamic color on Android 12+, else follow system dark
-    mode == ThemeMode.SYSTEM -> {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (darkSystem) dynamicDarkColorScheme(LocalContext.current)
-            else dynamicLightColorScheme(LocalContext.current)
-        } else if (darkSystem) DarkColorScheme else LightColorScheme
-    }
-    else -> if (darkSystem) DarkColorScheme else LightColorScheme
+internal fun themeScheme(mode: ThemeMode, darkSystem: Boolean): ColorScheme = when (mode) {
+    ThemeMode.LIGHT -> LightColorScheme
+    ThemeMode.DARK -> DarkColorScheme
+    ThemeMode.OLED -> OledColorScheme
+    ThemeMode.E_INK -> EinkColorScheme
+    ThemeMode.SYSTEM -> if (darkSystem) DarkColorScheme else LightColorScheme
 }
 
 /**
  * Top-level Leafline theme composable. Wraps MaterialTheme with the brand
  * color schemes, typography, and shapes.
  *
- * @param mode The [ThemeMode] to apply. Pass [ThemeMode.SYSTEM] to follow
- *   the system dark/light preference with dynamic color on Android 12+.
+ * @param mode The [ThemeMode] to apply. [ThemeMode.SYSTEM] follows the system
+ *   dark/light state with the fixed Leafline schemes.
  * @param darkSystem Whether the system is in dark mode (only used when
- *   [mode] is [ThemeMode.SYSTEM] or when an explicit theme is unselected).
+ *   [mode] is [ThemeMode.SYSTEM]).
  * @param content The composable content tree.
  */
 @Composable
 fun LeaflineTheme(
-    mode: ThemeMode = ThemeMode.LIGHT,
+    mode: ThemeMode = ThemeMode.SYSTEM,
     darkSystem: Boolean = false,
     content: @Composable () -> Unit
 ) {
