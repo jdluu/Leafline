@@ -48,9 +48,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.lifecycleScope
 import com.jdluu.leafline.di.appContainer
 import com.jdluu.leafline.library.LibraryBook
 import com.jdluu.leafline.library.LibraryFolderStore
+import com.jdluu.leafline.library.LocalEpubDocumentScanner
 import com.jdluu.leafline.library.LibraryScreen
 import com.jdluu.leafline.library.LibrarySortStore
 import com.jdluu.leafline.library.LibraryViewModelFactory
@@ -64,6 +66,8 @@ import com.jdluu.leafline.theme.Padding
 import com.jdluu.leafline.theme.Spacing
 import com.jdluu.leafline.theme.ThemeMode
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.material3.Switch
 
 private const val TAG = "MainActivity"
@@ -110,6 +114,20 @@ class MainActivity : ComponentActivity() {
         }
         LibraryFolderStore.fromContext(context).add(uri.toString())
         showToast("Library folder added")
+    }
+
+    fun importLibraryFolder(uri: Uri, context: Context, onComplete: (List<LibraryBook>, Int) -> Unit) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val imported = mutableListOf<LibraryBook>()
+            var failures = 0
+            LocalEpubDocumentScanner.scanTree(contentResolver, uri).forEach { documentUri ->
+                val book = importEpub(documentUri, context) { failures++ }
+                if (book != null) imported += book
+            }
+            withContext(Dispatchers.Main) {
+                onComplete(imported, failures)
+            }
+        }
     }
 
     fun importEpub(contentUri: Uri, context: Context, onFailure: (String) -> Unit): LibraryBook? {
@@ -254,6 +272,15 @@ fun LeaflineApp(activity: MainActivity) {
     ) { uri: Uri? ->
         uri?.let { selectedUri ->
             (activity as MainActivity).saveLibraryFolder(selectedUri, context)
+            (activity as MainActivity).importLibraryFolder(selectedUri, context) { imported, failures ->
+                imported.forEach(libraryViewModel::addBook)
+                val message = if (failures == 0) {
+                    "Imported ${imported.size} EPUB(s)"
+                } else {
+                    "Imported ${imported.size} EPUB(s), $failures failed"
+                }
+                activity.showToast(message)
+            }
         }
     }
 
