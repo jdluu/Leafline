@@ -14,10 +14,10 @@ object BookMetadataMapper {
         addedAt: Instant,
         koreaderHash: String? = null
     ): LibraryBook {
-        val stableId = run {
-            val identifier = metadata.identifier?.trim()
-            if (!identifier.isNullOrBlank()) identifier else fileHash
-        }
+        val stableId = BookIdentity.from(
+            identifier = metadata.identifier,
+            fileHash = fileHash
+        )
 
         val title = run {
             val t = metadata.title?.trim()

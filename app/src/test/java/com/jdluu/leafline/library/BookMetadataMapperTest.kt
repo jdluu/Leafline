@@ -22,7 +22,7 @@ class BookMetadataMapperTest {
             fileHash = "hash123",
             addedAt = Instant.parse("2024-01-15T10:30:00Z")
         )
-        assertEquals("test-identifier", result.stableId)
+        assertEquals("identifier:test-identifier:hash:hash123", result.stableId)
     }
 
     @OptIn(ExperimentalTime::class)
@@ -35,7 +35,7 @@ class BookMetadataMapperTest {
             fileHash = "hash123",
             addedAt = Instant.parse("2024-01-15T10:30:00Z")
         )
-        assertEquals("hash123", result.stableId)
+        assertEquals("hash:hash123", result.stableId)
     }
 
     @OptIn(ExperimentalTime::class)
@@ -48,7 +48,7 @@ class BookMetadataMapperTest {
             fileHash = "hash123",
             addedAt = Instant.parse("2024-01-15T10:30:00Z")
         )
-        assertEquals("hash123", result.stableId)
+        assertEquals("hash:hash123", result.stableId)
     }
 
     @OptIn(ExperimentalTime::class)
