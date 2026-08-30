@@ -175,4 +175,24 @@ class AnnotationDaoTest {
 
         assertEquals(0, annotationDao.updateNote(999L, "note"))
     }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun updateColor_changes_only_color_field() = runTest {
+        val id = annotationDao.insert(entity(colorHex = "#55E65100", note = "Keep this note"))
+
+        assertEquals(1, annotationDao.updateColor(id, "#5543A047"))
+
+        val updated = annotationDao.getForBook("book-1").single()
+        assertEquals("#5543A047", updated.colorHex)
+        assertEquals("Keep this note", updated.note)
+        assertEquals("book-1", updated.bookId)
+        assertEquals(1000L, updated.createdAt)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun updateColor_returns_zero_for_missing_row() = runTest {
+        assertEquals(0, annotationDao.updateColor(999L, "#5543A047"))
+    }
 }

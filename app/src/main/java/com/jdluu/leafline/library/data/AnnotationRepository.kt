@@ -13,4 +13,5 @@ interface AnnotationRepository {
     ): Long
     suspend fun removeAnnotation(id: Long)
     suspend fun updateAnnotationNote(id: Long, note: String?): Int
+    suspend fun updateAnnotationColor(id: Long, colorHex: String): Int
 }

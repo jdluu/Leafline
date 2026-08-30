@@ -49,8 +49,8 @@ import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Brightness6
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.FormatColorFill
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.FormatColorFill
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
@@ -229,6 +229,7 @@ internal fun ReaderOverlay(
     onAnnotationClick: (Annotation) -> Unit,
     onDeleteAnnotation: (Annotation) -> Unit,
     onEditAnnotation: (Annotation, String?) -> Unit,
+    onChangeColor: (Annotation, HighlightTint) -> Unit,
     onTocClick: (Link) -> Unit,
     onSettingsChange: (ReaderSettings) -> Unit,
     onBrightnessChange: (Float) -> Unit,
@@ -322,6 +323,7 @@ internal fun ReaderOverlay(
                     onAnnotationClick = onAnnotationClick,
                     onDeleteAnnotation = onDeleteAnnotation,
                     onEditAnnotation = onEditAnnotation,
+                    onChangeColor = onChangeColor,
                     onDismiss = onDismissHighlights
                 )
             }
@@ -720,11 +722,13 @@ internal fun AnnotationListSheet(
     onAnnotationClick: (Annotation) -> Unit,
     onDeleteAnnotation: (Annotation) -> Unit,
     onEditAnnotation: (Annotation, String?) -> Unit,
+    onChangeColor: (Annotation, HighlightTint) -> Unit,
     onDismiss: () -> Unit,
     excerptFor: (Annotation) -> String = { annotationExcerpt(it) }
 ) {
     var editDialogAnnotation by remember { mutableStateOf<Annotation?>(null) }
     var editNoteText by remember { mutableStateOf("") }
+    var colorPickerAnnotation by remember { mutableStateOf<Annotation?>(null) }
     val focusRequester = remember { FocusRequester() }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
@@ -780,6 +784,13 @@ internal fun AnnotationListSheet(
                             ) {
                                 Icon(Icons.Default.Edit, contentDescription = "Edit note")
                             }
+                            IconButton(
+                                onClick = {
+                                    colorPickerAnnotation = annotation
+                                }
+                            ) {
+                                Icon(Icons.Default.FormatColorFill, contentDescription = "Change highlight color")
+                            }
                             IconButton(onClick = { onDeleteAnnotation(annotation) }) {
                                 Icon(Icons.Default.Delete, contentDescription = "Delete highlight")
                             }
@@ -818,6 +829,16 @@ internal fun AnnotationListSheet(
             },
             dismissButton = {
                 TextButton(onClick = { editDialogAnnotation = null }) { Text("Cancel") }
+            }
+        )
+    }
+
+    colorPickerAnnotation?.let { annotation ->
+        HighlightTintPickerSheet(
+            onDismiss = { colorPickerAnnotation = null },
+            onTintSelected = { tint ->
+                onChangeColor(annotation, tint)
+                colorPickerAnnotation = null
             }
         )
     }

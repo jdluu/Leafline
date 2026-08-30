@@ -52,6 +52,10 @@ class AnnotationRepositoryImpl(
         annotationDao.updateNote(id, normalizedNote)
     }
 
+    override suspend fun updateAnnotationColor(id: Long, colorHex: String): Int = withContext(ioDispatcher) {
+        annotationDao.updateColor(id, colorHex)
+    }
+
     private fun normalizeNote(note: String?): String? {
         return note?.trim()?.takeIf { it.isNotBlank() }
     }

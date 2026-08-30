@@ -690,6 +690,9 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     onEditAnnotation = { annotation, note ->
                         annotationManager.updateNote(annotation, note)
                     },
+                    onChangeColor = { annotation, tint ->
+                        annotationManager.updateColor(annotation, tint.hex)
+                    },
                     onTocClick = { link ->
                         navigateToTocLink(link)
                         scope.launch { drawerState.close() }

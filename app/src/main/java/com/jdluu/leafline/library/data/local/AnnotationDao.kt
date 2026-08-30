@@ -21,4 +21,7 @@ interface AnnotationDao {
 
     @Query("UPDATE annotations SET note = :note WHERE id = :id")
     suspend fun updateNote(id: Long, note: String?): Int
+
+    @Query("UPDATE annotations SET colorHex = :colorHex WHERE id = :id")
+    suspend fun updateColor(id: Long, colorHex: String): Int
 }
