@@ -21,5 +21,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-The project is pre-release: no versions have been published. Release builds
-and tagging are on hold until the feature set stabilizes.
+The project is pre-release and no versions have been published yet. Development
+and release preparation continue through the normal issue and pull request
+workflow.

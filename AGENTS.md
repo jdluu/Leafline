@@ -281,10 +281,11 @@ clients or manipulate EPUB archives directly.
 - `scripts/check_touch_targets.sh` and `scripts/check_dynamic_type.sh` guard
   against regressions in touch target sizing and font-scale compliance.
 
-### Release builds (on hold)
+### Release builds
 
-The project is pre-release: no versions are published and no release APKs are
-built. When releases resume:
+The project is pre-release and no versions are published yet. Release builds
+remain available for local validation and will be cut when the release
+criteria are met:
 
 - Generate a release keystore once and keep credentials in
   `~/.gradle/gradle.properties` (never in the repo):
@@ -302,28 +303,14 @@ LEAFLINE_KEY_PASSWORD=...
 - Versioning: `versionCode` increments monotonically per release, `versionName`
   follows semver. Releases are cut from `main` and tagged `v<versionName>`.
 
-## Feature freeze
+### Current delivery status
 
-A feature freeze is in effect as of 2026-08-25. All roadmap phases
-(phase-1 through phase-7) are complete and closed; no new user-facing features
-are accepted until the first public release ships.
-
-- In scope: refactoring (notably the ongoing ReaderActivity split), stability,
-  performance, accessibility fixes, dependency updates, test coverage, docs.
-- Out of scope: new reader or library capabilities, new sync behaviors, new
-  settings, OPDS in any form, and any feature that would touch the Room schema
-  without a concrete bug to justify it.
-- Exceptions require an explicit user decision recorded on a GitHub issue
-  labeled `feature-freeze-exception` before implementation starts.
-- The freeze lifts when the project exits pre-release: after the v0.1.0 tag is
-  cut from `main`, the CHANGELOG Unreleased section is emptied, and Obtainium
-  users receive the update.
-
-### Open architecture items
-
-- Optional follow-ups deferred past the freeze: note editing UI, per-color
-  highlight tints, swipe-to-delete in the highlights sheet. These are recorded
-  as backlog issues and must not be started while the freeze holds.
+Leafline is actively developed toward its first public release. New features,
+bug fixes, refactoring, accessibility work, performance work, dependency
+updates, tests, and documentation are all considered through the normal
+issue, branch, pull request, and CI workflow. The product boundaries above
+remain unchanged: OPDS/catalog acquisition belongs to ShelfSync, while Leafline
+opens and manages EPUBs available locally on the device.
 
 ### Quality gates
 
