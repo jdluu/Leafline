@@ -331,7 +331,10 @@ fun LibraryScreen(
                         onClick = { onOpenBook(book) },
                         onLongClick = { detailSheetBook = book },
                         collections = collections,
-                        bookCollections = emptyList(), // simplified: collection state per book
+                        bookCollectionIds = viewModel
+                            .collectionIdsForBook(book.stableId)
+                            .collectAsStateWithLifecycle(emptySet())
+                            .value,
                         onAddToCollection = { collectionId ->
                             viewModel.addBookToCollection(book.stableId, collectionId)
                         },
@@ -433,6 +436,10 @@ fun LibraryScreen(
         BookDetailSheet(
             book = book,
             collections = collections,
+            bookCollectionIds = viewModel
+                .collectionIdsForBook(book.stableId)
+                .collectAsStateWithLifecycle(emptySet())
+                .value,
             onDismiss = { detailSheetBook = null },
             onDelete = {
                 detailSheetBook = null
@@ -936,7 +943,7 @@ fun BookGridTile(
     onClick: () -> Unit,
     onLongClick: () -> Unit = {},
     collections: List<Collection> = emptyList(),
-    bookCollections: List<Collection> = emptyList(),
+    bookCollectionIds: Set<Long> = emptySet(),
     onAddToCollection: (Long) -> Unit = {},
     onRemoveFromCollection: (Long) -> Unit = {}
 ) {
@@ -1039,7 +1046,7 @@ fun BookGridTile(
         BookCollectionPickerSheet(
             bookStableId = book.stableId,
             collections = collections,
-            bookCollectionIds = emptySet(), // simplified per-book collection state
+            bookCollectionIds = bookCollectionIds,
             onDismiss = { showCollectionPicker = false },
             onAddToCollection = { id ->
                 onAddToCollection(id)
@@ -1137,6 +1144,7 @@ private fun ContinueReadingTile(book: LibraryBook, onClick: () -> Unit) {
 private fun BookDetailSheet(
     book: LibraryBook,
     collections: List<Collection>,
+    bookCollectionIds: Set<Long>,
     onDismiss: () -> Unit,
     onDelete: () -> Unit,
     onSetReadingStatus: (ReadingStatus) -> Unit,
@@ -1269,11 +1277,15 @@ private fun BookDetailSheet(
             if (collections.isNotEmpty()) {
                 Text("Collections:", style = MaterialTheme.typography.labelMedium)
                 Spacer(Modifier.height(4.dp))
-                // Simple toggle row for each collection
+                // Toggle row for each collection
                 collections.forEach { collection ->
+                    val isMember = collection.id in bookCollectionIds
                     FilterChip(
-                        selected = false, // simplified: no per-book collection tracking here
-                        onClick = { onAddToCollection(collection.id) },
+                        selected = isMember,
+                        onClick = {
+                            if (isMember) onRemoveFromCollection(collection.id)
+                            else onAddToCollection(collection.id)
+                        },
                         label = { Text(collection.name) },
                         modifier = Modifier.padding(vertical = 2.dp)
                     )
