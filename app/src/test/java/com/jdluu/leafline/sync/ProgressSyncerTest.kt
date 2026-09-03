@@ -46,6 +46,68 @@ class ReadingProgressMathTest {
         assertNull(ReadingProgressMath.percentageFromLocator("not json"))
         assertNull(ReadingProgressMath.percentageFromLocator("""{"href":"/a.xhtml"}"""))
     }
+
+    @Test
+    fun `progressLabel returns percent read for valid midpoint`() {
+        val locator = """{"locations":{"totalProgression":0.4235}}"""
+        assertEquals("42% read", ReadingProgressMath.progressLabel(locator))
+    }
+
+    @Test
+    fun `progressLabel returns zero percent for start of book`() {
+        val locator = """{"locations":{"totalProgression":0.0}}"""
+        assertEquals("0% read", ReadingProgressMath.progressLabel(locator))
+    }
+
+    @Test
+    fun `progressLabel returns one hundred percent for end of book`() {
+        val locator = """{"locations":{"totalProgression":1.0}}"""
+        assertEquals("100% read", ReadingProgressMath.progressLabel(locator))
+    }
+
+    @Test
+    fun `progressLabel clamps negative to zero`() {
+        val locator = """{"locations":{"progression":-0.5}}"""
+        assertEquals("0% read", ReadingProgressMath.progressLabel(locator))
+    }
+
+    @Test
+    fun `progressLabel clamps above one to one hundred`() {
+        val locator = """{"locations":{"progression":1.8}}"""
+        assertEquals("100% read", ReadingProgressMath.progressLabel(locator))
+    }
+
+    @Test
+    fun `progressLabel returns null for null input`() {
+        assertNull(ReadingProgressMath.progressLabel(null))
+    }
+
+    @Test
+    fun `progressLabel returns null for blank input`() {
+        assertNull(ReadingProgressMath.progressLabel(""))
+        assertNull(ReadingProgressMath.progressLabel("   "))
+    }
+
+    @Test
+    fun `progressLabel returns null for malformed json`() {
+        assertNull(ReadingProgressMath.progressLabel("not json"))
+    }
+
+    @Test
+    fun `progressLabel returns null when locations object missing`() {
+        assertNull(ReadingProgressMath.progressLabel("""{"href":"/a.xhtml"}"""))
+    }
+
+    @Test
+    fun `progressLabel returns null when progression values missing`() {
+        assertNull(ReadingProgressMath.progressLabel("""{"locations":{}}"""))
+    }
+
+    @Test
+    fun `progressLabel rounds to nearest integer`() {
+        val locator = """{"locations":{"totalProgression":0.426}}"""
+        assertEquals("43% read", ReadingProgressMath.progressLabel(locator))
+    }
 }
 
 class ProgressSyncerTest {
