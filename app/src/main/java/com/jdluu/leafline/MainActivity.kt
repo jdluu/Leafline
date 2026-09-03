@@ -44,6 +44,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -52,10 +53,13 @@ import androidx.lifecycle.lifecycleScope
 import com.jdluu.leafline.di.appContainer
 import com.jdluu.leafline.library.LibraryBook
 import com.jdluu.leafline.library.LibraryFolderStore
+import com.jdluu.leafline.library.LibraryFolderViewModel
+import com.jdluu.leafline.library.LibraryFolderViewModelFactory
 import com.jdluu.leafline.library.LocalEpubDocumentScanner
 import com.jdluu.leafline.library.LibraryScreen
 import com.jdluu.leafline.library.LibrarySortStore
 import com.jdluu.leafline.library.LibraryViewModelFactory
+import com.jdluu.leafline.library.SafFolderMetadata
 import com.jdluu.leafline.library.cover.EpubCoverLoader
 import com.jdluu.leafline.sync.KoreaderSyncConfig
 import com.jdluu.leafline.sync.KoreaderSyncConfigStore
@@ -221,6 +225,13 @@ fun LeaflineApp(activity: MainActivity) {
         )
     )
 
+    val libraryFolderViewModel: LibraryFolderViewModel = viewModel(
+        factory = LibraryFolderViewModelFactory(
+            store = LibraryFolderStore.fromContext(activity),
+            metadata = SafFolderMetadata(activity.contentResolver)
+        )
+    )
+
     var selectedTab by remember { mutableIntStateOf(0) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val appearanceStore = remember { AppearanceStore.fromContext(context) }
@@ -267,10 +278,19 @@ fun LeaflineApp(activity: MainActivity) {
         }
     }
 
+    var pendingReplaceFolderUri by rememberSaveable { mutableStateOf<String?>(null) }
+
     val addLibraryFolderLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
+        val replaceUri = pendingReplaceFolderUri
+        pendingReplaceFolderUri = null
         uri?.let { selectedUri ->
+            if (replaceUri != null) {
+                // Reselect: drop the stale stored entry (releasing any held grant) before adding
+                // the replacement so the new grant is the only one held for this location.
+                libraryFolderViewModel.remove(replaceUri)
+            }
             (activity as MainActivity).saveLibraryFolder(selectedUri, context)
             (activity as MainActivity).importLibraryFolder(selectedUri, context) { imported, failures ->
                 imported.forEach(libraryViewModel::addBook)
@@ -282,6 +302,8 @@ fun LeaflineApp(activity: MainActivity) {
                 activity.showToast(message)
             }
         }
+        // Reflect add, reselect, or a cancelled picker in the open folder sheet.
+        libraryFolderViewModel.refresh()
     }
 
     LeaflineTheme(
@@ -314,8 +336,13 @@ fun LeaflineApp(activity: MainActivity) {
                 when (LeaflineTab.entries.getOrNull(selectedTab)) {
                     LeaflineTab.Library -> LibraryScreen(
                         viewModel = libraryViewModel,
+                        foldersViewModel = libraryFolderViewModel,
                         onImportEpub = { importEpubLauncher.launch(arrayOf(MainActivity.EPUB_MIME_TYPE)) },
                         onAddLibraryFolder = { addLibraryFolderLauncher.launch(null) },
+                        onReselectFolder = { uri ->
+                            pendingReplaceFolderUri = uri
+                            addLibraryFolderLauncher.launch(null)
+                        },
                         onOpenBook = { book ->
                             activity.startActivity(
                                 ReaderActivity.newIntent(activity, book.filePath)
