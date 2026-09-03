@@ -156,6 +156,22 @@ class LibraryViewModel(
 
     private val attemptedCoverIds = mutableSetOf<String>()
 
+    private val collectionIdsCache = mutableMapOf<String, Flow<Set<Long>>>()
+
+    /**
+     * Reactive set of collection IDs that [bookStableId] belongs to.
+     *
+     * Emits the known membership whenever the repository's
+     * [LibraryRepository.getCollectionsForBook] flow emits. Repeated calls for
+     * the same stable ID return the same cached flow instance.
+     */
+    fun collectionIdsForBook(bookStableId: String): Flow<Set<Long>> =
+        collectionIdsCache.getOrPut(bookStableId) {
+            repository.getCollectionsForBook(bookStableId).map { collections ->
+                collections.mapTo(mutableSetOf()) { it.id }
+            }
+        }
+
     fun setSort(sort: LibrarySort) {
         if (_sort.value == sort) return
         _sort.value = sort
