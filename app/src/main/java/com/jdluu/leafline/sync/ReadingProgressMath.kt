@@ -32,4 +32,13 @@ object ReadingProgressMath {
         if (!value.isJsonPrimitive) return null
         return runCatching { value.asJsonPrimitive.asDouble }.getOrNull()
     }
+
+    /**
+     * Returns a display label like "42% read" derived from a locator JSON
+     * payload, or null when the locator is missing or invalid.
+     */
+    fun progressLabel(locatorJson: String?): String? {
+        val percent = percentageFromLocator(locatorJson) ?: return null
+        return "${Math.round(percent)}% read"
+    }
 }

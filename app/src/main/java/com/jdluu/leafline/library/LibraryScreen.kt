@@ -93,6 +93,7 @@ import com.jdluu.leafline.library.rescan.FolderRescanResult
 import com.jdluu.leafline.library.rescan.FolderRescanUiState
 import com.jdluu.leafline.library.rescan.FolderRescanViewModel
 import com.jdluu.leafline.library.rescan.RescanSummary
+import com.jdluu.leafline.sync.ReadingProgressMath
 import com.jdluu.leafline.theme.IconSize
 import com.jdluu.leafline.theme.Padding
 import com.jdluu.leafline.theme.Spacing
@@ -1102,10 +1103,21 @@ fun rememberCoverBitmap(path: String?): Bitmap? {
 
 @Composable
 private fun ContinueReadingTile(book: LibraryBook, onClick: () -> Unit) {
+    val progressFraction = ReadingProgressMath.percentageFromLocator(book.lastLocatorJson)
+        ?.div(ReadingProgressMath.FULL_PERCENT)
+        ?.coerceIn(0.0, 1.0)
+        ?.toFloat()
+    val progressLabel = ReadingProgressMath.progressLabel(book.lastLocatorJson)
+
     Card(
         modifier = Modifier
             .width(120.dp)
             .clickable(onClickLabel = "Continue reading", onClick = onClick)
+            .semantics {
+                if (progressLabel != null) {
+                    contentDescription = "${book.title}, $progressLabel"
+                }
+            }
     ) {
         Column {
             val bitmap = rememberCoverBitmap(book.coverPath)
@@ -1134,6 +1146,21 @@ private fun ContinueReadingTile(book: LibraryBook, onClick: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(horizontal = Spacing.xs)
             )
+            if (progressFraction != null && progressLabel != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                LinearProgressIndicator(
+                    progress = { progressFraction },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Spacing.xs)
+                )
+                Text(
+                    text = progressLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = Spacing.xs)
+                )
+            }
             Spacer(modifier = Modifier.height(4.dp))
         }
     }
