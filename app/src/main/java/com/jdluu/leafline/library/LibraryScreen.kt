@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Eco
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.AlertDialog
@@ -97,8 +98,10 @@ import kotlinx.coroutines.withContext
 @Composable
 fun LibraryScreen(
     viewModel: LibraryViewModel,
+    foldersViewModel: LibraryFolderViewModel? = null,
     onImportEpub: () -> Unit,
     onAddLibraryFolder: () -> Unit = {},
+    onReselectFolder: (String) -> Unit = {},
     onOpenBook: (LibraryBook) -> Unit
 ) {
     val books by viewModel.sortedBooks.collectAsStateWithLifecycle()
@@ -115,6 +118,7 @@ fun LibraryScreen(
     var collectionMenuExpanded by remember { mutableStateOf(false) }
     var detailSheetBook by remember { mutableStateOf<LibraryBook?>(null) }
     var showDeleteConfirm by remember { mutableStateOf<LibraryBook?>(null) }
+    var showFolderSheet by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -166,6 +170,15 @@ fun LibraryScreen(
                     Icon(
                         Icons.Default.CollectionsBookmark,
                         contentDescription = "Manage collections"
+                    )
+                }
+                IconButton(onClick = {
+                    foldersViewModel?.refresh()
+                    showFolderSheet = true
+                }) {
+                    Icon(
+                        Icons.Default.FolderOpen,
+                        contentDescription = "Manage folders"
                     )
                 }
             }
@@ -354,6 +367,17 @@ fun LibraryScreen(
             onDismiss = { showCollectionSheet = false },
             onCreate = { showCreateDialog = true },
             onDelete = { collection -> viewModel.deleteCollection(collection.id) }
+        )
+    }
+
+    // Folder management sheet
+    if (showFolderSheet && foldersViewModel != null) {
+        LibraryFoldersSheet(
+            folders = foldersViewModel.folders.collectAsStateWithLifecycle().value,
+            onDismiss = { showFolderSheet = false },
+            onAddFolder = { onAddLibraryFolder() },
+            onRemove = { uri -> foldersViewModel.remove(uri) },
+            onReselect = { uri -> onReselectFolder(uri) }
         )
     }
 
@@ -568,6 +592,117 @@ private fun CollectionManagementSheet(
                                 Icon(
                                     Icons.Default.Delete,
                                     contentDescription = "Delete ${collection.name}",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                        HorizontalDivider()
+                    }
+                }
+            }
+            Spacer(Modifier.height(Spacing.sm))
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LibraryFoldersSheet(
+    folders: List<LibraryFolder>,
+    onDismiss: () -> Unit,
+    onAddFolder: () -> Unit,
+    onRemove: (String) -> Unit,
+    onReselect: (String) -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(modifier = Modifier.padding(Padding.screen)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Saved folders",
+                    style = MaterialTheme.typography.titleLarge
+                )
+                TextButton(onClick = onAddFolder) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp) // touch-target-ok: decorative icon in button
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text("Add")
+                }
+            }
+            Text(
+                "Books in these local folders are available in your library.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = Spacing.xs)
+            )
+            Spacer(Modifier.height(Padding.compact))
+            if (folders.isEmpty()) {
+                Text(
+                    "No saved folders. Add a folder to import its EPUBs.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = Spacing.md)
+                )
+            } else {
+                LazyColumn {
+                    items(folders, key = { it.uri }) { folder ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = Spacing.xs),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.FolderOpen,
+                                contentDescription = null,
+                                tint = if (folder.accessible) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.error
+                                },
+                                modifier = Modifier.size(24.dp) // touch-target-ok: decorative icon in row
+                            )
+                            Spacer(Modifier.width(Padding.compact))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    folder.label ?: "Unnamed folder",
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                                Text(
+                                    if (folder.accessible) {
+                                        "Accessible"
+                                    } else {
+                                        "Permission lost, reselect to restore"
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (folder.accessible) {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    } else {
+                                        MaterialTheme.colorScheme.error
+                                    }
+                                )
+                            }
+                            if (!folder.accessible) {
+                                TextButton(onClick = { onReselect(folder.uri) }) {
+                                    Icon(
+                                        Icons.Default.Refresh,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp) // touch-target-ok: decorative icon in button
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Reselect")
+                                }
+                            }
+                            IconButton(onClick = { onRemove(folder.uri) }) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = "Remove ${folder.label ?: "folder"}",
                                     tint = MaterialTheme.colorScheme.error
                                 )
                             }
