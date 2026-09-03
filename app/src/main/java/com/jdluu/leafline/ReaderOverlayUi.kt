@@ -463,14 +463,7 @@ internal fun BrightnessControl(
                 )
                 Text(
                     text = "Brightness",
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier
-                        .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-                        .clickable(
-                            role = Role.Button,
-                            onClickLabel = "Reset brightness to system default",
-                            onClick = onReset
-                        )
+                    style = MaterialTheme.typography.labelLarge
                 )
                 Spacer(modifier = Modifier.weight(1f))
                 Text(
@@ -478,6 +471,14 @@ internal fun BrightnessControl(
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                TextButton(
+                    onClick = onReset,
+                    modifier = Modifier.semantics {
+                        contentDescription = "Reset brightness to system default"
+                    }
+                ) {
+                    Text("Reset")
+                }
             }
             Slider(
                 value = brightness ?: BRIGHTNESS_MAX,
