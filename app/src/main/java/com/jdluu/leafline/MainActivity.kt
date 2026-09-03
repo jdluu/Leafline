@@ -61,6 +61,9 @@ import com.jdluu.leafline.library.LibrarySortStore
 import com.jdluu.leafline.library.LibraryViewModelFactory
 import com.jdluu.leafline.library.SafFolderMetadata
 import com.jdluu.leafline.library.cover.EpubCoverLoader
+import com.jdluu.leafline.library.rescan.FolderRescanViewModel
+import com.jdluu.leafline.library.rescan.FolderRescanViewModelFactory
+import com.jdluu.leafline.library.rescan.createFolderRescanRunner
 import com.jdluu.leafline.sync.KoreaderSyncConfig
 import com.jdluu.leafline.sync.KoreaderSyncConfigStore
 import com.jdluu.leafline.sync.SyncWorker
@@ -232,6 +235,16 @@ fun LeaflineApp(activity: MainActivity) {
         )
     )
 
+    val folderRescanViewModel: FolderRescanViewModel = viewModel(
+        factory = FolderRescanViewModelFactory(
+            runner = createFolderRescanRunner(
+                context = activity,
+                importer = activity.appContainer.epubImporter,
+                repository = activity.appContainer.libraryRepository
+            )
+        )
+    )
+
     var selectedTab by remember { mutableIntStateOf(0) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val appearanceStore = remember { AppearanceStore.fromContext(context) }
@@ -337,6 +350,7 @@ fun LeaflineApp(activity: MainActivity) {
                     LeaflineTab.Library -> LibraryScreen(
                         viewModel = libraryViewModel,
                         foldersViewModel = libraryFolderViewModel,
+                        folderRescanViewModel = folderRescanViewModel,
                         onImportEpub = { importEpubLauncher.launch(arrayOf(MainActivity.EPUB_MIME_TYPE)) },
                         onAddLibraryFolder = { addLibraryFolderLauncher.launch(null) },
                         onReselectFolder = { uri ->

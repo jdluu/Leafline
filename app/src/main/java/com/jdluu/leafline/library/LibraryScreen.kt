@@ -55,10 +55,12 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -87,6 +89,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jdluu.leafline.LibraryViewModel
 import com.jdluu.leafline.library.ReadingStatus
 import com.jdluu.leafline.library.data.Collection
+import com.jdluu.leafline.library.rescan.FolderRescanResult
+import com.jdluu.leafline.library.rescan.FolderRescanUiState
+import com.jdluu.leafline.library.rescan.FolderRescanViewModel
+import com.jdluu.leafline.library.rescan.RescanSummary
 import com.jdluu.leafline.theme.IconSize
 import com.jdluu.leafline.theme.Padding
 import com.jdluu.leafline.theme.Spacing
@@ -99,6 +105,7 @@ import kotlinx.coroutines.withContext
 fun LibraryScreen(
     viewModel: LibraryViewModel,
     foldersViewModel: LibraryFolderViewModel? = null,
+    folderRescanViewModel: FolderRescanViewModel? = null,
     onImportEpub: () -> Unit,
     onAddLibraryFolder: () -> Unit = {},
     onReselectFolder: (String) -> Unit = {},
@@ -372,12 +379,21 @@ fun LibraryScreen(
 
     // Folder management sheet
     if (showFolderSheet && foldersViewModel != null) {
+        val rescanState by folderRescanViewModel?.state?.collectAsStateWithLifecycle()
+            ?: remember { mutableStateOf<FolderRescanUiState>(FolderRescanUiState.Idle) }
         LibraryFoldersSheet(
             folders = foldersViewModel.folders.collectAsStateWithLifecycle().value,
             onDismiss = { showFolderSheet = false },
             onAddFolder = { onAddLibraryFolder() },
             onRemove = { uri -> foldersViewModel.remove(uri) },
-            onReselect = { uri -> onReselectFolder(uri) }
+            onReselect = { uri -> onReselectFolder(uri) },
+            rescanState = rescanState,
+            onRescanAll = {
+                folderRescanViewModel?.rescanAll(
+                    foldersViewModel.folders.value.map { it.uri }
+                )
+            },
+            onRescanOne = { uri -> folderRescanViewModel?.rescanOne(uri) }
         )
     }
 
@@ -612,7 +628,10 @@ private fun LibraryFoldersSheet(
     onDismiss: () -> Unit,
     onAddFolder: () -> Unit,
     onRemove: (String) -> Unit,
-    onReselect: (String) -> Unit
+    onReselect: (String) -> Unit,
+    rescanState: FolderRescanUiState = FolderRescanUiState.Idle,
+    onRescanAll: () -> Unit = {},
+    onRescanOne: (String) -> Unit = {}
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(modifier = Modifier.padding(Padding.screen)) {
@@ -625,14 +644,29 @@ private fun LibraryFoldersSheet(
                     "Saved folders",
                     style = MaterialTheme.typography.titleLarge
                 )
-                TextButton(onClick = onAddFolder) {
-                    Icon(
-                        Icons.Default.Add,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp) // touch-target-ok: decorative icon in button
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Text("Add")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(
+                        onClick = onRescanAll,
+                        enabled = folders.isNotEmpty() &&
+                            rescanState !is FolderRescanUiState.Running
+                    ) {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = null,
+                            modifier = Modifier.size(IconSize.small) // touch-target-ok: decorative icon in button
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(if (rescanState is FolderRescanUiState.Running) "Rescanning…" else "Rescan")
+                    }
+                    TextButton(onClick = onAddFolder) {
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp) // touch-target-ok: decorative icon in button
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Add")
+                    }
                 }
             }
             Text(
@@ -642,6 +676,33 @@ private fun LibraryFoldersSheet(
                 modifier = Modifier.padding(top = Spacing.xs)
             )
             Spacer(Modifier.height(Padding.compact))
+            when (val state = rescanState) {
+                is FolderRescanUiState.Running -> {
+                    LinearProgressIndicator(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = Spacing.xs)
+                    )
+                    Text(
+                        "Rescanning saved folders…",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = Padding.compact)
+                    )
+                }
+                is FolderRescanUiState.Done -> {
+                    RescanSummaryRow(summary = state.summary)
+                }
+                is FolderRescanUiState.Error -> {
+                    Text(
+                        text = state.message.ifBlank { "Rescan failed unexpectedly" },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(bottom = Padding.compact)
+                    )
+                }
+                FolderRescanUiState.Idle -> {}
+            }
             if (folders.isEmpty()) {
                 Text(
                     "No saved folders. Add a folder to import its EPUBs.",
@@ -698,6 +759,19 @@ private fun LibraryFoldersSheet(
                                     Spacer(Modifier.width(4.dp))
                                     Text("Reselect")
                                 }
+                            } else {
+                                TextButton(
+                                    onClick = { onRescanOne(folder.uri) },
+                                    enabled = rescanState !is FolderRescanUiState.Running
+                                ) {
+                                    Icon(
+                                        Icons.Default.Refresh,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp) // touch-target-ok: decorative icon in button
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Rescan")
+                                }
                             }
                             IconButton(onClick = { onRemove(folder.uri) }) {
                                 Icon(
@@ -712,6 +786,63 @@ private fun LibraryFoldersSheet(
                 }
             }
             Spacer(Modifier.height(Spacing.sm))
+        }
+    }
+}
+
+/**
+ * Accessible summary of the most recent folder rescan, including per-folder
+ * failures.
+ */
+@Composable
+private fun RescanSummaryRow(
+    summary: RescanSummary
+) {
+    val totals = summary.totals
+    val total = totals.total
+    val failureCount = summary.folderResults.count { it is FolderRescanResult.Failed }
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = Padding.compact),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceVariant
+    ) {
+        Column(modifier = Modifier.padding(Padding.compact)) {
+            Text(
+                text = if (total == 0 && failureCount == 0) {
+                    "No EPUBs found to rescan"
+                } else {
+                    "Rescan complete: $total file(s)"
+                },
+                style = MaterialTheme.typography.titleSmall
+            )
+            if (total > 0 || failureCount > 0) {
+                Text(
+                    text = buildList {
+                        if (totals.added > 0) add("${totals.added} added")
+                        if (totals.updated > 0) add("${totals.updated} updated")
+                        if (totals.skipped > 0) add("${totals.skipped} unchanged")
+                        if (totals.failedFiles > 0) add("${totals.failedFiles} failed")
+                        if (failureCount > 0) add("${failureCount} folder(s) unreachable")
+                    }.joinToString(", "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (failureCount > 0) {
+                summary.folderResults.filterIsInstance<FolderRescanResult.Failed>()
+                    .forEach { failed ->
+                        Text(
+                            text = failed.reason.ifBlank { "Folder unreachable" },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(top = Spacing.xs)
+                        )
+                    }
+            }
         }
     }
 }
