@@ -435,10 +435,12 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
 
             setContentView(R.layout.activity_reader)
 
-            supportFragmentManager.commitNow {
-                add(R.id.navigator_container, EpubNavigatorFragment::class.java, null, NAVIGATOR_TAG)
+            val restoredNavigator = supportFragmentManager.findFragmentByTag(NAVIGATOR_TAG)
+            if (restoredNavigator == null) {
+                supportFragmentManager.commitNow {
+                    add(R.id.navigator_container, EpubNavigatorFragment::class.java, null, NAVIGATOR_TAG)
+                }
             }
-
             navigator = supportFragmentManager.findFragmentByTag(NAVIGATOR_TAG) as EpubNavigatorFragment
             tapZoneHandler = com.jdluu.leafline.reader.navigation.TapZoneHandler(
                 context = this,
@@ -567,8 +569,10 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     }
 
     override fun onDestroy() {
+        if (this::tapZoneHandler.isInitialized) {
+            navigator?.removeInputListener(tapZoneHandler.inputListener)
+        }
         super.onDestroy()
-        navigator?.removeInputListener(tapZoneHandler.inputListener)
     }
 
     private fun submitSearch(rawQuery: String) {
