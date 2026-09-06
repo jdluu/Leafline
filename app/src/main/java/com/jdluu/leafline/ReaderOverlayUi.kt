@@ -235,6 +235,7 @@ internal fun ReaderOverlay(
     onRestoreAnnotation: (Annotation) -> Unit,
     onEditAnnotation: (Annotation, String?) -> Unit,
     onChangeColor: (Annotation, HighlightTint) -> Unit,
+    onExportAnnotations: (List<Annotation>) -> Unit,
     onTocClick: (Link) -> Unit,
     onSettingsChange: (ReaderSettings) -> Unit,
     onBrightnessChange: (Float) -> Unit,
@@ -330,6 +331,7 @@ internal fun ReaderOverlay(
                     onRestoreAnnotation = onRestoreAnnotation,
                     onEditAnnotation = onEditAnnotation,
                     onChangeColor = onChangeColor,
+                    onExportAnnotations = onExportAnnotations,
                     onDismiss = onDismissHighlights
                 )
             }
@@ -733,6 +735,7 @@ internal fun AnnotationListSheet(
     onRestoreAnnotation: (Annotation) -> Unit,
     onEditAnnotation: (Annotation, String?) -> Unit,
     onChangeColor: (Annotation, HighlightTint) -> Unit,
+    onExportAnnotations: (List<Annotation>) -> Unit,
     onDismiss: () -> Unit,
     excerptFor: (Annotation) -> String = { annotationExcerpt(it) }
 ) {
@@ -761,6 +764,16 @@ internal fun AnnotationListSheet(
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(Padding.screen)
         )
+        if (annotations.isNotEmpty()) {
+            OutlinedButton(
+                onClick = { onExportAnnotations(annotations) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Padding.screen)
+            ) {
+                Text("Export highlights")
+            }
+        }
         if (annotations.isEmpty()) {
             Text(
                 "No highlights yet",

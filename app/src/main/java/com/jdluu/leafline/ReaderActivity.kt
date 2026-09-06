@@ -647,6 +647,17 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         }
     }
 
+    private fun exportAnnotations(selected: List<Annotation>, title: String) {
+        val content = com.jdluu.leafline.reader.annotations.AnnotationExportFormatter
+            .markdown(selected, ::annotationExcerpt)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/markdown"
+            putExtra(Intent.EXTRA_SUBJECT, "$title annotations")
+            putExtra(Intent.EXTRA_TEXT, content)
+        }
+        startActivity(Intent.createChooser(intent, "Export highlights"))
+    }
+
     private fun addReaderOverlay() {
         val composeView = ComposeView(this).apply {
             setContent {
@@ -697,6 +708,9 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     },
                     onChangeColor = { annotation, tint ->
                         annotationManager.updateColor(annotation, tint.hex)
+                    },
+                    onExportAnnotations = { selected ->
+                        exportAnnotations(selected, bookTitle.value)
                     },
                     onTocClick = { link ->
                         navigateToTocLink(link)
