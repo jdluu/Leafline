@@ -363,3 +363,10 @@ Use portable paths and generic server descriptions. Never document private
 hostnames, IP addresses, local filesystem layouts, or secrets. README.md stays
 user-facing; engineering notes belong here in AGENTS.md, never in committed
 planning documents.
+
+Keep repository documentation small and intentional: use `README.md` for
+user-facing information, this `AGENTS.md` for engineering rules and maintenance
+procedures, and `docs/design/BRAND.md` for the visual design contract. Do not add
+standalone process or planning documents when the information belongs in one of
+those three files. Temporary plans belong in the ignored `.hermes/plans/`
+directory.
