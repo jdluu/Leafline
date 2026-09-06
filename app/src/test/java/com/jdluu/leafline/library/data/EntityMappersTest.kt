@@ -3,6 +3,7 @@ package com.jdluu.leafline.library.data
 import com.jdluu.leafline.library.data.local.AnnotationEntity
 import com.jdluu.leafline.library.data.local.BookmarkEntity
 import com.jdluu.leafline.library.data.local.CollectionEntity
+import com.jdluu.leafline.library.data.local.ReadingSessionEntity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -113,5 +114,60 @@ class EntityMappersTest {
             Collection(id = 3L, name = "Favorites", createdAtEpochMillis = 20241010L),
             entity.toCollection()
         )
+    }
+
+    // -- ReadingSession --
+
+    @Test
+    fun `reading session maps all fields`() {
+        val entity = ReadingSessionEntity(
+            id = 10L,
+            bookId = "book-42",
+            startTimeEpochMillis = 1000L,
+            endTimeEpochMillis = 2000L,
+            activeDurationMillis = 500L,
+            startProgression = 0.1,
+            endProgression = 0.3,
+            startLocatorJson = """{"href":"/ch1.xhtml"}""",
+            endLocatorJson = """{"href":"/ch2.xhtml"}"""
+        )
+
+        val domain = entity.toReadingSession()
+        assertEquals(10L, domain.id)
+        assertEquals("book-42", domain.bookId)
+        assertEquals(1000L, domain.startTimeEpochMillis)
+        assertEquals(2000L, domain.endTimeEpochMillis)
+        assertEquals(500L, domain.activeDurationMillis)
+        assertEquals(0.1, domain.startProgression!!, 0.001)
+        assertEquals(0.3, domain.endProgression!!, 0.001)
+        assertEquals("""{"href":"/ch1.xhtml"}""", domain.startLocatorJson)
+        assertEquals("""{"href":"/ch2.xhtml"}""", domain.endLocatorJson)
+
+        val roundTripped = domain.toEntity()
+        assertEquals(entity, roundTripped)
+    }
+
+    @Test
+    fun `reading session maps nullable fields`() {
+        val entity = ReadingSessionEntity(
+            id = 11L,
+            bookId = "book-43",
+            startTimeEpochMillis = 1000L,
+            endTimeEpochMillis = 1500L,
+            activeDurationMillis = 500L,
+            startProgression = null,
+            endProgression = null,
+            startLocatorJson = null,
+            endLocatorJson = null
+        )
+
+        val domain = entity.toReadingSession()
+        assertNull(domain.startProgression)
+        assertNull(domain.endProgression)
+        assertNull(domain.startLocatorJson)
+        assertNull(domain.endLocatorJson)
+
+        val roundTripped = domain.toEntity()
+        assertEquals(entity, roundTripped)
     }
 }

@@ -3,6 +3,7 @@ package com.jdluu.leafline.library.data
 import com.jdluu.leafline.library.data.local.AnnotationEntity
 import com.jdluu.leafline.library.data.local.BookmarkEntity
 import com.jdluu.leafline.library.data.local.CollectionEntity
+import com.jdluu.leafline.library.data.local.ReadingSessionEntity
 
 fun BookmarkEntity.toBookmark(): Bookmark {
     return Bookmark(
@@ -30,5 +31,33 @@ fun CollectionEntity.toCollection(): Collection {
         id = id,
         name = name,
         createdAtEpochMillis = createdAtEpochMillis
+    )
+}
+
+fun ReadingSessionEntity.toReadingSession(): ReadingSession {
+    return ReadingSession(
+        id = id,
+        bookId = bookId,
+        startTimeEpochMillis = startTimeEpochMillis,
+        endTimeEpochMillis = endTimeEpochMillis,
+        activeDurationMillis = activeDurationMillis,
+        startProgression = startProgression,
+        endProgression = endProgression,
+        startLocatorJson = startLocatorJson,
+        endLocatorJson = endLocatorJson
+    )
+}
+
+fun ReadingSession.toEntity(): ReadingSessionEntity {
+    return ReadingSessionEntity(
+        id = id,
+        bookId = bookId,
+        startTimeEpochMillis = startTimeEpochMillis,
+        endTimeEpochMillis = endTimeEpochMillis,
+        activeDurationMillis = activeDurationMillis,
+        startProgression = startProgression,
+        endProgression = endProgression,
+        startLocatorJson = startLocatorJson,
+        endLocatorJson = endLocatorJson
     )
 }
