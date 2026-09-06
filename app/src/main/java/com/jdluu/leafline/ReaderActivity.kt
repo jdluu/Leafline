@@ -148,6 +148,7 @@ import com.jdluu.leafline.reader.search.BookSearchState
 import com.jdluu.leafline.reader.search.BookSearchStatus
 import com.jdluu.leafline.reader.search.BookSearcher
 import com.jdluu.leafline.reader.search.SearchDecorationPlanner
+import com.jdluu.leafline.reader.session.ReadingSessionRecorder
 import com.jdluu.leafline.reader.tapZoneAt
 import com.jdluu.leafline.reader.theme.toReadiumTheme
 import com.jdluu.leafline.reader.withStyleMode
@@ -270,6 +271,8 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     private val snackbarHostState = SnackbarHostState()
     private lateinit var tapZoneHandler: com.jdluu.leafline.reader.navigation.TapZoneHandler
     private lateinit var bookmarkManager: com.jdluu.leafline.reader.bookmarks.BookmarkManager
+    private lateinit var sessionRecorder: ReadingSessionRecorder
+    private var sessionRestored: Boolean = false
 
     @OptIn(ExperimentalReadiumApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -278,6 +281,13 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         annotationRepository = appContainer.annotationRepository
         libraryRepository = appContainer.libraryRepository
         readerPreferencesStore = ReaderPreferencesStore.fromContext(this)
+
+        sessionRecorder = ReadingSessionRecorder(
+            repository = appContainer.readingSessionRepository,
+            scope = lifecycleScope
+        )
+        lifecycle.addObserver(sessionRecorder)
+        sessionRestored = sessionRecorder.restoreState(savedInstanceState)
 
         val importedPath = intent?.getStringExtra(EXTRA_FILE_PATH)
         var epubFile: File? = null
@@ -458,10 +468,22 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             }
 
             bookStableId?.let { stableId ->
+                if (!sessionRestored) {
+                    val initialProg = initialLocator?.locations?.totalProgression
+                        ?: initialLocator?.locations?.progression
+                    sessionRecorder.startSession(
+                        bookId = stableId,
+                        initialLocatorJson = savedLocatorJson,
+                        initialProgression = initialProg
+                    )
+                }
                 lifecycleScope.launch {
                     navigator?.currentLocator?.collect { locator ->
                         val locatorJson = locator.toJSON().toString()
                         currentLocation.value = locator
+                        val progression = locator.locations.totalProgression
+                            ?: locator.locations.progression
+                        sessionRecorder.updateLocation(locatorJson, progression)
                         try {
                             libraryRepository.saveLastLocator(
                                 stableId,
@@ -568,9 +590,19 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         window.attributes = attributes
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        if (this::sessionRecorder.isInitialized) {
+            sessionRecorder.saveState(outState)
+        }
+    }
+
     override fun onDestroy() {
         if (this::tapZoneHandler.isInitialized) {
             navigator?.removeInputListener(tapZoneHandler.inputListener)
+        }
+        if (this::sessionRecorder.isInitialized && isFinishing) {
+            sessionRecorder.stopSession()
         }
         super.onDestroy()
     }
@@ -753,6 +785,9 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
 
     override fun onStop() {
         super.onStop()
+        if (this::sessionRecorder.isInitialized && isFinishing) {
+            sessionRecorder.stopSession()
+        }
         if (this::syncManager.isInitialized) {
             syncManager.pushProgressOnExit { book, progress ->
                 syncManager.showMarkFinishedDialog(book, progress)

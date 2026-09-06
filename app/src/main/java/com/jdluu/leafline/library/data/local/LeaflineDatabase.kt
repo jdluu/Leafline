@@ -14,9 +14,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         BookmarkEntity::class,
         AnnotationEntity::class,
         CollectionEntity::class,
-        BookCollectionCrossRef::class
+        BookCollectionCrossRef::class,
+        ReadingSessionEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -25,6 +26,7 @@ abstract class LeaflineDatabase : RoomDatabase() {
     abstract fun bookmarkDao(): BookmarkDao
     abstract fun annotationDao(): AnnotationDao
     abstract fun collectionDao(): CollectionDao
+    abstract fun readingSessionDao(): ReadingSessionDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -110,6 +112,31 @@ abstract class LeaflineDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `reading_sessions` (" +
+                        "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`bookId` TEXT NOT NULL, " +
+                        "`startTimeEpochMillis` INTEGER NOT NULL, " +
+                        "`endTimeEpochMillis` INTEGER NOT NULL, " +
+                        "`activeDurationMillis` INTEGER NOT NULL, " +
+                        "`startProgression` REAL, " +
+                        "`endProgression` REAL, " +
+                        "`startLocatorJson` TEXT, " +
+                        "`endLocatorJson` TEXT)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_reading_sessions_bookId` " +
+                        "ON `reading_sessions` (`bookId`)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_reading_sessions_startTimeEpochMillis` " +
+                        "ON `reading_sessions` (`startTimeEpochMillis`)"
+                )
+            }
+        }
+
         fun build(context: Context): LeaflineDatabase {
             return Room.databaseBuilder(
                 context.applicationContext,
@@ -123,7 +150,8 @@ abstract class LeaflineDatabase : RoomDatabase() {
                     MIGRATION_4_5,
                     MIGRATION_5_6,
                     MIGRATION_6_7,
-                    MIGRATION_7_8
+                    MIGRATION_7_8,
+                    MIGRATION_8_9
                 )
                 .build()
         }

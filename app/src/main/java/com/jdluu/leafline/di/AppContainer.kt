@@ -10,6 +10,8 @@ import com.jdluu.leafline.library.data.BookmarkRepository
 import com.jdluu.leafline.library.data.BookmarkRepositoryImpl
 import com.jdluu.leafline.library.data.LibraryRepository
 import com.jdluu.leafline.library.data.LibraryRepositoryImpl
+import com.jdluu.leafline.library.data.ReadingSessionRepository
+import com.jdluu.leafline.library.data.ReadingSessionRepositoryImpl
 import com.jdluu.leafline.library.data.local.LeaflineDatabase
 import com.jdluu.leafline.library.data.local.RoomBookDataSource
 import com.jdluu.leafline.sync.KoreaderSyncApi
@@ -33,6 +35,9 @@ class AppContainer(context: Context) {
 
     val annotationRepository: AnnotationRepository =
         AnnotationRepositoryImpl(database.annotationDao())
+
+    val readingSessionRepository: ReadingSessionRepository =
+        ReadingSessionRepositoryImpl(database.readingSessionDao())
 
     /**
      * Lazy like-for-like with the previous call-site construction: the OkHttp
