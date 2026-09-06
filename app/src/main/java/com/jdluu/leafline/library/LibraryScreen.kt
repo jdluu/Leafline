@@ -1,6 +1,5 @@
 package com.jdluu.leafline.library
 
-import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -931,10 +930,18 @@ private fun LibrarySortMenu(
     }
 }
 
+internal fun libraryGridColumnsForWidth(widthDp: Int): Int {
+    return when {
+        widthDp < 600 -> 2
+        widthDp < 840 -> 3
+        else -> 5
+    }
+}
+
 @Composable
 fun rememberLibraryGridColumns(): Int {
     val configuration = LocalConfiguration.current
-    return if (configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) 3 else 2
+    return libraryGridColumnsForWidth(configuration.screenWidthDp)
 }
 
 @OptIn(ExperimentalFoundationApi::class)
