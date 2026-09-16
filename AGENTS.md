@@ -370,3 +370,38 @@ procedures, and `docs/design/BRAND.md` for the visual design contract. Do not ad
 standalone process or planning documents when the information belongs in one of
 those three files. Temporary plans belong in the ignored `.hermes/plans/`
 directory.
+
+
+## GitHub board + token quirks (from the former leafline-github-workflow skill)
+
+# Leafline GitHub Workflow
+
+## When to Use
+
+Load this skill whenever creating branches/PRs/issues or managing the GitHub Project board for `jdluu/Leafline`.
+
+Repo: `jdluu/Leafline` (private). Board: "Leafline Development" — https://github.com/users/jdluu/projects/7 (project number 7, GraphQL ID `PVT_kwHOBPhPDc4BhPN8`, Status field `PVTSSF_lAHOBPhPDc4BhPN8zhgLrW4`, option Todo=`f75ad846`).
+
+## Conventions (also in AGENTS.md)
+- Conventional commits, no emojis/emdashes. Never push to `main` directly.
+- Branches: `feat/...`, `fix/...`, `chore/...`, `docs/...` → PR → squash-merge → delete branch.
+- Reference issue numbers in commits; "Closes #N" in PR body auto-closes.
+- README is user-facing only; engineering notes go in AGENTS.md. Never commit roadmap/planning docs.
+
+## Board management via gh CLI
+- `gh project item-list 7 --owner jdluu` fails with "unknown owner type" — use GraphQL instead:
+  `gh api graphql -f query='{ viewer { projectV2(number: 7) { ... } } }'`.
+- Add issue to board: get issue node id (`gh issue view N --json id -q .id`) then
+  mutation `addProjectV2ItemById(projectId, contentId)`; set status with
+  `updateProjectV2ItemFieldValue(... value:{singleSelectOptionId:"f75ad846"})`.
+- Pass complex variables via `gh api graphql --input file.json` (JSON payload), not `-f` string flags.
+
+## Auth / token pitfalls
+- `gh auth login --with-token` fails while `GH_TOKEN` env var is set ("value of GH_TOKEN is being used"). Prefix commands with `unset GH_TOKEN;` or edit `~/.config/gh/hosts.yml` oauth_token directly.
+- Fine-grained PATs CANNOT manage user-owned Projects v2 boards (only org projects) and return 401 unless the repo is explicitly in their access list. Use a **classic PAT with `repo` + `project` scopes** for this workflow.
+- The token lives in Bitwarden secret `GITHUB_TOKEN`. Fetch fresh with `bws secret list > /tmp/bws.json`; if bws errors "Doesn't contain a decryption key", delete stale state at `~/.config/bws/state/<uuid>` and retry. Hermes also caches secrets in `~/.hermes/cache/bws_cache.json` (stale until gateway restart).
+- Branch protection on private repos requires GitHub Pro — not enabled; convention-only rule instead.
+
+## Verification
+- Docs-only changes: `git diff --check` suffices; Android toolchain is NOT installed on this machine, so never claim builds passed.
+- After board edits, verify counts via GraphQL totalCount and fieldValues names.
