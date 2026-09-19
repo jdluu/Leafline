@@ -413,3 +413,15 @@ They were previously in `~/.hermes/skills/` (Hermes' global library), the wrong 
 - `docs/agent-references/android-reader-development/SKILL.md` — native Android ebook reader development (Compose, storage, sync); 26 references.
 - `docs/agent-references/library-client-integration/SKILL.md` — building the offline client against a book catalog server (OPDS/API shapes, caching, conflicts).
 - `docs/agent-references/native-android-design-systems/SKILL.md` — mapping a brand onto native Android Compose UI (tokens, type, motion, components).
+
+### Piloting notes (also moved out of the global skill library)
+
+`docs/agent-references/android-epub-piloting/` holds notes from driving a coding agent
+(OpenCode) on this repo's Android/EPUB work:
+
+- `leafline-android-epub-workflow.md` — evidence discipline; readium api recovery; real epub device test.
+- `android-epub-device-testing.md` — evidence sequence; repository hygiene; common interpretation.
+- `android-epub-and-persistence-verification.md` — readium api verification; real epub device test; autonomous evidence discipline.
+- `opencode-kotlin-api-recovery.md` — pattern; recovery procedure; prevention.
+- `kotlin-activity-extraction.md` — when to use; technique steps (one slice at a time); results from this session.
+- `android-baseline-profile-syntax.md` — correct class rules; what fails; diagnostic.
