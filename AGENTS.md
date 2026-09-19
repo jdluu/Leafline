@@ -405,3 +405,11 @@ Repo: `jdluu/Leafline` (private). Board: "Leafline Development" — https://gith
 ## Verification
 - Docs-only changes: `git diff --check` suffices; Android toolchain is NOT installed on this machine, so never claim builds passed.
 - After board edits, verify counts via GraphQL totalCount and fieldValues names.
+## Agent references (moved out of the global skill library)
+
+These describe *this* app, so they live here for any coding agent working in this repo.
+They were previously in `~/.hermes/skills/` (Hermes' global library), the wrong place for project-specific knowledge.
+
+- `docs/agent-references/android-reader-development/SKILL.md` — native Android ebook reader development (Compose, storage, sync); 26 references.
+- `docs/agent-references/library-client-integration/SKILL.md` — building the offline client against a book catalog server (OPDS/API shapes, caching, conflicts).
+- `docs/agent-references/native-android-design-systems/SKILL.md` — mapping a brand onto native Android Compose UI (tokens, type, motion, components).
