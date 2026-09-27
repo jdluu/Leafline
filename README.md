@@ -19,10 +19,15 @@ own server.
 
 ## Screenshots
 
-<p align="center">
-  <img src="docs/assets/screenshot-library.png" alt="Library view" width="280" />
-  <img src="docs/assets/screenshot-reader.png" alt="Reader view" width="280" />
-</p>
+**Your library** — imported EPUBs with cover thumbnails, reading-status filters,
+and collections:
+
+<img src="docs/assets/screenshot-library.png" alt="Leafline library showing imported books with cover thumbnails and reading-status filters" width="320" />
+
+**The reader** — paginated text with real typography: chapter headings, italics,
+and paragraph indents, with reading chrome out of the way:
+
+<img src="docs/assets/screenshot-reader.png" alt="Leafline reader showing chapter one of Pride and Prejudice" width="320" />
 
 ## Features
 
