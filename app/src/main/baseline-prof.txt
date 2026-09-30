@@ -19,7 +19,6 @@ Lcom/jdluu/leafline/reader/ReaderPreferencesStore/**
 Lcom/jdluu/leafline/sync/ProgressSyncer/**
 Lcom/jdluu/leafline/sync/KoreaderSyncClient/**
 Lcom/jdluu/leafline/sync/FileHashUtil/**
-Lcom/jdluu/leafline/opds/OpdsConfigStore/**
 Lcom/jdluu/leafline/theme/Theme/**
 Lcom/jdluu/leafline/theme/Color/**
 Lorg/readium/r2/streamer/PublicationOpener/**
