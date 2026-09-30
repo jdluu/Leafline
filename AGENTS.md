@@ -42,9 +42,11 @@ docs: document opds authentication boundary
   (https://github.com/users/jdluu/projects/7). Pick a Todo item from the board,
   move it to In Progress when starting, reference its number in commits
   (`feat: ... (#12)`), and let "Closes #N" in the PR description close it
-  automatically. Branch protection on `main` is not enabled because private
-  repos require GitHub Pro for that feature; discipline is convention-based:
-  never push directly to `main`.
+  automatically. Branch protection on `main` requires the three CI checks
+  (Build and unit test, Android lint, Quality guards) to pass with the branch up
+  to date, and blocks force-pushes and deletions. It requires no review, so a
+  solo maintainer can still merge their own pull requests; never push directly
+  to `main` remains the rule.
 - Roadmap items live as GitHub Issues labeled by phase
   (`phase-1-reading-polish` ... `phase-7-distribution`). Do not keep roadmap or
   planning documents inside the repository.
@@ -377,12 +379,12 @@ hostnames, IP addresses, local filesystem layouts, or secrets. README.md stays
 user-facing; engineering notes belong here in AGENTS.md, never in committed
 planning documents.
 
-Keep repository documentation small and intentional: use `README.md` for
-user-facing information, this `AGENTS.md` for engineering rules and maintenance
-procedures, and `docs/design/BRAND.md` for the visual design contract. Do not add
-standalone process or planning documents when the information belongs in one of
-those three files. Temporary plans belong in the ignored `.hermes/plans/`
-directory.
+Keep repository documentation small and intentional. There is no `docs/` tree:
+use `README.md` for user-facing information, this `AGENTS.md` for engineering
+rules, architecture, procedures, and everything a coding agent needs, and the
+top-level `DESIGN.md` for the visual design contract. Do not add standalone
+process or planning documents when the information belongs in one of those three
+files. Temporary plans belong in the ignored `.hermes/plans/` directory.
 
 
 ## GitHub board and workflow notes
@@ -396,8 +398,9 @@ for user-owned projects with "unknown owner type".
   `gh api graphql --input <payload>.json` rather than `-f` string flags.
 - Board access requires a token with repository and project scopes. Keep
   credentials in `gh`'s own configuration or a secret manager; never commit them.
-- Branch protection is available on public repositories; it is not currently
-  enabled, so the never-push-to-`main` rule stays convention-based.
+- Branch protection is enabled on `main`: the three CI checks must pass and the
+  branch must be up to date, and force-pushes and deletions are blocked. No
+  review is required. The never-push-to-`main` rule still stands as a habit.
 
 ## Verification
 
@@ -406,24 +409,251 @@ for user-owned projects with "unknown owner type".
   so run the applicable Gradle gate rather than assuming it is unavailable.
 - After board edits, verify counts via GraphQL totalCount and fieldValues names.
 
+## Consolidated engineering references
 
-## Agent references (moved out of the global skill library)
+These sections carry forward the durable engineering knowledge that previously
+lived under `docs/agent-references/`. They describe this repository only.
 
-These describe *this* app, so they live here for any coding agent working in this repo.
-They were previously in `~/.hermes/skills/` (Hermes' global library), the wrong place for project-specific knowledge.
+### Agent development workflow
 
-- `docs/agent-references/android-reader-development/SKILL.md` — native Android ebook reader development (Compose, storage, sync); 26 references.
-- `docs/agent-references/library-client-integration/SKILL.md` — building the offline client against a book catalog server (OPDS/API shapes, caching, conflicts).
-- `docs/agent-references/native-android-design-systems/SKILL.md` — mapping a brand onto native Android Compose UI (tokens, type, motion, components).
+- Work on a dedicated feature branch (`feat/...`, `fix/...`, `chore/...`,
+  `docs/...`, `refactor/...`) for every task and merge via pull request; never
+  push or commit directly to `main`.
+- Resolve credentials from the environment at process start and never write
+  them to disk, prompts, or logs.
+- Deliver changes in small, self-contained vertical slices across the affected
+  layers (Entity, DAO, DataSource, Repository, ViewModel, Screen, and
+  call-site wiring) with unit tests before starting the next slice.
+- When extracting responsibilities from a monolithic Activity exceeding 800
+  lines into focused manager classes:
+  - Create the manager class in the same package or a direct subpackage, and
+    pass Activity dependencies (navigator, repositories, lifecycle scope, UI
+    callbacks) as constructor-injected lambdas or providers rather than
+    retaining Activity references.
+  - Promote extracted private Activity functions and top-level constants to
+    internal visibility so callers within the module retain access.
+  - Verify each extraction slice independently with `./gradlew
+    :app:compileDebugKotlin` and `./gradlew :app:testDebugUnitTest` before
+    committing.
+- Ensure only one active worker or session modifies a repository working tree
+  at a time; if unexpected file modifications or deletions appear between
+  commands, stop immediately, identify the concurrent process, reconcile with
+  `git reset -q`, `git checkout -- .`, and `git clean -fd`, and verify before
+  proceeding.
+- When resuming work after an interrupted task, inspect `git status --short`
+  and `git diff` for partial work; either commit and build upon verified
+  partial work with an explicit file inventory, or cleanly discard uncommitted
+  changes before restarting.
+- Never recreate existing models or layers; search the codebase for existing
+  symbol definitions across packages to avoid creating competing duplicate
+  implementations.
+- Pre-stage external reference artifacts (such as unpacked dependency AARs for
+  `javap` inspection) inside the repository tree under `build/tmp/` rather
+  than attempting to access external or system directories.
+- Run the full verification suite before committing: `./gradlew
+  :app:testDebugUnitTest`, `./gradlew :app:lintDebug`, `./gradlew
+  :app:assembleDebug`, `bash scripts/check_dynamic_type.sh`, `bash
+  scripts/check_touch_targets.sh`, and `git diff --check`.
+- Stage only intended files explicitly (`git add <files>`), verifying that no
+  unrelated formatting churn or temporary build artifacts are included.
+- Delete merged remote branches promptly and reset local tracking branches
+  with `git fetch origin` and `git checkout main`.
 
-### Piloting notes (also moved out of the global skill library)
+### Android, Gradle, and Readium pitfalls
 
-`docs/agent-references/android-epub-piloting/` holds notes from driving a coding agent
-(OpenCode) on this repo's Android/EPUB work:
+- Treat AGP, Gradle wrapper, Kotlin, Compose compiler, and KSP versions as a
+  strictly coupled compatibility set; verify matching versions against
+  official release notes before upgrading.
+- Match the KSP plugin version to the exact Kotlin compiler release (e.g.
+  `<kotlinVersion>-<kspVersion>`); mismatched revisions fail plugin
+  resolution.
+- Set `android.disallowKotlinSourceSets=false` in `gradle.properties` when AGP
+  built-in Kotlin rejects KSP-generated source directory registration.
+- Maintain `baseline-prof.txt` with valid class rules using `L<class_name>/**`
+  syntax without flags; do not use `HSPL` flags on class rules because AGP
+  rejects them during release builds (`assembleRelease` validates profiles
+  whereas debug builds pass silently).
+- Treat `NO-SOURCE` in Gradle test output as absence of discovered tests
+  rather than behavioral test coverage.
+- Access Readium 3.3.0 publication metadata strictly through
+  `publication.metadata` (exposing `identifier`, `title`, `language.code`,
+  `description`, `published`, `authors`, `publishers`, `numberOfPages`); do
+  not rely on non-existent top-level publication convenience properties.
+- Annotate all Readium experimental API usage (including `EpubPreferences`,
+  `SearchIterator`, and search extensions) with
+  `@OptIn(ExperimentalReadiumApi::class)` on the enclosing class or function.
+- In Readium 3.3.0 `Theme`, use only `Theme.LIGHT`, `Theme.DARK`, or
+  `Theme.SEPIA`; there is no `Theme.AUTO` (null indicates following system
+  theme).
+- Handle EPUB fixed-layout cover pages separately from reflowable content:
+  cover pages are images unaffected by theme or typography preferences;
+  advance to body text before validating theme rendering.
+- When resolving local file paths from `context.filesDir`, use
+  `File.absolutePath` rather than `canonicalPath` for database lookups and
+  comparisons, because canonicalization resolves symlinks (such as
+  `/data/user/0` to `/data/data`) and causes string mismatch failures; use
+  `canonicalPath` solely for directory-traversal security boundaries.
+- Watch for Kotlin type argument mismatches: `String.trim()` expects `Char`
+  arguments (e.g. `trim('.', '_')`), not String parameters.
+- Verify abstract listener implementations when implementing Readium
+  interfaces (such as `EpubNavigatorFragment.Listener`), ensuring required
+  methods like `onExternalLinkActivated(url: AbsoluteUrl)` are implemented.
 
-- `leafline-android-epub-workflow.md` — evidence discipline; readium api recovery; real epub device test.
-- `android-epub-device-testing.md` — evidence sequence; repository hygiene; common interpretation.
-- `android-epub-and-persistence-verification.md` — readium api verification; real epub device test; autonomous evidence discipline.
-- `opencode-kotlin-api-recovery.md` — pattern; recovery procedure; prevention.
-- `kotlin-activity-extraction.md` — when to use; technique steps (one slice at a time); results from this session.
-- `android-baseline-profile-syntax.md` — correct class rules; what fails; diagnostic.
+### Reader UI and Compose patterns
+
+- When embedding Compose UI controls over Readium's `EpubNavigatorFragment`,
+  attach a `ComposeView` via `addContentView` with full-parent layout
+  parameters so overlays sit directly over the navigator fragment.
+- Keep product-shell appearance settings (Material 3 colors, system theme
+  mode) strictly separate from book-content EPUB preferences (Readium theme,
+  font family, margins, line height).
+- For Table of Contents rendering, flatten the recursive
+  `publication.tableOfContents: List<Link>` tree into a flat list of `(Link,
+  depth)` pairs for display in a `ModalNavigationDrawer`, and navigate via
+  `navigator.go(link, animated = false)`.
+- For in-book search:
+  - Obtain the search iterator via `publication.search(query)` extension
+    (null-checking for non-searchable publications) and execute search
+    iterations (`iterator.next()`) asynchronously on `Dispatchers.IO`.
+  - Validate `coroutineContext.isActive` before publishing search result
+    batches to avoid overwriting newer results with stale coroutine emissions.
+  - Normalize search queries by trimming and collapsing whitespace, and
+    debounce text field input (e.g. 300ms) before initiating search.
+  - Map each `Locator` result to UI models containing excerpt before, match
+    highlight, excerpt after, and serialize `locator.toJSON().toString()` to
+    allow restoring navigation positions via `Locator.fromJSON`.
+- In book lists and shelves, use `Modifier.combinedClickable` (with
+  `@OptIn(ExperimentalFoundationApi::class)`) to support both tap (open book)
+  and long-press (open details sheet), providing explicit `onClickLabel` and
+  `onLongClickLabel` accessibility descriptions.
+- Use `ModalBottomSheet` for multi-section content, rich metadata, and action
+  groups (such as book details, search, or collection management); use
+  `AlertDialog` strictly for single confirmations (such as delete
+  confirmation).
+- In library and settings screens, use `FilterChip` within `LazyRow` (spaced
+  by 8dp) for horizontally scrollable filter rows.
+- Ensure all interactive controls maintain a minimum touch target size of
+  48dp; distinguish between decorative icon sizes and enclosing interactive
+  target bounds.
+- Provide accessible alternatives (such as buttons or custom accessibility
+  actions) for any swipe-to-dismiss gestures.
+- Use `NonCancellable` coroutine context when pushing progress or saving state
+  during activity stop/pause to ensure operations complete during teardown.
+
+### Room and persistence patterns
+
+- Keep domain models (e.g. `LibraryBook`) and mappers completely independent
+  of Room annotations; isolate `@Entity`, `@Dao`, `@Database`, and
+  `@TypeConverter` classes in a dedicated local data package with explicit
+  bidirectional domain-entity converters.
+- Derive stable book identity from trimmed non-blank `metadata.identifier`,
+  falling back to the SHA-256 file content hash.
+- Configure the Room compiler through KSP
+  (`ksp("androidx.room:room-compiler:...")`), never through
+  `annotationProcessor`.
+- Execute schema changes through incremental migrations (`val MIGRATION_N_N+1
+  = object : Migration(N, N + 1)`); never use
+  `fallbackToDestructiveMigration()`.
+- Increment database version by exactly one per migration, update
+  `@Database(version = ...)`, and register every migration in
+  `.addMigrations(...)`.
+- When adding columns to existing tables via `ALTER TABLE ADD COLUMN`, specify
+  SQLite types (`TEXT`, `INTEGER`, `REAL`), include `NOT NULL DEFAULT
+  <value>`, and never use unsupported SQLite types like `BOOLEAN` (use
+  `INTEGER` with 0/1).
+- Use `INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL` for auto-generated integer
+  keys, and define explicit compound primary keys (`PRIMARY KEY(colA, colB)`)
+  and reverse-lookup indexes on junction tables.
+- For list-valued entity fields (such as book authors), implement explicit
+  `TypeConverter` methods handling JSON serialization, and safely guard empty
+  string inputs in deserializers to return empty lists.
+- Verify in-memory database DAOs with tests covering upsert
+  (`@Insert(onConflict = REPLACE)`), lookup by stable identifier and hash,
+  ordering, non-ASCII/escaping round-trips, and Flow re-emission on database
+  mutation.
+
+### Instrumented testing and on-device verification
+
+- Use camelCase method names without spaces for instrumented test methods in
+  `src/androidTest`; DEX bytecode prior to DEX 040 rejects spaces in test
+  method names.
+- When reading test fixtures in `src/androidTest/assets/`, access them via
+  `InstrumentationRegistry.getInstrumentation().context.assets.open(...)` (the
+  test APK context), not `targetContext.assets` (the app under test APK); copy
+  fixtures to `targetContext.filesDir` when the code under test requires a
+  filesystem path.
+- In JUnit 4 instrumented tests, write `@Before fun setUp()` with a block body
+  containing `runBlocking { ... }` rather than an expression body (`=
+  runBlocking { ... }`), because JUnit 4 requires `setUp()` to return `void`.
+- Execute warm-up queries before timing database performance in benchmarks, as
+  cold first queries take substantially longer than steady-state execution.
+- When running `./gradlew :app:connectedDebugAndroidTest`, run one test class
+  at a time (`-Pandroid.testInstrumentationRunnerArguments.class=...`) if
+  multiple devices or emulators are connected to prevent parallel execution
+  interference and UI flakes.
+- When using `adb` with multiple connected devices, pin the target device
+  serial via `adb -s <serial>` on every command.
+- Inspect visible UI on device using `adb shell uiautomator dump
+  /sdcard/ui.xml` and parse bounds/labels for coordinate-based actions;
+  remember that Readium's navigator renders inside a `WebView` which obscures
+  child Compose overlay nodes in UIAutomator dumps, requiring screenshots
+  (`adb exec-out screencap -p`) for overlay verification.
+- When verifying theme and layout changes visually, navigate past the cover
+  page to a reflowable text chapter before capturing screenshots.
+- Use temporary test EPUB fixtures pushed to device storage without committing
+  them to the repository; trigger `MEDIA_SCANNER_SCAN_FILE` if the system
+  document picker does not list pushed files immediately, and navigate to the
+  root in the file picker if Recent is empty.
+- Triage crashes by clearing logcat (`adb logcat -c`) before reproducing the
+  issue and inspecting `adb logcat -d | grep -E
+  "FATAL|com.jdluu.leafline.*Exception"`.
+- Measure cold-start time using `adb shell am start -W -n <component>` across
+  multiple runs on release/R8 builds; avoid drawing optimization conclusions
+  from JIT-dominated debug builds.
+
+### Design system maintenance
+
+- Maintain a single Material 3 semantic token system applied consistently
+  across all product-shell surfaces (library, settings, dialogs, sheets,
+  navigation, reader overlay).
+- Persist product-shell appearance modes (e.g. Light, Dark, System)
+  independently from per-book reader preferences, and fall back safely to
+  System when encountering unknown stored values.
+- Retain the fixed product palette in System mode; do not allow dynamic
+  wallpaper colors to silently replace product branding unless explicitly
+  configured.
+- Verify that every interactive control maintains a minimum 48dp touch target,
+  and run `bash scripts/check_touch_targets.sh` to prevent target-size
+  regressions.
+- Ensure all text elements use `MaterialTheme.typography` sp-based styles and
+  run `bash scripts/check_dynamic_type.sh` to ensure font-scale compliance up
+  to 200%.
+- Maintain WCAG AA contrast compliance across all themes, verifying body text
+  meets 4.5:1 and UI/large text meets 3.0:1 (including highlight tints against
+  light, dark, and sepia reader backgrounds).
+- For repository screenshots, capture one library screen and one reader screen
+  displaying readable body text from an open EPUB; validate PNG format and
+  dimensions, and update existing documentation image paths directly.
+
+### Public artifact hygiene
+
+- Keep `README.md` strictly user-facing (features, requirements, build
+  instructions, user setup); place engineering rules, architecture decisions,
+  and procedures in `AGENTS.md`.
+- Never commit internal development plans, session transcripts, spike notes,
+  roadmaps, or temporary files to the repository; track work as GitHub Issues
+  and project board items.
+- Keep public artifacts (issues, PR titles and descriptions, commit messages,
+  branch names, code comments, documentation) strictly professional and free
+  of internal agent identities, model names, orchestration prompts, or private
+  session details.
+- Never commit credentials, tokens, secret names, private network addresses,
+  hostnames, signing keys, `local.properties`, build directories, or generated
+  APKs.
+- Follow conventional commit conventions without emojis or emdashes (`feat:
+  ...`, `fix: ...`, `chore: ...`, `docs: ...`, `refactor: ...`), and reference
+  tracking issues using `Closes #N` in PR descriptions.
+- Keep external test EPUB fixtures outside the repository or clean them up
+  immediately after test verification.
+- Always run `git diff --check` and verify clean working tree status before
+  concluding tasks.
