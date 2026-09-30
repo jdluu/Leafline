@@ -9,9 +9,7 @@
 Leafline is a free, open-source EPUB reader for Android. It keeps your books,
 highlights, and reading progress entirely on your device. The name refers to
 both the leaves of a book and a continuous reading line across devices.
-For fetching books from OPDS library servers, see
-[ShelfSync](https://github.com/jdluu/ShelfSync), a companion sync client that
-downloads and hands off EPUBs to any local reader, Leafline included.
+It opens EPUB files already on your device.
 
 Leafline collects no analytics, crash reports, or usage data. Everything stays
 on your device except the progress sync you configure yourself against your
