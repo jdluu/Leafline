@@ -19,9 +19,14 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Settings
@@ -465,7 +470,7 @@ private val ThemeMode.description: String
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun KoreaderSyncSection(modifier: Modifier = Modifier) {
+internal fun KoreaderSyncSection(modifier: Modifier = Modifier) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
     var serverUrl by remember { mutableStateOf(KoreaderSyncConfigStore.config?.serverUrl ?: "") }
@@ -505,7 +510,28 @@ private fun KoreaderSyncSection(modifier: Modifier = Modifier) {
         )
         Row(
             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().padding(top = Spacing.xs)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = Spacing.xs)
+                .toggleable(
+                    value = enabled,
+                    role = Role.Switch,
+                    onValueChange = { checked ->
+                        enabled = checked
+                        val base = KoreaderSyncConfigStore.config ?: KoreaderSyncConfig(
+                            serverUrl = serverUrl.trim(),
+                            username = syncUsername.trim(),
+                            password = syncPassword,
+                            enabled = false
+                        )
+                        KoreaderSyncConfigStore.config = base.copy(enabled = checked)
+                        if (checked) {
+                            SyncWorker.schedule(context)
+                        } else {
+                            SyncWorker.cancel(context)
+                        }
+                    }
+                )
         ) {
             Text(
                 "Enable progress sync",
@@ -514,21 +540,7 @@ private fun KoreaderSyncSection(modifier: Modifier = Modifier) {
             )
             Switch(
                 checked = enabled,
-                onCheckedChange = { checked ->
-                    enabled = checked
-                    val base = KoreaderSyncConfigStore.config ?: KoreaderSyncConfig(
-                        serverUrl = serverUrl.trim(),
-                        username = syncUsername.trim(),
-                        password = syncPassword,
-                        enabled = false
-                    )
-                    KoreaderSyncConfigStore.config = base.copy(enabled = checked)
-                    if (checked) {
-                        SyncWorker.schedule(context)
-                    } else {
-                        SyncWorker.cancel(context)
-                    }
-                }
+                onCheckedChange = null
             )
         }
         Row(modifier = Modifier.padding(top = Spacing.sm)) {
@@ -572,7 +584,9 @@ private fun KoreaderSyncSection(modifier: Modifier = Modifier) {
                     message == "Saved." -> MaterialTheme.colorScheme.onSurfaceVariant
                     else -> MaterialTheme.colorScheme.error
                 },
-                modifier = Modifier.padding(top = Spacing.xs)
+                modifier = Modifier
+                    .padding(top = Spacing.xs)
+                    .semantics { liveRegion = LiveRegionMode.Polite }
             )
         }
         Text(
