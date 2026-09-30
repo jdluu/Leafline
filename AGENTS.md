@@ -76,7 +76,7 @@ Never do:
 
 - Commit to `main`. Open a pull request. Branch protection requires the `Build and unit test`, `Android lint`, and `Quality guards` checks and blocks force-push.
 - Commit credentials, tokens, signing keys, `local.properties`, `.env*`, APKs, or build output.
-- Implement OPDS browsing or downloading, host a server, or act as a Calibre replacement. Catalog acquisition belongs to ShelfSync.
+- Implement OPDS catalog browsing or downloading, host a server, or act as a Calibre replacement. Leafline opens EPUB files already on the device.
 - Write a new EPUB parser or renderer. Use the Readium Kotlin Toolkit.
 - Edit anything under `app/build/`, `build/`, or `.gradle/`.
 - Let a test reach the live network.
