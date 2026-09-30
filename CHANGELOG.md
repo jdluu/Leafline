@@ -21,6 +21,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-The project is pre-release and no versions have been published yet. Development
-and release preparation continue through the normal issue and pull request
-workflow.
+## [0.0.1] - 2026-09-29
+
+First public pre-release.
+
+- EPUB 2 and EPUB 3 reading via the Readium Kotlin Toolkit, in paginated or
+  continuous-scroll mode, with configurable tap zones, page-turn animation, and
+  reduced-motion awareness.
+- Publisher and custom typography: font stacks (including OpenDyslexic and
+  Accessible DfA), line height, margins, themes, and per-book brightness.
+- Text-to-speech reading mode with synchronized progression.
+- On-device import of local EPUBs (single and bulk) plus saved-folder scanning
+  and rescans, collections, reading-status flags, a continue-reading shelf,
+  sorting, and search.
+- Bookmarks, multi-color highlights with editable notes, full-text in-book
+  search, and annotation export to Markdown.
+- KOReader-compatible progress sync with background sync and conflict handling.
+- Accessibility: TalkBack labels and announcements, dynamic type to 200%,
+  48dp touch targets, WCAG AA contrast, and reduced-motion support.
+- No analytics, crash reporting, or telemetry.
+
+Requires Android 8.0 (API 26) or newer.
