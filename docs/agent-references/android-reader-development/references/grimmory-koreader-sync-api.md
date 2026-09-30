@@ -150,7 +150,7 @@ fun isRemoteNewer(remote: KoreaderRemoteProgress, localMs: Long?, localPercentag
 ### Settings UI
 
 Settings screen section "KOReader Sync":
-- Server URL text field (e.g. `http://192.168.1.100:6061/api/koreader`)
+- Server URL text field (e.g. `http://<server-host>:<port>/api/koreader`)
 - Username and password fields
 - Enable toggle
 - "Test connection" button (calls `auth()`, shows result)

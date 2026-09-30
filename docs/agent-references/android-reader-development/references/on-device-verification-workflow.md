@@ -83,7 +83,7 @@ for m in re.finditer(r'<node[^>]*?(?:text|content-desc)=\"([^\"]+)\"[^>]*?bounds
   `res/xml/network_security_config.xml` with `cleartextTrafficPermitted="true"`
   registered via `android:networkSecurityConfig` in the manifest.
 - Ping success does NOT imply TCP reachability. The dev VM could ping
-  192.168.1.100 but TCP 6061 timed out from both VM and phone (different subnets,
+  the server host but the KOReader port timed out from both VM and phone (different subnets,
   firewall). Test the actual port from the same network segment as the client.
 
 ## Cold-start measurement (#26 pattern)

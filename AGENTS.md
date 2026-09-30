@@ -296,9 +296,8 @@ clients or manipulate EPUB archives directly.
 
 ### Release builds
 
-The project is pre-release and no versions are published yet. Release builds
-remain available for local validation and will be cut when the release
-criteria are met:
+Releases are cut from `main` and tagged `v<versionName>`; the first published
+pre-release is `v0.0.1`. Signing setup:
 
 - Generate a release keystore once and keep credentials in
   `~/.gradle/gradle.properties` (never in the repo):
@@ -318,7 +317,8 @@ LEAFLINE_KEY_PASSWORD=...
 
 ### Current delivery status
 
-Leafline is actively developed toward its first public release. New features,
+Leafline has published its first public pre-release (`v0.0.1`) and continues
+active development. New features,
 bug fixes, refactoring, accessibility work, performance work, dependency
 updates, tests, and documentation are all considered through the normal
 issue, branch, pull request, and CI workflow. The product boundaries above
@@ -385,39 +385,28 @@ those three files. Temporary plans belong in the ignored `.hermes/plans/`
 directory.
 
 
-## GitHub board + token quirks (from the former leafline-github-workflow skill)
+## GitHub board and workflow notes
 
-# Leafline GitHub Workflow
+Work is tracked on the "Leafline Development" project board (user project number
+7). Board operations need GraphQL; `gh project item-list 7 --owner jdluu` fails
+for user-owned projects with "unknown owner type".
 
-## When to Use
-
-Load this skill whenever creating branches/PRs/issues or managing the GitHub Project board for `jdluu/Leafline`.
-
-Repo: `jdluu/Leafline` (private). Board: "Leafline Development" — https://github.com/users/jdluu/projects/7 (project number 7, GraphQL ID `PVT_kwHOBPhPDc4BhPN8`, Status field `PVTSSF_lAHOBPhPDc4BhPN8zhgLrW4`, option Todo=`f75ad846`).
-
-## Conventions (also in AGENTS.md)
-- Conventional commits, no emojis/emdashes. Never push to `main` directly.
-- Branches: `feat/...`, `fix/...`, `chore/...`, `docs/...` → PR → squash-merge → delete branch.
-- Reference issue numbers in commits; "Closes #N" in PR body auto-closes.
-- README is user-facing only; engineering notes go in AGENTS.md. Never commit roadmap/planning docs.
-
-## Board management via gh CLI
-- `gh project item-list 7 --owner jdluu` fails with "unknown owner type" — use GraphQL instead:
-  `gh api graphql -f query='{ viewer { projectV2(number: 7) { ... } } }'`.
-- Add issue to board: get issue node id (`gh issue view N --json id -q .id`) then
-  mutation `addProjectV2ItemById(projectId, contentId)`; set status with
-  `updateProjectV2ItemFieldValue(... value:{singleSelectOptionId:"f75ad846"})`.
-- Pass complex variables via `gh api graphql --input file.json` (JSON payload), not `-f` string flags.
-
-## Auth / token pitfalls
-- `gh auth login --with-token` fails while `GH_TOKEN` env var is set ("value of GH_TOKEN is being used"). Prefix commands with `unset GH_TOKEN;` or edit `~/.config/gh/hosts.yml` oauth_token directly.
-- Fine-grained PATs CANNOT manage user-owned Projects v2 boards (only org projects) and return 401 unless the repo is explicitly in their access list. Use a **classic PAT with `repo` + `project` scopes** for this workflow.
-- The token lives in Bitwarden secret `GITHUB_TOKEN`. Fetch fresh with `bws secret list > /tmp/bws.json`; if bws errors "Doesn't contain a decryption key", delete stale state at `~/.config/bws/state/<uuid>` and retry. Hermes also caches secrets in `~/.hermes/cache/bws_cache.json` (stale until gateway restart).
-- Branch protection on private repos requires GitHub Pro — not enabled; convention-only rule instead.
+- Add an issue to the board with `addProjectV2ItemById`, then set Status with
+  `updateProjectV2ItemFieldValue`. Pass complex variables via
+  `gh api graphql --input <payload>.json` rather than `-f` string flags.
+- Board access requires a token with repository and project scopes. Keep
+  credentials in `gh`'s own configuration or a secret manager; never commit them.
+- Branch protection is available on public repositories; it is not currently
+  enabled, so the never-push-to-`main` rule stays convention-based.
 
 ## Verification
-- Docs-only changes: `git diff --check` suffices; Android toolchain is NOT installed on this machine, so never claim builds passed.
+
+- Docs-only changes: `git diff --check` suffices.
+- The Android toolchain is installed on the development machine (`ANDROID_HOME`),
+  so run the applicable Gradle gate rather than assuming it is unavailable.
 - After board edits, verify counts via GraphQL totalCount and fieldValues names.
+
+
 ## Agent references (moved out of the global skill library)
 
 These describe *this* app, so they live here for any coding agent working in this repo.
