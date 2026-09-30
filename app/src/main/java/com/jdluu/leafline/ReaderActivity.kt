@@ -236,9 +236,12 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         private const val TTS_UTTERANCE_DECORATION_ID = "tts-utterance"
         private val TTS_UTTERANCE_TINT = 0x55E65100.toInt()
 
-        fun newIntent(context: Context, filePath: String): Intent {
+        const val EXTRA_SHOW_TOOLBAR = "extra_show_toolbar"
+
+        fun newIntent(context: Context, filePath: String, showToolbar: Boolean = false): Intent {
             return Intent(context, ReaderActivity::class.java).apply {
                 putExtra(EXTRA_FILE_PATH, filePath)
+                putExtra(EXTRA_SHOW_TOOLBAR, showToolbar)
             }
         }
     }
@@ -286,6 +289,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     private var bookmarks = mutableStateOf<List<Bookmark>>(emptyList())
     private var annotations = mutableStateOf<List<Annotation>>(emptyList())
     private var currentLocation = mutableStateOf<Locator?>(null)
+    private var pageAnnouncement = mutableStateOf<String?>(null)
     @Volatile
     private var activeSearchResultId: Int? = null
     private val snackbarHostState = SnackbarHostState()
@@ -308,6 +312,10 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         )
         lifecycle.addObserver(sessionRecorder)
         sessionRestored = sessionRecorder.restoreState(savedInstanceState)
+
+        if (intent?.getBooleanExtra(EXTRA_SHOW_TOOLBAR, false) == true) {
+            toolbarVisible.value = true
+        }
 
         val importedPath = intent?.getStringExtra(EXTRA_FILE_PATH)
         var epubFile: File? = null
@@ -493,7 +501,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                 navigatorProvider = { navigator },
                 settingsProvider = { settingsController.settings.value },
                 onToggleMenu = { toolbarVisible.value = !toolbarVisible.value },
-                onAnnouncement = {}
+                onAnnouncement = { announcement -> pageAnnouncement.value = announcement }
             )
             navigator?.addInputListener(tapZoneHandler.inputListener)
             lifecycleScope.launch {
@@ -754,7 +762,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     highlightsSheetVisible = highlightsSheetVisible.value,
                     searchSheetVisible = searchSheetVisible.value,
                     searchState = searchState,
-                    pageAnnouncement = tapZoneHandler.announcement,
+                    pageAnnouncement = pageAnnouncement.value,
                     snackbarHostState = snackbarHostState,
                     syncConflict = syncConflict,
                     onJumpToRemote = { syncConflict?.onJump?.invoke(); syncConflictState.value = null },

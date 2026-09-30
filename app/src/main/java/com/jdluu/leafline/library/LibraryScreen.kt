@@ -78,7 +78,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -196,7 +198,8 @@ fun LibraryScreen(
                 onValueChange = viewModel::setQuery,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = Padding.screen, vertical = 4.dp),
+                    .padding(horizontal = Padding.screen, vertical = 4.dp)
+                    .semantics { contentDescription = "Search title or author" },
                 placeholder = { Text("Search title or author") },
                 singleLine = true,
                 trailingIcon = {
@@ -222,7 +225,8 @@ fun LibraryScreen(
                     FilterChip(
                         selected = selectedCollection == null,
                         onClick = { viewModel.selectCollection(null) },
-                        label = { Text("All") }
+                        label = { Text("All") },
+                        modifier = Modifier.semantics { contentDescription = "All collections" }
                     )
                 }
                 items(collections) { collection ->
@@ -234,7 +238,7 @@ fun LibraryScreen(
                             {
                                 Icon(
                                     Icons.Default.Close,
-                                    contentDescription = "Clear filter",
+                                    contentDescription = null,
                                     modifier = Modifier.size(16.dp) // touch-target-ok: decorative chip icon
                                 )
                             }
@@ -253,7 +257,8 @@ fun LibraryScreen(
                 FilterChip(
                     selected = readingStatusFilter == null,
                     onClick = { viewModel.setReadingStatusFilter(null) },
-                    label = { Text("All") }
+                    label = { Text("All") },
+                    modifier = Modifier.semantics { contentDescription = "All reading statuses" }
                 )
             }
             ReadingStatus.entries.forEach { status ->
@@ -683,32 +688,36 @@ private fun LibraryFoldersSheet(
                 modifier = Modifier.padding(top = Spacing.xs)
             )
             Spacer(Modifier.height(Padding.compact))
-            when (val state = rescanState) {
-                is FolderRescanUiState.Running -> {
-                    LinearProgressIndicator(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = Spacing.xs)
-                    )
-                    Text(
-                        "Rescanning saved folders…",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = Padding.compact)
-                    )
+            Box(modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }) {
+                when (val state = rescanState) {
+                    is FolderRescanUiState.Running -> {
+                        Column {
+                            LinearProgressIndicator(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = Spacing.xs)
+                            )
+                            Text(
+                                "Rescanning saved folders…",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(bottom = Padding.compact)
+                            )
+                        }
+                    }
+                    is FolderRescanUiState.Done -> {
+                        RescanSummaryRow(summary = state.summary)
+                    }
+                    is FolderRescanUiState.Error -> {
+                        Text(
+                            text = state.message.ifBlank { "Rescan failed unexpectedly" },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(bottom = Padding.compact)
+                        )
+                    }
+                    FolderRescanUiState.Idle -> {}
                 }
-                is FolderRescanUiState.Done -> {
-                    RescanSummaryRow(summary = state.summary)
-                }
-                is FolderRescanUiState.Error -> {
-                    Text(
-                        text = state.message.ifBlank { "Rescan failed unexpectedly" },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(bottom = Padding.compact)
-                    )
-                }
-                FolderRescanUiState.Idle -> {}
             }
             if (folders.isEmpty()) {
                 Text(
@@ -977,7 +986,7 @@ fun BookGridTile(
                 if (bitmap != null) {
                     Image(
                         bitmap = bitmap.asImageBitmap(),
-                        contentDescription = book.title,
+                        contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
                     )
@@ -1031,7 +1040,7 @@ fun BookGridTile(
                     ) {
                         Icon(
                             Icons.Default.CollectionsBookmark,
-                            contentDescription = "Collections",
+                            contentDescription = "Collections for ${book.title}",
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(18.dp) // touch-target-ok: decorative glyph inside icon button
                         )
@@ -1120,7 +1129,7 @@ private fun ContinueReadingTile(book: LibraryBook, onClick: () -> Unit) {
         modifier = Modifier
             .width(120.dp)
             .clickable(onClickLabel = "Continue reading", onClick = onClick)
-            .semantics {
+            .semantics(mergeDescendants = true) {
                 if (progressLabel != null) {
                     contentDescription = "${book.title}, $progressLabel"
                 }
@@ -1137,7 +1146,7 @@ private fun ContinueReadingTile(book: LibraryBook, onClick: () -> Unit) {
                 if (bitmap != null) {
                     Image(
                         bitmap = bitmap.asImageBitmap(),
-                        contentDescription = book.title,
+                        contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
                     )
@@ -1208,7 +1217,7 @@ private fun BookDetailSheet(
                     if (bitmap != null) {
                         Image(
                             bitmap = bitmap.asImageBitmap(),
-                            contentDescription = book.title,
+                            contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize()
                         )
@@ -1349,6 +1358,7 @@ private fun MetadataRow(label: String, value: String) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 2.dp)
+            .semantics(mergeDescendants = true) {}
     ) {
         Text(
             label,

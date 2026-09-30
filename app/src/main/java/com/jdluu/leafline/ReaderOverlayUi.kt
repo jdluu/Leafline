@@ -101,10 +101,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -551,6 +554,7 @@ internal fun QuickControls(
                             Icon(Icons.Default.Pause, contentDescription = null)
                         },
                         modifier = Modifier.semantics {
+                            role = Role.Button
                             contentDescription = "Pause text-to-speech"
                         }
                     )
@@ -562,6 +566,7 @@ internal fun QuickControls(
                             Icon(Icons.Default.Stop, contentDescription = null)
                         },
                         modifier = Modifier.semantics {
+                            role = Role.Button
                             contentDescription = "Stop text-to-speech"
                         }
                     )
@@ -575,6 +580,7 @@ internal fun QuickControls(
                             Icon(Icons.Default.PlayArrow, contentDescription = null)
                         },
                         modifier = Modifier.semantics {
+                            role = Role.Button
                             contentDescription = "Resume text-to-speech"
                         }
                     )
@@ -586,6 +592,7 @@ internal fun QuickControls(
                             Icon(Icons.Default.Stop, contentDescription = null)
                         },
                         modifier = Modifier.semantics {
+                            role = Role.Button
                             contentDescription = "Stop text-to-speech"
                         }
                     )
@@ -599,6 +606,7 @@ internal fun QuickControls(
                             Icon(Icons.Default.PlayArrow, contentDescription = null)
                         },
                         modifier = Modifier.semantics {
+                            role = Role.Button
                             contentDescription = "Retry text-to-speech"
                         }
                     )
@@ -610,6 +618,7 @@ internal fun QuickControls(
                             Icon(Icons.Default.Stop, contentDescription = null)
                         },
                         modifier = Modifier.semantics {
+                            role = Role.Button
                             contentDescription = "Stop text-to-speech"
                         }
                     )
@@ -623,6 +632,7 @@ internal fun QuickControls(
                             Icon(Icons.Default.PlayArrow, contentDescription = null)
                         },
                         modifier = Modifier.semantics {
+                            role = Role.Button
                             contentDescription = "Read aloud with text-to-speech"
                         }
                     )
@@ -792,7 +802,7 @@ internal fun BookmarkListSheet(
                             ) {
                                 Icon(
                                     Icons.Default.Delete,
-                                    contentDescription = "Delete",
+                                    contentDescription = null,
                                     tint = MaterialTheme.colorScheme.onErrorContainer,
                                     modifier = Modifier.padding(end = Spacing.md)
                                 )
@@ -806,6 +816,14 @@ internal fun BookmarkListSheet(
                                     onClickLabel = "Open bookmark",
                                     onClick = { onBookmarkClick(bookmark) }
                                 )
+                                .semantics {
+                                    customActions = listOf(
+                                        CustomAccessibilityAction("Delete bookmark") {
+                                            onDeleteBookmark(bookmark)
+                                            true
+                                        }
+                                    )
+                                }
                         ) {
                             Column(
                                 modifier = Modifier.padding(horizontal = Padding.screen, vertical = Padding.compact)
@@ -942,7 +960,17 @@ internal fun AnnotationListSheet(
                                     onClickLabel = "Open highlight",
                                     onClick = { onAnnotationClick(annotation) }
                                 )
+                                .semantics {
+                                    customActions = listOf(
+                                        CustomAccessibilityAction("Delete highlight") {
+                                            scope.launch { undoCoordinator.deleteWithUndo(annotation) }
+                                            true
+                                        }
+                                    )
+                                }
                         ) {
+                            val excerpt = excerptFor(annotation)
+                            val excerptShort = excerpt.take(30)
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.padding(
@@ -954,7 +982,7 @@ internal fun AnnotationListSheet(
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = excerptFor(annotation),
+                                        text = excerpt,
                                         style = MaterialTheme.typography.bodyLarge,
                                         maxLines = 3,
                                         overflow = TextOverflow.Ellipsis
@@ -971,21 +999,21 @@ internal fun AnnotationListSheet(
                                         editNoteText = annotation.note.orEmpty()
                                     }
                                 ) {
-                                    Icon(Icons.Default.Edit, contentDescription = "Edit note")
+                                    Icon(Icons.Default.Edit, contentDescription = "Edit note for highlight: $excerptShort")
                                 }
                                 IconButton(
                                     onClick = {
                                         colorPickerAnnotation = annotation
                                     }
                                 ) {
-                                    Icon(Icons.Default.FormatColorFill, contentDescription = "Change highlight color")
+                                    Icon(Icons.Default.FormatColorFill, contentDescription = "Change color for highlight: $excerptShort")
                                 }
                                 IconButton(
                                     onClick = {
                                         scope.launch { undoCoordinator.deleteWithUndo(annotation) }
                                     }
                                 ) {
-                                    Icon(Icons.Default.Delete, contentDescription = "Delete highlight")
+                                    Icon(Icons.Default.Delete, contentDescription = "Delete highlight: $excerptShort")
                                 }
                             }
                         }
@@ -1133,13 +1161,13 @@ internal fun SearchStatusText(state: BookSearchState, modifier: Modifier = Modif
             text = if (status.resultCount == 0) "No matches found" else matchCountLabel(status.resultCount),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = modifier
+            modifier = modifier.semantics { liveRegion = LiveRegionMode.Polite }
         )
         is BookSearchStatus.Failed -> Text(
             text = status.message,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.error,
-            modifier = modifier
+            modifier = modifier.semantics { liveRegion = LiveRegionMode.Polite }
         )
     }
 }
@@ -1159,6 +1187,7 @@ internal fun SearchResultRow(
             .fillMaxWidth()
             .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
             .clickable(onClickLabel = "Open search result", onClick = onClick)
+            .semantics(mergeDescendants = true) {}
     ) {
         Column(
             modifier = Modifier.padding(horizontal = Padding.screen, vertical = Padding.compact)
@@ -1286,7 +1315,11 @@ internal fun ReaderSettingsSheet(
                 }
                 Text(
                     text = "%.2f".format(preferences.pageMargins ?: PAGE_MARGINS_DEFAULT),
-                    modifier = Modifier.padding(horizontal = Padding.compact)
+                    modifier = Modifier
+                        .padding(horizontal = Padding.compact)
+                        .semantics {
+                            contentDescription = "Page margin: ${"%.2f".format(preferences.pageMargins ?: PAGE_MARGINS_DEFAULT)}"
+                        }
                 )
                 IconButton(onClick = {
                     applyCustomPreference { prefs ->
@@ -1323,7 +1356,11 @@ internal fun ReaderSettingsSheet(
                 }
                 Text(
                     text = "%.1f".format(preferences.lineHeight ?: 1.2),
-                    modifier = Modifier.padding(horizontal = Padding.compact)
+                    modifier = Modifier
+                        .padding(horizontal = Padding.compact)
+                        .semantics {
+                            contentDescription = "Line height: ${"%.1f".format(preferences.lineHeight ?: 1.2)}"
+                        }
                 )
                 IconButton(onClick = {
                     applyCustomPreference { prefs ->
@@ -1451,7 +1488,15 @@ internal fun ReaderSettingsSheet(
 
             Spacer(modifier = Modifier.height(Spacing.sm))
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(
+                        value = settings.reduceMotion,
+                        role = Role.Switch,
+                        onValueChange = { reduce ->
+                            onSettingsChange(settings.copy(reduceMotion = reduce))
+                        }
+                    ),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -1461,9 +1506,7 @@ internal fun ReaderSettingsSheet(
                 )
                 Switch(
                     checked = settings.reduceMotion,
-                    onCheckedChange = { reduce ->
-                        onSettingsChange(settings.copy(reduceMotion = reduce))
-                    }
+                    onCheckedChange = null
                 )
             }
             Text(
@@ -1499,7 +1542,9 @@ internal fun TapZoneActionRow(
                     selected = selected == action,
                     onClick = { onSelect(action) },
                     label = { Text(optionLabel) },
-                    modifier = Modifier.padding(end = Spacing.xs)
+                    modifier = Modifier
+                        .padding(end = Spacing.xs)
+                        .semantics { contentDescription = "$label: $optionLabel" }
                 )
             }
         }
@@ -1571,6 +1616,7 @@ internal fun MetadataRow(label: String, value: String) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 2.dp)
+            .semantics(mergeDescendants = true) {}
     ) {
         Text(
             label,
