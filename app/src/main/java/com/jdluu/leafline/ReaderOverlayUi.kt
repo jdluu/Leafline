@@ -52,10 +52,14 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.FormatColorFill
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.WbSunny
+import com.jdluu.leafline.reader.tts.ReaderTtsState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.DropdownMenu
@@ -247,7 +251,11 @@ internal fun ReaderOverlay(
     onClearSearch: () -> Unit,
     onSearchResultClick: (BookSearchResult) -> Unit,
     highlightTintSheetVisible: Boolean,
-    onHighlightTintSelected: (HighlightTint) -> Unit
+    onHighlightTintSelected: (HighlightTint) -> Unit,
+    ttsState: ReaderTtsState = ReaderTtsState.UNAVAILABLE,
+    onTtsPlay: () -> Unit = {},
+    onTtsPause: () -> Unit = {},
+    onTtsStop: () -> Unit = {}
 ) {
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -299,9 +307,13 @@ internal fun ReaderOverlay(
                         onBrightnessChange = onBrightnessChange,
                         onReset = onBrightnessReset
                     )
-                    SepiaQuickControl(
-                        selected = currentSettings.theme == ReaderTheme.SEPIA,
-                        onToggle = onToggleSepia
+                    QuickControls(
+                        sepiaSelected = currentSettings.theme == ReaderTheme.SEPIA,
+                        onToggleSepia = onToggleSepia,
+                        ttsState = ttsState,
+                        onTtsPlay = onTtsPlay,
+                        onTtsPause = onTtsPause,
+                        onTtsStop = onTtsStop
                     )
                 }
             }
@@ -497,6 +509,133 @@ internal fun BrightnessControl(
 }
 
 /**
+ * Quick controls row in the reader overlay toolbar, providing one-tap
+ * theme switching (sepia) and explicit text-to-speech controls (play, pause, stop).
+ */
+@Composable
+internal fun QuickControls(
+    sepiaSelected: Boolean,
+    onToggleSepia: () -> Unit,
+    ttsState: ReaderTtsState = ReaderTtsState.UNAVAILABLE,
+    onTtsPlay: () -> Unit = {},
+    onTtsPause: () -> Unit = {},
+    onTtsStop: () -> Unit = {}
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+        tonalElevation = 6.dp
+    ) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+            modifier = Modifier.padding(horizontal = Padding.screen, vertical = Spacing.xs)
+        ) {
+            FilterChip(
+                selected = sepiaSelected,
+                onClick = onToggleSepia,
+                label = { Text("Sepia") },
+                leadingIcon = {
+                    Icon(Icons.Default.WbSunny, contentDescription = null)
+                },
+                modifier = Modifier.semantics {
+                    contentDescription = if (sepiaSelected) "Disable sepia theme" else "Enable sepia theme"
+                }
+            )
+            when (ttsState) {
+                ReaderTtsState.PLAYING -> {
+                    FilterChip(
+                        selected = true,
+                        onClick = onTtsPause,
+                        label = { Text("Pause") },
+                        leadingIcon = {
+                            Icon(Icons.Default.Pause, contentDescription = null)
+                        },
+                        modifier = Modifier.semantics {
+                            contentDescription = "Pause text-to-speech"
+                        }
+                    )
+                    FilterChip(
+                        selected = false,
+                        onClick = onTtsStop,
+                        label = { Text("Stop") },
+                        leadingIcon = {
+                            Icon(Icons.Default.Stop, contentDescription = null)
+                        },
+                        modifier = Modifier.semantics {
+                            contentDescription = "Stop text-to-speech"
+                        }
+                    )
+                }
+                ReaderTtsState.PAUSED -> {
+                    FilterChip(
+                        selected = false,
+                        onClick = onTtsPlay,
+                        label = { Text("Resume") },
+                        leadingIcon = {
+                            Icon(Icons.Default.PlayArrow, contentDescription = null)
+                        },
+                        modifier = Modifier.semantics {
+                            contentDescription = "Resume text-to-speech"
+                        }
+                    )
+                    FilterChip(
+                        selected = false,
+                        onClick = onTtsStop,
+                        label = { Text("Stop") },
+                        leadingIcon = {
+                            Icon(Icons.Default.Stop, contentDescription = null)
+                        },
+                        modifier = Modifier.semantics {
+                            contentDescription = "Stop text-to-speech"
+                        }
+                    )
+                }
+                ReaderTtsState.ERROR -> {
+                    FilterChip(
+                        selected = false,
+                        onClick = onTtsPlay,
+                        label = { Text("Retry TTS") },
+                        leadingIcon = {
+                            Icon(Icons.Default.PlayArrow, contentDescription = null)
+                        },
+                        modifier = Modifier.semantics {
+                            contentDescription = "Retry text-to-speech"
+                        }
+                    )
+                    FilterChip(
+                        selected = false,
+                        onClick = onTtsStop,
+                        label = { Text("Stop") },
+                        leadingIcon = {
+                            Icon(Icons.Default.Stop, contentDescription = null)
+                        },
+                        modifier = Modifier.semantics {
+                            contentDescription = "Stop text-to-speech"
+                        }
+                    )
+                }
+                ReaderTtsState.IDLE -> {
+                    FilterChip(
+                        selected = false,
+                        onClick = onTtsPlay,
+                        label = { Text("Read aloud") },
+                        leadingIcon = {
+                            Icon(Icons.Default.PlayArrow, contentDescription = null)
+                        },
+                        modifier = Modifier.semantics {
+                            contentDescription = "Read aloud with text-to-speech"
+                        }
+                    )
+                }
+                ReaderTtsState.UNAVAILABLE -> {
+                    // Hidden when TTS is not supported for the publication
+                }
+            }
+        }
+    }
+}
+
+/**
  * Warm/sepia quick control shown next to the brightness slider in the reader
  * overlay. Selected means the publication renders with the sepia theme;
  * toggling swaps between sepia and the previously active theme, persisted by
@@ -508,25 +647,10 @@ internal fun SepiaQuickControl(
     selected: Boolean,
     onToggle: () -> Unit
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
-        tonalElevation = 6.dp
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = Padding.screen, vertical = Spacing.xs)
-        ) {
-            FilterChip(
-                selected = selected,
-                onClick = onToggle,
-                label = { Text("Sepia") },
-                leadingIcon = {
-                    Icon(Icons.Default.WbSunny, contentDescription = null)
-                }
-            )
-        }
-    }
+    QuickControls(
+        sepiaSelected = selected,
+        onToggleSepia = onToggle
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

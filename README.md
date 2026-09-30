@@ -39,6 +39,8 @@ and paragraph indents, with reading chrome out of the way:
   search
 - **Customizable reading** — Adjustable fonts, themes (including sepia),
   margins, line height, tap zones, page-turn animation, and per-book brightness
+- **Text-to-speech** — Optional on-device reading aloud with synchronized page
+  turning and spoken utterance highlighting
 - **Offline-first** — Works fully offline once books are on the device
 - **No telemetry** — No analytics, crash reports, or usage data collected
 
