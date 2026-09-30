@@ -168,13 +168,25 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration.Companion.seconds
+import org.readium.navigator.media.common.MediaNavigator
+import org.readium.navigator.media.tts.AndroidTtsNavigator
+import org.readium.navigator.media.tts.AndroidTtsNavigatorFactory
+import org.readium.navigator.media.tts.TtsNavigator
+import org.readium.navigator.media.tts.android.AndroidTtsEngine
 import org.readium.r2.navigator.Decoration
 import org.readium.r2.navigator.DecorableNavigator
+import org.readium.r2.navigator.VisualNavigator
+import com.jdluu.leafline.reader.tts.ReaderTtsController
+import com.jdluu.leafline.reader.tts.ReaderTtsState
+import com.jdluu.leafline.reader.tts.throttleLatest
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.navigator.epub.EpubPreferences
@@ -220,6 +232,9 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         private const val MENU_ITEM_COPY_ID = 2
         private const val KEY_SYNC_DEVICE_ID = "sync_device_id"
         private const val PAGE_TURN_ANNOUNCE_DEBOUNCE_MS = 300L
+        private const val TTS_DECORATION_GROUP = "leafline-tts"
+        private const val TTS_UTTERANCE_DECORATION_ID = "tts-utterance"
+        private val TTS_UTTERANCE_TINT = 0x55E65100.toInt()
 
         fun newIntent(context: Context, filePath: String): Intent {
             return Intent(context, ReaderActivity::class.java).apply {
@@ -239,6 +254,11 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     private val searchDecorationPlanner = SearchDecorationPlanner()
     private lateinit var syncManager: com.jdluu.leafline.reader.sync.ReaderSyncManager
     private lateinit var annotationManager: com.jdluu.leafline.reader.annotations.AnnotationManager
+    private var ttsFactory: AndroidTtsNavigatorFactory? = null
+    private var ttsNavigator: AndroidTtsNavigator? = null
+    private var ttsJob: Job? = null
+    private val ttsObserveJobs = mutableListOf<Job>()
+    private lateinit var ttsController: ReaderTtsController
 
     /** Lazily wired once the navigator exists; see onCreate. */
     private val goToLocator: (org.readium.r2.shared.publication.Locator) -> Unit = { locator ->
@@ -412,6 +432,21 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             bookTitle.value = publication.metadata.title ?: "Reading"
             tocLinks.value = flattenToc(publication.tableOfContents)
             this@ReaderActivity.publication = publication
+            val ttsFactory = runCatching {
+                AndroidTtsNavigatorFactory(application, publication)
+            }.getOrNull()
+            this@ReaderActivity.ttsFactory = ttsFactory
+            ttsController = ReaderTtsController(
+                initialState = if (ttsFactory != null) ReaderTtsState.IDLE else ReaderTtsState.UNAVAILABLE,
+                onPlay = { handleTtsPlay() },
+                onPause = { handleTtsPause() },
+                onStop = { handleTtsStop() },
+                onError = { message ->
+                    if (message != null) {
+                        Toast.makeText(this@ReaderActivity, message, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            )
             bookSearcher = BookSearcher(
                 scope = lifecycleScope,
                 searchFactory = { query -> this@ReaderActivity.publication?.search(query) }
@@ -604,6 +639,11 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         if (this::sessionRecorder.isInitialized && isFinishing) {
             sessionRecorder.stopSession()
         }
+        if (this::ttsController.isInitialized) {
+            ttsController.stop()
+        }
+        ttsNavigator?.close()
+        ttsNavigator = null
         super.onDestroy()
     }
 
@@ -698,6 +738,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                 val searchState by bookSearcher.state.collectAsState()
                 val syncConflict by syncConflictState.collectAsState()
                 val currentSettings by settingsController.settings.collectAsState()
+                val ttsState by ttsController.state.collectAsState()
                 ReaderOverlay(
                     title = bookTitle.value,
                     toolbarVisible = toolbarVisible.value,
@@ -761,7 +802,11 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     onHighlightTintSelected = { tint ->
                         highlightTintSheetVisible.value = false
                         annotationManager.saveHighlightWithTint(tint, pendingHighlightLocator)
-                    }
+                    },
+                    ttsState = ttsState,
+                    onTtsPlay = { ttsController.play() },
+                    onTtsPause = { ttsController.pause() },
+                    onTtsStop = { ttsController.stop() }
                 )
             }
         }
@@ -783,10 +828,156 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         }
     }
 
+    private fun handleTtsPlay(): Boolean {
+        val nav = ttsNavigator
+        if (nav != null) {
+            Log.d(TAG, "Resuming TTS playback")
+            nav.play()
+            return true
+        }
+
+        val factory = ttsFactory ?: return false
+        Log.d(TAG, "Initializing TTS navigator from factory")
+
+        ttsJob?.cancel()
+        ttsJob = lifecycleScope.launch {
+            try {
+                val initialLocator = (navigator as? VisualNavigator)?.firstVisibleElementLocator()
+                    ?: navigator?.currentLocator?.value
+                Log.d(TAG, "Starting TTS from initial locator: $initialLocator")
+
+                val listener = object : TtsNavigator.Listener {
+                    override fun onStopRequested() {
+                        Log.d(TAG, "TTS stop requested by listener")
+                        ttsController.stop()
+                    }
+                }
+
+                val result = factory.createNavigator(
+                    listener = listener,
+                    initialLocator = initialLocator
+                )
+
+                val newNavigator = result.getOrNull()
+                if (newNavigator == null) {
+                    val failure = result.failureOrNull()
+                    Log.e(TAG, "Failed to create TTS navigator: $failure")
+                    ttsController.onEngineError(failure?.message ?: "Failed to initialize TTS")
+                    return@launch
+                }
+
+                ttsNavigator = newNavigator
+                observeTtsNavigator(newNavigator)
+                Log.d(TAG, "TTS navigator created; starting playback")
+                newNavigator.play()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error starting TTS playback", e)
+                ttsController.onEngineError(e.message ?: "Failed to start text-to-speech")
+            }
+        }
+        return true
+    }
+
+    private fun handleTtsPause() {
+        Log.d(TAG, "Pausing TTS playback")
+        ttsNavigator?.pause()
+    }
+
+    private fun handleTtsStop() {
+        Log.d(TAG, "Stopping TTS playback")
+        ttsJob?.cancel()
+        ttsJob = null
+        ttsObserveJobs.forEach { it.cancel() }
+        ttsObserveJobs.clear()
+        lifecycleScope.launch {
+            try {
+                navigator?.applyDecorations(emptyList(), TTS_DECORATION_GROUP)
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not clear TTS decorations", e)
+            }
+        }
+        ttsNavigator?.close()
+        ttsNavigator = null
+    }
+
+    private fun observeTtsNavigator(nav: AndroidTtsNavigator) {
+        ttsObserveJobs.forEach { it.cancel() }
+        ttsObserveJobs.clear()
+
+        ttsObserveJobs += lifecycleScope.launch {
+            nav.playback.collect { playback ->
+                when (val state = playback.state) {
+                    is MediaNavigator.State.Ended -> {
+                        Log.d(TAG, "TTS playback ended")
+                        ttsController.onPlaybackEnded()
+                    }
+                    is TtsNavigator.State.Failure -> {
+                        val error = state.error
+                        val engineError = (error as? TtsNavigator.Error.EngineError<*>)?.cause
+                        Log.w(TAG, "TTS playback failure: $error")
+                        if (engineError is AndroidTtsEngine.Error.LanguageMissingData) {
+                            Log.i(TAG, "TTS missing voice data; requesting install")
+                            AndroidTtsEngine.requestInstallVoice(this@ReaderActivity)
+                        }
+                        ttsController.onEngineError(error.message ?: engineError?.toString() ?: "TTS error")
+                    }
+                    is MediaNavigator.State.Failure -> {
+                        Log.w(TAG, "TTS media failure")
+                        ttsController.onEngineError("TTS playback failure")
+                    }
+                    is MediaNavigator.State.Ready -> {
+                        if (playback.playWhenReady) {
+                            ttsController.onExternalPlay()
+                        } else {
+                            ttsController.onExternalPause()
+                        }
+                    }
+                    else -> {}
+                }
+            }
+        }
+
+        ttsObserveJobs += lifecycleScope.launch {
+            nav.location
+                .mapNotNull { it.utteranceLocator }
+                .distinctUntilChanged()
+                .collect { utteranceLocator ->
+                    val decoration = Decoration(
+                        id = TTS_UTTERANCE_DECORATION_ID,
+                        locator = utteranceLocator,
+                        style = Decoration.Style.Highlight(
+                            tint = TTS_UTTERANCE_TINT
+                        )
+                    )
+                    try {
+                        this@ReaderActivity.navigator?.applyDecorations(
+                            listOf(decoration),
+                            TTS_DECORATION_GROUP
+                        )
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Could not apply TTS utterance decoration", e)
+                    }
+                }
+        }
+
+        ttsObserveJobs += lifecycleScope.launch {
+            nav.location
+                .throttleLatest(1.seconds)
+                .mapNotNull { it.tokenLocator ?: it.utteranceLocator }
+                .distinctUntilChanged()
+                .collect { locator ->
+                    this@ReaderActivity.navigator?.go(locator, animated = false)
+                }
+        }
+    }
+
     override fun onStop() {
         super.onStop()
         if (this::sessionRecorder.isInitialized && isFinishing) {
             sessionRecorder.stopSession()
+        }
+        if (this::ttsController.isInitialized && isFinishing) {
+            ttsController.stop()
         }
         if (this::syncManager.isInitialized) {
             syncManager.pushProgressOnExit { book, progress ->

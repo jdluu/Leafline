@@ -109,6 +109,7 @@ dependencies {
     implementation("org.readium.kotlin-toolkit:readium-shared:$readiumVersion")
     implementation("org.readium.kotlin-toolkit:readium-streamer:$readiumVersion")
     implementation("org.readium.kotlin-toolkit:readium-navigator:$readiumVersion")
+    implementation("org.readium.kotlin-toolkit:readium-navigator-media-tts:$readiumVersion")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation("androidx.work:work-runtime-ktx:2.11.2")

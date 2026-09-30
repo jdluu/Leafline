@@ -249,6 +249,19 @@ clients or manipulate EPUB archives directly.
   Accessible DfA, iA Writer Duospace). Stored values are normalized on load:
   unknown font names fall back to original, page margins snap into range, and
   a stored Publisher selection drops stale custom typography.
+- Text-to-speech (TTS): Readium 3.3.0 provides TTS playback through
+  `readium-navigator-media-tts` (`AndroidTtsNavigatorFactory`), querying
+  the Android system TTS service declared in `AndroidManifest.xml`.
+  Orchestration is owned by `ReaderTtsController` (`reader/tts/`), which manages
+  lifecycle states (IDLE, PLAYING, PAUSED, UNAVAILABLE, ERROR) and play/pause/stop
+  actions behind the `TtsPlayerAdapter` interface/lambda seam so the controller
+  has no Android dependencies and is plain-JVM testable. If TTS factory creation
+  fails or the publication has no speakable content, the controller marks TTS as
+  unavailable and controls are gracefully omitted. When reading aloud, spoken
+  utterances are decorated in amber (`#55E65100`, WCAG AA compliant) via
+  `DecorableNavigator`, visual pages synchronize with speech progression throttled
+  to at most once per second (`throttleLatest(1.seconds)`), and missing voice data
+  triggers the system voice installation request.
 
 ### Dynamic type decisions
 
