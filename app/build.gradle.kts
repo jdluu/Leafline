@@ -24,38 +24,41 @@ android {
         vectorDrawables { useSupportLibrary = true }
     }
 
-buildTypes {
+    signingConfigs {
+        create("release") {
+            // Release signing (#32): credentials never live in this repo. Set
+            // them in ~/.gradle/gradle.properties (or CI secrets):
+            //   LEAFLINE_STORE_FILE=/absolute/path/to/leafline-release.jks
+            //   LEAFLINE_STORE_PASSWORD=...
+            //   LEAFLINE_KEY_ALIAS=leafline
+            //   LEAFLINE_KEY_PASSWORD=...
+            // When the properties are absent the release build stays unsigned,
+            // which is what F-Droid/Acres recipe builds produce anyway (they
+            // sign with their own keys at packaging time).
+            val storeFile = (project.findProperty("LEAFLINE_STORE_FILE") as? String)
+                ?.takeIf { it.isNotBlank() }
+            if (storeFile != null) {
+                this.storeFile = project.file(storeFile)
+                storePassword = project.findProperty("LEAFLINE_STORE_PASSWORD") as? String
+                keyAlias = project.findProperty("LEAFLINE_KEY_ALIAS") as? String
+                keyPassword = project.findProperty("LEAFLINE_KEY_PASSWORD") as? String
+            }
+        }
+    }
+
+    buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            // Release signing (#32): credentials never live in this repo.
-            // Set these in ~/.gradle/gradle.properties (or CI secrets):
-            //   LEAFLINE_STORE_FILE=/absolute/path/to/leafline-release.jks
-            //   LEAFLINE_STORE_PASSWORD=...
-            //   LEAFLINE_KEY_ALIAS=leafline
-            //   LEAFLINE_KEY_PASSWORD=...
-            // Unsigned release builds still work without them.
-            signingConfigs.findByName("release")?.let { config ->
-                val storeFile = project.findProperty("LEAFLINE_STORE_FILE") as? String
-                if (storeFile != null) {
-                    config.storeFile = file(storeFile)
-                    config.storePassword = project.findProperty("LEAFLINE_STORE_PASSWORD") as? String
-                    config.keyAlias = project.findProperty("LEAFLINE_KEY_ALIAS") as? String
-                    config.keyPassword = project.findProperty("LEAFLINE_KEY_PASSWORD") as? String
-                }
-            }
-        }
-    }
-
-    signingConfigs {
-        create("release") {
-            // Populated from gradle properties above when present; the build
-            // falls back to an unsigned release APK otherwise, which is what
-            // F-Droid/Acres recipe builds produce anyway (they sign with
-            // their own keys at packaging time).
+            // Only attach the signing config once it has actually been
+            // populated, so a credential-less environment still builds an
+            // unsigned release APK instead of failing.
+            signingConfigs.findByName("release")
+                ?.takeIf { it.storeFile != null }
+                ?.let { signingConfig = it }
         }
     }
 
