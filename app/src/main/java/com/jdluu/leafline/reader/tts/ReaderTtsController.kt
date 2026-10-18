@@ -40,6 +40,11 @@ interface TtsPlayerAdapter {
      * Stop playback and release or clear active resources.
      */
     fun stop()
+
+    /**
+     * Adjust playback rate (e.g. 0.75x to 2.0x).
+     */
+    fun setRate(rate: Float) {}
 }
 
 /**
@@ -53,6 +58,7 @@ class ReaderTtsController(
     private val onPlay: () -> Boolean,
     private val onPause: () -> Unit = {},
     private val onStop: () -> Unit = {},
+    private val onSetRate: (Float) -> Unit = {},
     private val onError: (String?) -> Unit = {}
 ) {
     constructor(
@@ -64,6 +70,7 @@ class ReaderTtsController(
         onPlay = { adapter.play() },
         onPause = { adapter.pause() },
         onStop = { adapter.stop() },
+        onSetRate = { adapter.setRate(it) },
         onError = onError
     )
 
@@ -72,6 +79,15 @@ class ReaderTtsController(
 
     private val _lastErrorMessage = MutableStateFlow<String?>(null)
     val lastErrorMessage: StateFlow<String?> = _lastErrorMessage.asStateFlow()
+
+    private val _rate = MutableStateFlow(1.0f)
+    val rate: StateFlow<Float> = _rate.asStateFlow()
+
+    fun setRate(newRate: Float) {
+        val clamped = newRate.coerceIn(0.5f, 3.0f)
+        _rate.value = clamped
+        onSetRate(clamped)
+    }
 
     /**
      * Requests playback to start or resume.

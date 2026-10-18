@@ -103,6 +103,15 @@ class ReadingSessionRepositoryTest {
             )
         }
 
+        override suspend fun queryAggregateForBook(bookId: String): AggregateDbResult {
+            val matching = stored.value.filter { it.bookId == bookId }
+            return AggregateDbResult(
+                sessionCount = matching.size,
+                totalActiveDurationMillis = matching.sumOf { it.activeDurationMillis },
+                booksOpenedCount = if (matching.isNotEmpty()) 1 else 0
+            )
+        }
+
         override suspend fun deleteById(id: Long): Int {
             val before = stored.value.size
             stored.value = stored.value.filterNot { it.id == id }
@@ -315,5 +324,48 @@ class ReadingSessionRepositoryTest {
         val deletedAll = repository.deleteAllSessions()
         assertEquals(1, deletedAll)
         assertTrue(repository.getAllSessions().isEmpty())
+    }
+    @Test
+    fun getAggregateForBookComputesTotalsCorrectly() = runTest {
+        val (repo, dao) = newRepository(StandardTestDispatcher(testScheduler))
+        dao.insert(
+            ReadingSessionEntity(
+                id = 1,
+                bookId = "book-1",
+                startTimeEpochMillis = 1000L,
+                endTimeEpochMillis = 2000L,
+                activeDurationMillis = 120_000L,
+                startProgression = 0.1,
+                endProgression = 0.2
+            )
+        )
+        dao.insert(
+            ReadingSessionEntity(
+                id = 2,
+                bookId = "book-1",
+                startTimeEpochMillis = 3000L,
+                endTimeEpochMillis = 4000L,
+                activeDurationMillis = 60_000L,
+                startProgression = 0.2,
+                endProgression = 0.3
+            )
+        )
+        dao.insert(
+            ReadingSessionEntity(
+                id = 3,
+                bookId = "book-2",
+                startTimeEpochMillis = 5000L,
+                endTimeEpochMillis = 6000L,
+                activeDurationMillis = 300_000L,
+                startProgression = 0.0,
+                endProgression = 0.5
+            )
+        )
+
+        val aggregate = repo.getAggregateForBook("book-1")
+        assertEquals(2, aggregate.sessionCount)
+        assertEquals(180_000L, aggregate.activeDurationMillis)
+        assertEquals(3L, aggregate.activeMinutes)
+        assertEquals(1, aggregate.booksOpened)
     }
 }

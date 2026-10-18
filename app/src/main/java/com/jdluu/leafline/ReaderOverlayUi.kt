@@ -19,6 +19,11 @@ import android.view.WindowManager
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import com.jdluu.leafline.theme.HIGHLIGHT_TINTS
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -258,9 +263,12 @@ internal fun ReaderOverlay(
     highlightTintSheetVisible: Boolean,
     onHighlightTintSelected: (HighlightTint) -> Unit,
     ttsState: ReaderTtsState = ReaderTtsState.UNAVAILABLE,
+    ttsRate: Float = 1.0f,
     onTtsPlay: () -> Unit = {},
     onTtsPause: () -> Unit = {},
-    onTtsStop: () -> Unit = {}
+    onTtsStop: () -> Unit = {},
+    onTtsRateChange: (Float) -> Unit = {},
+    bookActiveDurationMillis: Long = 0L
 ) {
     BackHandler(enabled = toolbarVisible) {
         onDismissToolbar()
@@ -321,9 +329,11 @@ internal fun ReaderOverlay(
                         sepiaSelected = currentSettings.theme == ReaderTheme.SEPIA,
                         onToggleSepia = onToggleSepia,
                         ttsState = ttsState,
+                        ttsRate = ttsRate,
                         onTtsPlay = onTtsPlay,
                         onTtsPause = onTtsPause,
-                        onTtsStop = onTtsStop
+                        onTtsStop = onTtsStop,
+                        onTtsRateChange = onTtsRateChange
                     )
                 }
             }
@@ -397,6 +407,7 @@ internal fun ReaderOverlay(
             if (toolbarVisible) {
                 ReaderBottomBar(
                     currentLocatorJson = currentLocatorJson,
+                    activeDurationMillis = bookActiveDurationMillis,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .navigationBarsPadding()
@@ -535,9 +546,11 @@ internal fun QuickControls(
     sepiaSelected: Boolean,
     onToggleSepia: () -> Unit,
     ttsState: ReaderTtsState = ReaderTtsState.UNAVAILABLE,
+    ttsRate: Float = 1.0f,
     onTtsPlay: () -> Unit = {},
     onTtsPause: () -> Unit = {},
-    onTtsStop: () -> Unit = {}
+    onTtsStop: () -> Unit = {},
+    onTtsRateChange: (Float) -> Unit = {}
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -583,6 +596,20 @@ internal fun QuickControls(
                         modifier = Modifier.semantics {
                             role = Role.Button
                             contentDescription = "Stop text-to-speech"
+                        }
+                    )
+                    val speedOptions = listOf(0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
+                    FilterChip(
+                        selected = false,
+                        onClick = {
+                            val idx = speedOptions.indexOf(ttsRate).let { if (it == -1) 1 else it }
+                            val next = speedOptions[(idx + 1) % speedOptions.size]
+                            onTtsRateChange(next)
+                        },
+                        label = { Text("${ttsRate}x") },
+                        modifier = Modifier.semantics {
+                            role = Role.Button
+                            contentDescription = "Text-to-speech speed ${ttsRate}x"
                         }
                     )
                 }
@@ -916,12 +943,64 @@ internal fun AnnotationListSheet(
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
+        var searchQuery by remember { mutableStateOf("") }
+        var selectedTint by remember { mutableStateOf<HighlightTint?>(null) }
+
         Text(
             "Highlights",
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(Padding.screen)
         )
         if (annotations.isNotEmpty()) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text("Search highlights or notes") },
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Padding.screen, vertical = Spacing.xs),
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Default.Close, contentDescription = "Clear search")
+                        }
+                    }
+                }
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = Padding.screen, vertical = Spacing.xs),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+            ) {
+                FilterChip(
+                    selected = selectedTint == null,
+                    onClick = { selectedTint = null },
+                    label = { Text("All (${annotations.size})") }
+                )
+                HIGHLIGHT_TINTS.forEach { tint ->
+                    val count = annotations.count { it.colorHex.equals(tint.hex, ignoreCase = true) }
+                    if (count > 0) {
+                        FilterChip(
+                            selected = selectedTint == tint,
+                            onClick = { selectedTint = if (selectedTint == tint) null else tint },
+                            label = { Text("${tint.label} ($count)") },
+                            leadingIcon = {
+                                Box(
+                                    modifier = Modifier
+                                        .size(12.dp) // touch-target-ok: decorative swatch inside FilterChip
+                                        .clip(CircleShape)
+                                        .background(tint.swatchColor)
+                                )
+                            }
+                        )
+                    }
+                }
+            }
+
             OutlinedButton(
                 onClick = { onExportAnnotations(annotations) },
                 modifier = Modifier
@@ -931,15 +1010,33 @@ internal fun AnnotationListSheet(
                 Text("Export highlights")
             }
         }
+
+        val currentTint = selectedTint
+        val filteredAnnotations = remember(annotations, searchQuery, currentTint) {
+            annotations.filter { annotation ->
+                val matchesTint = currentTint == null || annotation.colorHex.equals(currentTint.hex, ignoreCase = true)
+                val matchesQuery = searchQuery.isBlank() ||
+                    excerptFor(annotation).contains(searchQuery, ignoreCase = true) ||
+                    (annotation.note?.contains(searchQuery, ignoreCase = true) == true)
+                matchesTint && matchesQuery
+            }
+        }
+
         if (annotations.isEmpty()) {
             Text(
                 "No highlights yet",
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(Padding.screen)
             )
+        } else if (filteredAnnotations.isEmpty()) {
+            Text(
+                "No matching highlights found",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(Padding.screen)
+            )
         } else {
             LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                items(annotations, key = { it.id }) { annotation ->
+                items(filteredAnnotations, key = { it.id }) { annotation ->
                     SwipeToDismissBox(
                         state = rememberSwipeToDismissBoxState(
                             confirmValueChange = { value ->
@@ -1650,6 +1747,7 @@ internal fun MetadataRow(label: String, value: String) {
 @Composable
 internal fun ReaderBottomBar(
     currentLocatorJson: String?,
+    activeDurationMillis: Long = 0L,
     modifier: Modifier = Modifier
 ) {
     val percent = remember(currentLocatorJson) {
@@ -1658,7 +1756,15 @@ internal fun ReaderBottomBar(
     val label = remember(currentLocatorJson) {
         ReadingProgressMath.progressLabel(currentLocatorJson)
     }
-    if (label != null && percent != null) {
+    val remaining = remember(percent, activeDurationMillis) {
+        ReadingProgressMath.estimatedRemainingTimeLabel(percent, activeDurationMillis)
+    }
+    val displayText = remember(label, remaining) {
+        if (label == null) null
+        else if (remaining != null) "$label • $remaining"
+        else label
+    }
+    if (displayText != null && percent != null) {
         Surface(
             modifier = modifier.fillMaxWidth(),
             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
@@ -1680,7 +1786,7 @@ internal fun ReaderBottomBar(
                 )
                 Spacer(modifier = Modifier.height(Spacing.xs))
                 Text(
-                    text = label,
+                    text = displayText,
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

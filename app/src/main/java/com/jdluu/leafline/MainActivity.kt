@@ -234,7 +234,8 @@ fun LeaflineApp(activity: MainActivity) {
         factory = LibraryViewModelFactory(
             repository = activity.appContainer.libraryRepository,
             coverLoader = EpubCoverLoader(activity.applicationContext),
-            sortStore = LibrarySortStore.fromContext(activity)
+            sortStore = LibrarySortStore.fromContext(activity),
+            readingSessionRepository = activity.appContainer.readingSessionRepository
         )
     )
 

@@ -41,4 +41,29 @@ object ReadingProgressMath {
         val percent = percentageFromLocator(locatorJson) ?: return null
         return "${Math.round(percent)}% read"
     }
+    /**
+     * Computes an estimated remaining reading time string like "~45 min left" or "~1h 20m left"
+     * based on current progress percentage (0.0 to 100.0) and active reading time (millis).
+     * Returns null if progress is missing, at/beyond 100%, or if reading duration is under 1 minute.
+     */
+    fun estimatedRemainingTimeLabel(
+        currentPercent: Double?,
+        activeDurationMillis: Long
+    ): String? {
+        if (currentPercent == null || currentPercent <= 0.0 || currentPercent >= FULL_PERCENT) return null
+        if (activeDurationMillis < 60_000L) return null
+        val remainingPercent = FULL_PERCENT - currentPercent
+        val millisPerPercent = activeDurationMillis.toDouble() / currentPercent
+        val remainingMillis = (remainingPercent * millisPerPercent).toLong()
+        val remainingMinutes = remainingMillis / 60_000L
+        return when {
+            remainingMinutes < 1L -> "< 1 min left"
+            remainingMinutes < 60L -> "~$remainingMinutes min left"
+            else -> {
+                val hours = remainingMinutes / 60L
+                val mins = remainingMinutes % 60L
+                if (mins == 0L) "~${hours}h left" else "~${hours}h ${mins}m left"
+            }
+        }
+    }
 }

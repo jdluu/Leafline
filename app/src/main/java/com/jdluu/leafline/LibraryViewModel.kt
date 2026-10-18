@@ -26,11 +26,15 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import com.jdluu.leafline.library.data.ReadingAggregate
+import com.jdluu.leafline.library.data.ReadingSessionRepository
+import java.time.LocalDate
 
 class LibraryViewModel(
     private val repository: LibraryRepository,
     private val coverLoader: CoverLoader? = null,
-    private val sortStore: LibrarySortStore? = null
+    private val sortStore: LibrarySortStore? = null,
+    private val readingSessionRepository: ReadingSessionRepository? = null
 ) : ViewModel() {
 
     val books: StateFlow<List<LibraryBook>> = repository.getAllBooks()
@@ -200,6 +204,30 @@ class LibraryViewModel(
         }
     }
 
+    fun deleteBooks(stableIds: Set<String>) {
+        viewModelScope.launch {
+            stableIds.forEach { id ->
+                repository.deleteBook(id)
+            }
+        }
+    }
+
+    fun setBooksReadingStatus(stableIds: Set<String>, status: ReadingStatus) {
+        viewModelScope.launch {
+            stableIds.forEach { id ->
+                repository.setReadingStatus(id, status)
+            }
+        }
+    }
+
+    fun addBooksToCollection(stableIds: Set<String>, collectionId: Long) {
+        viewModelScope.launch {
+            stableIds.forEach { id ->
+                repository.addBookToCollection(collectionId, id)
+            }
+        }
+    }
+
     // -- Reading status filter --
 
     fun setReadingStatusFilter(status: ReadingStatus?) {
@@ -247,5 +275,29 @@ class LibraryViewModel(
         viewModelScope.launch {
             repository.removeBookFromCollection(collectionId, bookStableId)
         }
+    }
+
+    suspend fun getReadingAggregateForBook(bookId: String): ReadingAggregate {
+        return readingSessionRepository?.getAggregateForBook(bookId) ?: ReadingAggregate.EMPTY
+    }
+
+    suspend fun getTodayAggregate(): ReadingAggregate {
+        return readingSessionRepository?.getDailyAggregate(LocalDate.now()) ?: ReadingAggregate.EMPTY
+    }
+
+    suspend fun getWeeklyAggregate(): ReadingAggregate {
+        return readingSessionRepository?.getWeeklyAggregate(LocalDate.now()) ?: ReadingAggregate.EMPTY
+    }
+
+    suspend fun getRecentDailyAggregates(days: Int = 7): List<Pair<LocalDate, ReadingAggregate>> {
+        val repo = readingSessionRepository ?: return emptyList()
+        val today = LocalDate.now()
+        val result = mutableListOf<Pair<LocalDate, ReadingAggregate>>()
+        for (i in (days - 1) downTo 0) {
+            val date = today.minusDays(i.toLong())
+            val aggregate = repo.getDailyAggregate(date)
+            result.add(date to aggregate)
+        }
+        return result
     }
 }

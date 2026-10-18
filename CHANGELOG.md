@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Reading Statistics & Insights dashboard tracking today's reading duration, weekly aggregates, session count, and a 7-day visual activity breakdown in a Material 3 sheet.
+- Book detail reading activity metrics: total reading time, session count, and average session length.
+- Estimated reading time remaining (`~X min left`) in the reader bottom HUD calculated from session reading speed.
+- Highlight color filtering chips and notes & text search in the annotations bottom sheet.
+- Text-to-speech (TTS) playback speed rate cycling control (`0.75x`, `1.0x`, `1.25x`, `1.5x`, `2.0x`).
+- Library multi-selection mode with batch status updates (Unread, Reading, Finished), collection assignment, and deletion.
 - Reader bottom HUD displaying reading progress percentage and visual progress indicator.
 - Hardware volume rocker page turning (`Volume Down` for forward, `Volume Up` for backward) in paginated reading mode.
 - System back navigation handler (`BackHandler`) in reader overlay to dismiss active HUD and menus before exiting the book.

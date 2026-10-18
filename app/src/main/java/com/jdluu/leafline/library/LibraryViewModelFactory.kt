@@ -5,16 +5,18 @@ import androidx.lifecycle.ViewModelProvider
 import com.jdluu.leafline.LibraryViewModel
 import com.jdluu.leafline.library.cover.CoverLoader
 import com.jdluu.leafline.library.data.LibraryRepository
+import com.jdluu.leafline.library.data.ReadingSessionRepository
 
 class LibraryViewModelFactory(
     private val repository: LibraryRepository,
     private val coverLoader: CoverLoader? = null,
-    private val sortStore: LibrarySortStore? = null
+    private val sortStore: LibrarySortStore? = null,
+    private val readingSessionRepository: ReadingSessionRepository? = null
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(LibraryViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return LibraryViewModel(repository, coverLoader, sortStore) as T
+            return LibraryViewModel(repository, coverLoader, sortStore, readingSessionRepository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

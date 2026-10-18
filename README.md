@@ -33,13 +33,17 @@ and paragraph indents, with reading chrome out of the way:
 - **On-device library** — Import your own EPUB files with cover thumbnails
 - **Progress sync** — Sync reading progress between your devices using any
   KOReader-compatible sync server you host yourself
-- **Bookmarks & annotations** — Multi-color highlights and full-text in-book
-  search
+- **Reading statistics & insights** — On-device reading time tracking, daily and
+  weekly insights, and estimated time remaining
+- **Bookmarks & annotations** — Multi-color highlights, color filtering, notes
+  search, and full-text in-book search
 - **Customizable reading** — Adjustable fonts, themes (including sepia),
-  margins, line height, tap zones, volume key page turning, reading progress HUD,
-  page-turn animation, and per-book brightness
-- **Text-to-speech** — Optional on-device reading aloud with synchronized page
-  turning and spoken utterance highlighting
+  margins, line height, tap zones, volume key page turning, reading progress HUD
+  with estimated time left, page-turn animation, and per-book brightness
+- **Text-to-speech** — Optional on-device reading aloud with configurable playback
+  speed, synchronized page turning, and spoken utterance highlighting
+- **Library management** — Multi-selection batch actions (mark status, assign
+  collections, delete), collections, reading status filters, and search
 - **Offline-first** — Works fully offline once books are on the device
 - **No telemetry** — No analytics, crash reports, or usage data collected
 

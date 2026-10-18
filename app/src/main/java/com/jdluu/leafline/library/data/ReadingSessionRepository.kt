@@ -15,6 +15,7 @@ interface ReadingSessionRepository {
     suspend fun getSessionsForBook(bookId: String): List<ReadingSession>
     suspend fun getSessionsInTimeRange(startEpochMillis: Long, endEpochMillis: Long): List<ReadingSession>
     suspend fun getAggregate(startEpochMillis: Long, endEpochMillis: Long): ReadingAggregate
+    suspend fun getAggregateForBook(bookId: String): ReadingAggregate
     suspend fun getDailyAggregate(
         date: LocalDate,
         zoneId: ZoneId = ZoneId.systemDefault()

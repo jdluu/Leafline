@@ -19,6 +19,7 @@ class ReaderTtsControllerTest {
     ) {
         val calls = mutableListOf<String>()
         val errorNotifications = mutableListOf<String?>()
+        val rateChanges = mutableListOf<Float>()
         var playReturns: Boolean = playResult
         var playShouldThrow: Boolean = false
 
@@ -31,6 +32,7 @@ class ReaderTtsControllerTest {
             },
             onPause = { calls += "pause" },
             onStop = { calls += "stop" },
+            onSetRate = { rateChanges += it },
             onError = { errorNotifications += it }
         )
     }
@@ -330,5 +332,25 @@ class ReaderTtsControllerTest {
         assertEquals(ReaderTtsState.IDLE, controller.state.value)
 
         assertEquals(listOf("play", "pause", "stop"), calls)
+    }
+    @Test
+    fun `setRate updates rate flow and notifies onSetRate callback`() {
+        val harness = Harness()
+        assertEquals(1.0f, harness.controller.rate.value)
+
+        harness.controller.setRate(1.5f)
+        assertEquals(1.5f, harness.controller.rate.value)
+        assertEquals(listOf(1.5f), harness.rateChanges)
+    }
+
+    @Test
+    fun `setRate clamps value between 0 5 and 3 0`() {
+        val harness = Harness()
+
+        harness.controller.setRate(0.2f)
+        assertEquals(0.5f, harness.controller.rate.value)
+
+        harness.controller.setRate(5.0f)
+        assertEquals(3.0f, harness.controller.rate.value)
     }
 }

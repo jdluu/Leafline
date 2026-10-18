@@ -112,6 +112,7 @@ import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.commitNow
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jdluu.leafline.di.appContainer
 import com.jdluu.leafline.library.ReadingStatus
 import com.jdluu.leafline.library.data.Annotation
@@ -182,6 +183,7 @@ import org.readium.navigator.media.tts.AndroidTtsNavigator
 import org.readium.navigator.media.tts.AndroidTtsNavigatorFactory
 import org.readium.navigator.media.tts.TtsNavigator
 import org.readium.navigator.media.tts.android.AndroidTtsEngine
+import org.readium.navigator.media.tts.android.AndroidTtsPreferences
 import org.readium.r2.navigator.Decoration
 import org.readium.r2.navigator.DecorableNavigator
 import org.readium.r2.navigator.VisualNavigator
@@ -298,6 +300,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     private lateinit var bookmarkManager: com.jdluu.leafline.reader.bookmarks.BookmarkManager
     private lateinit var sessionRecorder: ReadingSessionRecorder
     private var sessionRestored: Boolean = false
+    private var lifetimeActiveDurationMillis: Long = 0L
 
     @OptIn(ExperimentalReadiumApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -378,6 +381,10 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                         lifecycleScope.launch {
                             libraryRepository.setReadingStatus(book.stableId, ReadingStatus.READING)
                         }
+                    }
+                    lifecycleScope.launch {
+                        val agg = appContainer.readingSessionRepository.getAggregateForBook(book.stableId)
+                        lifetimeActiveDurationMillis = agg.activeDurationMillis
                     }
                 }
             } catch (e: Exception) {
@@ -818,9 +825,12 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                         annotationManager.saveHighlightWithTint(tint, pendingHighlightLocator)
                     },
                     ttsState = ttsState,
+                    ttsRate = ttsController.rate.collectAsStateWithLifecycle().value,
                     onTtsPlay = { ttsController.play() },
                     onTtsPause = { ttsController.pause() },
-                    onTtsStop = { ttsController.stop() }
+                    onTtsStop = { ttsController.stop() },
+                    onTtsRateChange = { rate -> handleTtsRateChange(rate) },
+                    bookActiveDurationMillis = lifetimeActiveDurationMillis + (if (::sessionRecorder.isInitialized) sessionRecorder.currentActiveDurationMillis() else 0L)
                 )
             }
         }
@@ -928,6 +938,11 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         }
         ttsNavigator?.close()
         ttsNavigator = null
+    }
+
+    private fun handleTtsRateChange(rate: Float) {
+        ttsController.setRate(rate)
+        ttsNavigator?.submitPreferences(AndroidTtsPreferences(speed = rate.toDouble()))
     }
 
     private fun observeTtsNavigator(nav: AndroidTtsNavigator) {
