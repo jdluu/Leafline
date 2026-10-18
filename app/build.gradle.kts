@@ -15,10 +15,9 @@ android {
         // current platform. Revisit only with a concrete device requirement.
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        // Pre-release: 0.0.x signals pre-alpha; MINOR bumps (0.1.0+) start
-        // when the first release ships, per the CHANGELOG versioning policy.
-        versionName = "0.0.1"
+        versionCode = 2
+        // Pre-release: 0.y.z; MINOR bumps (0.1.0+) per the CHANGELOG versioning policy.
+        versionName = "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
