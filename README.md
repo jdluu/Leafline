@@ -36,7 +36,8 @@ and paragraph indents, with reading chrome out of the way:
 - **Bookmarks & annotations** — Multi-color highlights and full-text in-book
   search
 - **Customizable reading** — Adjustable fonts, themes (including sepia),
-  margins, line height, tap zones, page-turn animation, and per-book brightness
+  margins, line height, tap zones, volume key page turning, reading progress HUD,
+  page-turn animation, and per-book brightness
 - **Text-to-speech** — Optional on-device reading aloud with synchronized page
   turning and spoken utterance highlighting
 - **Offline-first** — Works fully offline once books are on the device

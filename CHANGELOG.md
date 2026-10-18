@@ -21,6 +21,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Reader bottom HUD displaying reading progress percentage and visual progress indicator.
+- Hardware volume rocker page turning (`Volume Down` for forward, `Volume Up` for backward) in paginated reading mode.
+- System back navigation handler (`BackHandler`) in reader overlay to dismiss active HUD and menus before exiting the book.
+- In-memory LRU bitmap cache (`BitmapMemoryCache`) for cover thumbnails with power-of-two downsampling and RGB_565 format.
+- Optimistic UI updates when toggling reading status chips and collection filters in the library.
+
+### Changed
+- Centralized `ReadingStatus` as the single source of truth for display names.
+- Optimized EPUB cover loading by reusing Readium parser components across requests.
+- Generalized highlight undo handling to an open-closed `UndoCoordinator<T>` interface.
+- Debounced library search inputs with 200ms reactive flows and unified collection observing via `flatMapLatest`.
+
 ## [0.0.1] - 2026-09-29
 
 First public pre-release.
