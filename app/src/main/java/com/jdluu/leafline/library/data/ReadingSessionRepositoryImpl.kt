@@ -51,6 +51,16 @@ class ReadingSessionRepositoryImpl(
         readingSessionDao.getInTimeRange(startEpochMillis, endEpochMillis).map { it.toReadingSession() }
     }
 
+    override suspend fun getAggregateForBook(bookId: String): ReadingAggregate = withContext(ioDispatcher) {
+        val dbResult = readingSessionDao.queryAggregateForBook(bookId)
+        ReadingAggregate(
+            sessionCount = dbResult.sessionCount,
+            activeDurationMillis = dbResult.totalActiveDurationMillis,
+            activeMinutes = dbResult.totalActiveDurationMillis / 60_000L,
+            booksOpened = dbResult.booksOpenedCount
+        )
+    }
+
     override suspend fun getAggregate(
         startEpochMillis: Long,
         endEpochMillis: Long

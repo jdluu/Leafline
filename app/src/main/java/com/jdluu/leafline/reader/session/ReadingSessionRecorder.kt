@@ -72,6 +72,11 @@ class ReadingSessionRecorder(
     val isActive: Boolean
         get() = synchronized(stateLock) { isTracking && lastResumeTime != null }
 
+    fun currentActiveDurationMillis(): Long = synchronized(stateLock) {
+        val now = clock()
+        accumulatedActiveDuration + (lastResumeTime?.let { maxOf(0L, now - it) } ?: 0L)
+    }
+
     override fun onResume(owner: LifecycleOwner) {
         resume()
     }

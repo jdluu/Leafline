@@ -177,6 +177,22 @@ class LibraryViewModelTest {
             assertEquals(listOf(10L to "book-1"), repository.addedToCollection)
             assertEquals(listOf(20L to "book-1"), repository.removedFromCollection)
         }
+
+    @Test
+    fun `batch actions execute correctly on repository`() =
+        runTest(dispatcher) {
+            val repository = FakeLibraryRepository(books = flowOf(emptyList()))
+            val viewModel = LibraryViewModel(repository)
+
+            viewModel.setBooksReadingStatus(setOf("b1", "b2"), ReadingStatus.FINISHED)
+            viewModel.deleteBooks(setOf("b1", "b2"))
+            viewModel.addBooksToCollection(setOf("b1", "b2"), 42L)
+            advanceUntilIdle()
+
+            assertEquals(setOf("b1" to ReadingStatus.FINISHED, "b2" to ReadingStatus.FINISHED), repository.updatedReadingStatuses.toSet())
+            assertEquals(setOf("b1", "b2"), repository.deletedBooks.toSet())
+            assertEquals(setOf(42L to "b1", 42L to "b2"), repository.addedToCollection.toSet())
+        }
 }
 
 private fun testBook(
@@ -212,6 +228,8 @@ private class FakeLibraryRepository(
     val lookupHashes = mutableListOf<String>()
     val addedToCollection = mutableListOf<Pair<Long, String>>()
     val removedFromCollection = mutableListOf<Pair<Long, String>>()
+    val deletedBooks = mutableListOf<String>()
+    val updatedReadingStatuses = mutableListOf<Pair<String, ReadingStatus>>()
     override fun getAllBooks(): Flow<List<LibraryBook>> = books
 
     override fun searchBooks(query: String): Flow<List<LibraryBook>> = books
@@ -255,7 +273,9 @@ private class FakeLibraryRepository(
         updatedBooks += book
     }
 
-    override suspend fun deleteBook(stableId: String) = error("not used")
+    override suspend fun deleteBook(stableId: String) {
+        deletedBooks += stableId
+    }
 
     override suspend fun createCollection(name: String): Long = error("not used")
 
@@ -274,6 +294,7 @@ private class FakeLibraryRepository(
     override suspend fun getBookIdsForCollection(collectionId: Long): List<String> =
         error("not used")
 
-    override suspend fun setReadingStatus(stableId: String, status: ReadingStatus) =
-        error("not used")
+    override suspend fun setReadingStatus(stableId: String, status: ReadingStatus) {
+        updatedReadingStatuses += stableId to status
+    }
 }

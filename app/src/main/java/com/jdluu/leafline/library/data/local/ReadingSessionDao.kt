@@ -49,6 +49,15 @@ interface ReadingSessionDao {
             "COALESCE(SUM(activeDurationMillis), 0) AS totalActiveDurationMillis, " +
             "COUNT(DISTINCT bookId) AS booksOpenedCount " +
             "FROM reading_sessions " +
+            "WHERE bookId = :bookId"
+    )
+    suspend fun queryAggregateForBook(bookId: String): AggregateDbResult
+
+    @Query(
+        "SELECT COUNT(*) AS sessionCount, " +
+            "COALESCE(SUM(activeDurationMillis), 0) AS totalActiveDurationMillis, " +
+            "COUNT(DISTINCT bookId) AS booksOpenedCount " +
+            "FROM reading_sessions " +
             "WHERE startTimeEpochMillis >= :startEpochMillis AND startTimeEpochMillis < :endEpochMillis"
     )
     suspend fun queryAggregate(startEpochMillis: Long, endEpochMillis: Long): AggregateDbResult

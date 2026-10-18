@@ -31,6 +31,17 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.BarChart
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.CardDefaults
+import com.jdluu.leafline.library.data.ReadingAggregate
+import java.time.LocalDate
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Close
@@ -68,6 +79,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -129,10 +141,77 @@ fun LibraryScreen(
     var detailSheetBook by remember { mutableStateOf<LibraryBook?>(null) }
     var showDeleteConfirm by remember { mutableStateOf<LibraryBook?>(null) }
     var showFolderSheet by remember { mutableStateOf(false) }
+    var showInsightsSheet by remember { mutableStateOf(false) }
+    var selectionMode by remember { mutableStateOf(false) }
+    var selectedBookIds by remember { mutableStateOf(emptySet<String>()) }
+    var showBatchDeleteConfirm by remember { mutableStateOf(false) }
+    var showBatchStatusMenu by remember { mutableStateOf(false) }
+    var showBatchCollectionDialog by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = selectionMode) {
+        selectionMode = false
+        selectedBookIds = emptySet()
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            TopAppBar(
+            if (selectionMode) {
+                TopAppBar(
+                    title = {
+                        Text(
+                            "${selectedBookIds.size} selected",
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = {
+                            selectionMode = false
+                            selectedBookIds = emptySet()
+                        }) {
+                            Icon(Icons.Default.Close, contentDescription = "Exit selection")
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = {
+                            selectedBookIds = if (selectedBookIds.size == books.size) emptySet() else books.map { it.stableId }.toSet()
+                        }) {
+                            Icon(Icons.Default.SelectAll, contentDescription = "Select or deselect all")
+                        }
+                        if (selectedBookIds.isNotEmpty()) {
+                            Box {
+                                IconButton(onClick = { showBatchStatusMenu = true }) {
+                                    Icon(Icons.Default.CheckCircle, contentDescription = "Set reading status")
+                                }
+                                DropdownMenu(
+                                    expanded = showBatchStatusMenu,
+                                    onDismissRequest = { showBatchStatusMenu = false }
+                                ) {
+                                    ReadingStatus.entries.forEach { status ->
+                                        DropdownMenuItem(
+                                            text = { Text(status.displayName) },
+                                            onClick = {
+                                                viewModel.setBooksReadingStatus(selectedBookIds, status)
+                                                showBatchStatusMenu = false
+                                                selectionMode = false
+                                                selectedBookIds = emptySet()
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                            if (collections.isNotEmpty()) {
+                                IconButton(onClick = { showBatchCollectionDialog = true }) {
+                                    Icon(Icons.Default.CollectionsBookmark, contentDescription = "Add selected to collection")
+                                }
+                            }
+                            IconButton(onClick = { showBatchDeleteConfirm = true }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Delete selected books")
+                            }
+                        }
+                    }
+                )
+            } else {
+                TopAppBar(
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
@@ -182,6 +261,12 @@ fun LibraryScreen(
                         contentDescription = "Manage collections"
                     )
                 }
+                IconButton(onClick = { showInsightsSheet = true }) {
+                    Icon(
+                        Icons.Default.BarChart,
+                        contentDescription = "Reading insights"
+                    )
+                }
                 IconButton(onClick = {
                     foldersViewModel?.refresh()
                     showFolderSheet = true
@@ -191,8 +276,15 @@ fun LibraryScreen(
                         contentDescription = "Manage folders"
                     )
                 }
+                IconButton(onClick = { selectionMode = true }) {
+                    Icon(
+                        Icons.Default.Checklist,
+                        contentDescription = "Select books"
+                    )
+                }
             }
         )
+        }
         if (searchActive) {
             OutlinedTextField(
                 value = query,
@@ -326,10 +418,25 @@ fun LibraryScreen(
                 horizontalArrangement = Arrangement.spacedBy(Padding.compact)
             ) {
                 items(items = books, key = { it.stableId }) { book ->
+                    val isSelected = selectedBookIds.contains(book.stableId)
                     BookGridTile(
                         book = book,
-                        onClick = { onOpenBook(book) },
-                        onLongClick = { detailSheetBook = book },
+                        isSelected = isSelected,
+                        selectionMode = selectionMode,
+                        onClick = {
+                            if (selectionMode) {
+                                selectedBookIds = if (isSelected) selectedBookIds - book.stableId else selectedBookIds + book.stableId
+                            } else {
+                                onOpenBook(book)
+                            }
+                        },
+                        onLongClick = {
+                            if (selectionMode) {
+                                selectedBookIds = if (isSelected) selectedBookIds - book.stableId else selectedBookIds + book.stableId
+                            } else {
+                                detailSheetBook = book
+                            }
+                        },
                         collections = collections,
                         bookCollectionIds = viewModel
                             .collectionIdsForBook(book.stableId)
@@ -451,6 +558,58 @@ fun LibraryScreen(
             onOpen = {
                 detailSheetBook = null
                 onOpenBook(book)
+            },
+            onGetReadingStats = { viewModel.getReadingAggregateForBook(book.stableId) }
+        )
+    }
+
+    // Batch delete confirmation dialog
+    if (showBatchDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showBatchDeleteConfirm = false },
+            title = { Text("Delete books?") },
+            text = { Text("Remove ${selectedBookIds.size} books from your library? This cannot be undone.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteBooks(selectedBookIds)
+                        showBatchDeleteConfirm = false
+                        selectionMode = false
+                        selectedBookIds = emptySet()
+                    }
+                ) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBatchDeleteConfirm = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    // Batch add to collection dialog
+    if (showBatchCollectionDialog) {
+        AlertDialog(
+            onDismissRequest = { showBatchCollectionDialog = false },
+            title = { Text("Add to collection") },
+            text = {
+                LazyColumn {
+                    items(collections) { collection ->
+                        ListItem(
+                            headlineContent = { Text(collection.name) },
+                            modifier = Modifier.clickable {
+                                viewModel.addBooksToCollection(selectedBookIds, collection.id)
+                                showBatchCollectionDialog = false
+                                selectionMode = false
+                                selectedBookIds = emptySet()
+                            }
+                        )
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showBatchCollectionDialog = false }) { Text("Cancel") }
             }
         )
     }
@@ -959,6 +1118,8 @@ fun rememberLibraryGridColumns(): Int {
 @Composable
 fun BookGridTile(
     book: LibraryBook,
+    isSelected: Boolean = false,
+    selectionMode: Boolean = false,
     onClick: () -> Unit,
     onLongClick: () -> Unit = {},
     collections: List<Collection> = emptyList(),
@@ -968,12 +1129,13 @@ fun BookGridTile(
 ) {
     var showCollectionPicker by remember { mutableStateOf(false) }
     Card(
+        border = if (selectionMode && isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(
-                onClickLabel = "Open book",
+                onClickLabel = if (selectionMode) "Toggle selection" else "Open book",
                 onClick = onClick,
-                onLongClickLabel = "Book details",
+                onLongClickLabel = if (selectionMode) "Toggle selection" else "Book details",
                 onLongClick = onLongClick
             )
     ) {
@@ -994,6 +1156,25 @@ fun BookGridTile(
                     )
                 } else {
                     CoverPlaceholder(title = book.title)
+                }
+
+                if (selectionMode) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
+                                else androidx.compose.ui.graphics.Color.Transparent
+                            )
+                            .padding(Spacing.xs),
+                        contentAlignment = Alignment.TopEnd
+                    ) {
+                        Icon(
+                            imageVector = if (isSelected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                            contentDescription = if (isSelected) "Selected" else "Not selected",
+                            tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
             // Reading status badge
@@ -1191,7 +1372,8 @@ private fun BookDetailSheet(
     onSetReadingStatus: (ReadingStatus) -> Unit,
     onAddToCollection: (Long) -> Unit,
     onRemoveFromCollection: (Long) -> Unit,
-    onOpen: () -> Unit
+    onOpen: () -> Unit,
+    onGetReadingStats: suspend () -> ReadingAggregate = { ReadingAggregate.EMPTY }
 ) {
     var optimisticStatus by remember(book.readingStatus) { mutableStateOf(book.readingStatus) }
     var optimisticCollectionIds by remember(bookCollectionIds) { mutableStateOf(bookCollectionIds) }
@@ -1269,6 +1451,24 @@ private fun BookDetailSheet(
             }
             book.lastReadAtEpochMillis?.let { millis ->
                 MetadataRow("Last read", formatEpochMillis(millis))
+            }
+
+            var readingStats by remember(book.stableId) { mutableStateOf<ReadingAggregate?>(null) }
+            LaunchedEffect(book.stableId) {
+                readingStats = onGetReadingStats()
+            }
+            readingStats?.let { stats ->
+                if (stats.sessionCount > 0) {
+                    Spacer(Modifier.height(Spacing.sm))
+                    HorizontalDivider()
+                    Spacer(Modifier.height(Padding.compact))
+                    Text("Reading activity", style = MaterialTheme.typography.titleSmall)
+                    Spacer(Modifier.height(Spacing.xs))
+                    MetadataRow("Time read", formatReadingDuration(stats.activeDurationMillis))
+                    MetadataRow("Sessions", "${stats.sessionCount}")
+                    val avgMillis = stats.activeDurationMillis / stats.sessionCount
+                    MetadataRow("Average session", formatReadingDuration(avgMillis))
+                }
             }
 
             Spacer(Modifier.height(Spacing.sm))
@@ -1381,3 +1581,172 @@ private fun formatEpochMillis(millis: Long): String {
 }
 
 private const val COVER_ASPECT_RATIO = 0.7f
+internal fun formatReadingDuration(durationMillis: Long): String {
+    val totalMinutes = durationMillis / 60_000L
+    val hours = totalMinutes / 60L
+    val minutes = totalMinutes % 60L
+    return when {
+        totalMinutes < 1L -> "< 1 min"
+        hours == 0L -> "$minutes min"
+        minutes == 0L -> "${hours}h"
+        else -> "${hours}h ${minutes}m"
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReadingInsightsSheet(
+    viewModel: LibraryViewModel,
+    onDismiss: () -> Unit
+) {
+    var todayStats by remember { mutableStateOf(ReadingAggregate.EMPTY) }
+    var weeklyStats by remember { mutableStateOf(ReadingAggregate.EMPTY) }
+    var recentDailyStats by remember { mutableStateOf<List<Pair<LocalDate, ReadingAggregate>>>(emptyList()) }
+
+    LaunchedEffect(Unit) {
+        todayStats = viewModel.getTodayAggregate()
+        weeklyStats = viewModel.getWeeklyAggregate()
+        recentDailyStats = viewModel.getRecentDailyAggregates(7)
+    }
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = Spacing.md, vertical = Spacing.sm)
+                .padding(bottom = Spacing.lg)
+                .verticalScroll(rememberScrollState())
+        ) {
+            Text(
+                text = "Reading Insights",
+                style = MaterialTheme.typography.titleLarge
+            )
+            Spacer(Modifier.height(Spacing.xs))
+            Text(
+                text = "100% private and on-device. No analytics or tracking.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(Modifier.height(Spacing.md))
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Column(modifier = Modifier.padding(Spacing.md)) {
+                    Text(
+                        text = "Today",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Spacer(Modifier.height(Spacing.xs))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text(
+                                text = formatReadingDuration(todayStats.activeDurationMillis),
+                                style = MaterialTheme.typography.headlineMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "Time read",
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                        }
+                        Column {
+                            Text(
+                                text = "${todayStats.sessionCount}",
+                                style = MaterialTheme.typography.headlineMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "Sessions",
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                        }
+                        Column {
+                            Text(
+                                text = "${todayStats.booksOpened}",
+                                style = MaterialTheme.typography.headlineMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "Books opened",
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(Spacing.md))
+
+            Text(
+                text = "Past 7 Days",
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(Modifier.height(Spacing.xs))
+            Text(
+                text = "Total: ${formatReadingDuration(weeklyStats.activeDurationMillis)} across ${weeklyStats.sessionCount} sessions",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(Modifier.height(Spacing.md))
+
+            val maxMinutes = (recentDailyStats.maxOfOrNull { it.second.activeMinutes } ?: 0L).coerceAtLeast(15L)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(130.dp)
+                    .clip(MaterialTheme.shapes.medium)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    .padding(Spacing.sm),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                recentDailyStats.forEach { (date, agg) ->
+                    val ratio = (agg.activeMinutes.toFloat() / maxMinutes.toFloat()).coerceIn(0.06f, 1f)
+                    val dayLabel = date.dayOfWeek.name.take(3)
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = if (agg.activeMinutes > 0) "${agg.activeMinutes}m" else "",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Box(
+                            modifier = Modifier
+                                .width(16.dp)
+                                .height((70 * ratio).dp)
+                                .clip(MaterialTheme.shapes.small)
+                                .background(
+                                    if (agg.activeMinutes > 0) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.outlineVariant
+                                )
+                        )
+                        Spacer(Modifier.height(Spacing.xs))
+                        Text(
+                            text = dayLabel,
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(Spacing.md))
+            Button(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Close")
+            }
+        }
+    }
+}
