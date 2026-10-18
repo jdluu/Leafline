@@ -251,7 +251,10 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
 
     private var navigator: EpubNavigatorFragment? = null
     private var publication: Publication? = null
-    private var bookStableId: String? = null
+    private val bookStableIdState = androidx.compose.runtime.mutableStateOf<String?>(null)
+    private var bookStableId: String?
+        get() = bookStableIdState.value
+        set(value) { bookStableIdState.value = value }
     private lateinit var bookmarkRepository: BookmarkRepository
     private lateinit var annotationRepository: AnnotationRepository
     private lateinit var libraryRepository: LibraryRepository
@@ -324,7 +327,19 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         if (intent?.getBooleanExtra(EXTRA_SHOW_TOOLBAR, false) == true) {
             toolbarVisible.value = true
         }
+        if (intent?.getBooleanExtra("extra_show_highlights", false) == true) {
+            toolbarVisible.value = true
+            highlightsSheetVisible.value = true
+        }
+        if (intent?.getBooleanExtra("extra_show_bookmarks", false) == true) {
+            toolbarVisible.value = true
+            bookmarkSheetVisible.value = true
+        }
 
+        val intentBookId = intent?.getStringExtra("extra_book_id")
+        if (intentBookId != null) {
+            bookStableId = intentBookId
+        }
         val importedPath = intent?.getStringExtra(EXTRA_FILE_PATH)
         var epubFile: File? = null
 
@@ -366,9 +381,10 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         var savedBook: com.jdluu.leafline.library.LibraryBook? = null
         {
             try {
-                val lookupPath = epubFile!!.absolutePath
+                val lookupPath = epubFile!!.canonicalPath
                 savedBook = runBlocking {
                     libraryRepository.getBookByFilePath(lookupPath)
+                        ?: libraryRepository.getBookByFilePath(epubFile!!.absolutePath)
                 }
                 if (savedBook == null) {
                     Log.w(TAG, "No library book found for path: $lookupPath")

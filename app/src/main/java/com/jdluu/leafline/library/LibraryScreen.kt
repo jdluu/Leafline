@@ -507,6 +507,14 @@ fun LibraryScreen(
         )
     }
 
+    // Reading insights sheet
+    if (showInsightsSheet) {
+        ReadingInsightsSheet(
+            viewModel = viewModel,
+            onDismiss = { showInsightsSheet = false }
+        )
+    }
+
     // Create collection dialog
     if (showCreateDialog) {
         AlertDialog(
