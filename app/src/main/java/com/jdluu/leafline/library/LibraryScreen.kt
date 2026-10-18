@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
@@ -133,6 +135,7 @@ fun LibraryScreen(
     val collections by viewModel.collections.collectAsStateWithLifecycle()
     val selectedCollection by viewModel.selectedCollection.collectAsStateWithLifecycle()
     val readingStatusFilter by viewModel.readingStatusFilter.collectAsStateWithLifecycle()
+    val continueReadingBooks by viewModel.continueReadingBooks.collectAsStateWithLifecycle()
     var searchActive by remember { mutableStateOf(false) }
     var showCollectionSheet by remember { mutableStateOf(false) }
     var showCreateDialog by remember { mutableStateOf(false) }
@@ -255,139 +258,135 @@ fun LibraryScreen(
                         onDismiss = { menuExpanded = false }
                     )
                 }
-                IconButton(onClick = { showCollectionSheet = true }) {
-                    Icon(
-                        Icons.Default.CollectionsBookmark,
-                        contentDescription = "Manage collections"
-                    )
-                }
-                IconButton(onClick = { showInsightsSheet = true }) {
-                    Icon(
-                        Icons.Default.BarChart,
-                        contentDescription = "Reading insights"
-                    )
-                }
-                IconButton(onClick = {
-                    foldersViewModel?.refresh()
-                    showFolderSheet = true
-                }) {
-                    Icon(
-                        Icons.Default.FolderOpen,
-                        contentDescription = "Manage folders"
-                    )
-                }
-                IconButton(onClick = { selectionMode = true }) {
-                    Icon(
-                        Icons.Default.Checklist,
-                        contentDescription = "Select books"
-                    )
+                Box {
+                    var overflowMenuExpanded by remember { mutableStateOf(false) }
+                    IconButton(onClick = { overflowMenuExpanded = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "More options")
+                    }
+                    DropdownMenu(
+                        expanded = overflowMenuExpanded,
+                        onDismissRequest = { overflowMenuExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Select books") },
+                            leadingIcon = { Icon(Icons.Default.Checklist, contentDescription = null) },
+                            onClick = {
+                                overflowMenuExpanded = false
+                                selectionMode = true
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Reading insights") },
+                            leadingIcon = { Icon(Icons.Default.BarChart, contentDescription = null) },
+                            onClick = {
+                                overflowMenuExpanded = false
+                                showInsightsSheet = true
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Collections") },
+                            leadingIcon = { Icon(Icons.Default.CollectionsBookmark, contentDescription = null) },
+                            onClick = {
+                                overflowMenuExpanded = false
+                                showCollectionSheet = true
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Manage folders") },
+                            leadingIcon = { Icon(Icons.Default.FolderOpen, contentDescription = null) },
+                            onClick = {
+                                overflowMenuExpanded = false
+                                foldersViewModel?.refresh()
+                                showFolderSheet = true
+                            }
+                        )
+                    }
                 }
             }
         )
         }
-        if (searchActive) {
-            OutlinedTextField(
-                value = query,
-                onValueChange = viewModel::setQuery,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Padding.screen, vertical = 4.dp)
-                    .semantics { contentDescription = "Search title or author" },
-                placeholder = { Text("Search title or author") },
-                singleLine = true,
-                trailingIcon = {
-                    IconButton(
-                        onClick = {
-                            viewModel.setQuery("")
-                            searchActive = false
+
+        if (books.isEmpty()) {
+            if (searchActive) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = viewModel::setQuery,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Padding.screen, vertical = 4.dp)
+                        .semantics { contentDescription = "Search title or author" },
+                    placeholder = { Text("Search title or author") },
+                    singleLine = true,
+                    trailingIcon = {
+                        IconButton(
+                            onClick = {
+                                viewModel.setQuery("")
+                                searchActive = false
+                            }
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = "Clear search")
                         }
-                    ) {
-                        Icon(Icons.Default.Close, contentDescription = "Clear search")
+                    }
+                )
+            }
+
+            if (collections.isNotEmpty()) {
+                androidx.compose.foundation.lazy.LazyRow(
+                    modifier = Modifier.padding(horizontal = Padding.screen, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+                ) {
+                    item {
+                        FilterChip(
+                            selected = selectedCollection == null,
+                            onClick = { viewModel.selectCollection(null) },
+                            label = { Text("All") },
+                            modifier = Modifier.semantics { contentDescription = "All collections" }
+                        )
+                    }
+                    items(collections) { collection ->
+                        FilterChip(
+                            selected = selectedCollection == collection.id,
+                            onClick = { viewModel.selectCollection(collection.id) },
+                            label = { Text(collection.name) },
+                            trailingIcon = if (selectedCollection == collection.id) {
+                                {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp) // touch-target-ok: decorative chip icon
+                                    )
+                                }
+                            } else null
+                        )
                     }
                 }
-            )
-        }
+            }
 
-        // Collection filter chips
-        if (collections.isNotEmpty()) {
             androidx.compose.foundation.lazy.LazyRow(
                 modifier = Modifier.padding(horizontal = Padding.screen, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
             ) {
                 item {
                     FilterChip(
-                        selected = selectedCollection == null,
-                        onClick = { viewModel.selectCollection(null) },
+                        selected = readingStatusFilter == null,
+                        onClick = { viewModel.setReadingStatusFilter(null) },
                         label = { Text("All") },
-                        modifier = Modifier.semantics { contentDescription = "All collections" }
+                        modifier = Modifier.semantics { contentDescription = "All reading statuses" }
                     )
                 }
-                items(collections) { collection ->
-                    FilterChip(
-                        selected = selectedCollection == collection.id,
-                        onClick = { viewModel.selectCollection(collection.id) },
-                        label = { Text(collection.name) },
-                        trailingIcon = if (selectedCollection == collection.id) {
-                            {
-                                Icon(
-                                    Icons.Default.Close,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp) // touch-target-ok: decorative chip icon
-                                )
+                ReadingStatus.entries.forEach { status ->
+                    item {
+                        FilterChip(
+                            selected = readingStatusFilter == status,
+                            onClick = { viewModel.setReadingStatusFilter(status) },
+                            label = {
+                                Text(status.displayName)
                             }
-                        } else null
-                    )
-                }
-            }
-        }
-
-        // Reading status filter chips
-        androidx.compose.foundation.lazy.LazyRow(
-            modifier = Modifier.padding(horizontal = Padding.screen, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
-        ) {
-            item {
-                FilterChip(
-                    selected = readingStatusFilter == null,
-                    onClick = { viewModel.setReadingStatusFilter(null) },
-                    label = { Text("All") },
-                    modifier = Modifier.semantics { contentDescription = "All reading statuses" }
-                )
-            }
-            ReadingStatus.entries.forEach { status ->
-                item {
-                    FilterChip(
-                        selected = readingStatusFilter == status,
-                        onClick = { viewModel.setReadingStatusFilter(status) },
-                        label = {
-                            Text(status.displayName)
-                        }
-                    )
-                }
-            }
-        }
-
-        // Continue reading shelf
-        val continueReadingBooks by viewModel.continueReadingBooks.collectAsStateWithLifecycle()
-        if (continueReadingBooks.isNotEmpty()) {
-            Column(modifier = Modifier.padding(top = Spacing.xs)) {
-                Text(
-                    "Continue reading",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(horizontal = Padding.screen)
-                )
-                androidx.compose.foundation.lazy.LazyRow(
-                    modifier = Modifier.padding(horizontal = Padding.compact, vertical = Spacing.xs),
-                    horizontalArrangement = Arrangement.spacedBy(Padding.compact)
-                ) {
-                    items(continueReadingBooks, key = { it.stableId }) { book ->
-                        ContinueReadingTile(book = book, onClick = { onOpenBook(book) })
+                        )
                     }
                 }
             }
-        }
 
-        if (books.isEmpty()) {
             when {
                 !isLibraryLoaded -> LibraryLoadingState()
                 query.isNotBlank() -> LibraryEmptyState(
@@ -413,10 +412,123 @@ fun LibraryScreen(
             LazyVerticalGrid(
                 columns = GridCells.Fixed(rememberLibraryGridColumns()),
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(Padding.screen),
+                contentPadding = PaddingValues(start = Padding.screen, end = Padding.screen, top = Spacing.xs, bottom = 88.dp),
                 verticalArrangement = Arrangement.spacedBy(Padding.compact),
                 horizontalArrangement = Arrangement.spacedBy(Padding.compact)
             ) {
+                if (searchActive) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        OutlinedTextField(
+                            value = query,
+                            onValueChange = viewModel::setQuery,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .semantics { contentDescription = "Search title or author" },
+                            placeholder = { Text("Search title or author") },
+                            singleLine = true,
+                            trailingIcon = {
+                                IconButton(
+                                    onClick = {
+                                        viewModel.setQuery("")
+                                        searchActive = false
+                                    }
+                                ) {
+                                    Icon(Icons.Default.Close, contentDescription = "Clear search")
+                                }
+                            }
+                        )
+                    }
+                }
+
+                if (collections.isNotEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        androidx.compose.foundation.lazy.LazyRow(
+                            modifier = Modifier.padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+                        ) {
+                            item {
+                                FilterChip(
+                                    selected = selectedCollection == null,
+                                    onClick = { viewModel.selectCollection(null) },
+                                    label = { Text("All") },
+                                    modifier = Modifier.semantics { contentDescription = "All collections" }
+                                )
+                            }
+                            items(collections) { collection ->
+                                FilterChip(
+                                    selected = selectedCollection == collection.id,
+                                    onClick = { viewModel.selectCollection(collection.id) },
+                                    label = { Text(collection.name) },
+                                    trailingIcon = if (selectedCollection == collection.id) {
+                                        {
+                                            Icon(
+                                                Icons.Default.Close,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp) // touch-target-ok: decorative chip icon
+                                            )
+                                        }
+                                    } else null
+                                )
+                            }
+                        }
+                    }
+                }
+
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    androidx.compose.foundation.lazy.LazyRow(
+                        modifier = Modifier.padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+                    ) {
+                        item {
+                            FilterChip(
+                                selected = readingStatusFilter == null,
+                                onClick = { viewModel.setReadingStatusFilter(null) },
+                                label = { Text("All") },
+                                modifier = Modifier.semantics { contentDescription = "All reading statuses" }
+                            )
+                        }
+                        ReadingStatus.entries.forEach { status ->
+                            item {
+                                FilterChip(
+                                    selected = readingStatusFilter == status,
+                                    onClick = { viewModel.setReadingStatusFilter(status) },
+                                    label = {
+                                        Text(status.displayName)
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (continueReadingBooks.isNotEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Column(modifier = Modifier.padding(top = Spacing.xs)) {
+                            Text(
+                                "Continue reading",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            androidx.compose.foundation.lazy.LazyRow(
+                                modifier = Modifier.padding(vertical = Spacing.xs),
+                                horizontalArrangement = Arrangement.spacedBy(Padding.compact)
+                            ) {
+                                items(continueReadingBooks, key = { it.stableId }) { book ->
+                                    ContinueReadingTile(book = book, onClick = { onOpenBook(book) })
+                                }
+                            }
+                        }
+                    }
+                }
+
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Text(
+                        text = if (readingStatusFilter != null) readingStatusFilter!!.displayName else "All books",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(top = Spacing.xs)
+                    )
+                }
+
                 items(items = books, key = { it.stableId }) { book ->
                     val isSelected = selectedBookIds.contains(book.stableId)
                     BookGridTile(
@@ -460,20 +572,8 @@ fun LibraryScreen(
         modifier = Modifier
             .align(Alignment.BottomEnd)
             .padding(Padding.screen)
-            .padding(bottom = if (books.isEmpty()) 0.dp else Spacing.xxl)
     ) {
         Icon(Icons.Default.Add, contentDescription = "Import EPUB")
-    }
-    OutlinedButton(
-        onClick = onAddLibraryFolder,
-        modifier = Modifier
-            .align(Alignment.BottomStart)
-            .padding(Padding.screen)
-            .padding(bottom = if (books.isEmpty()) 0.dp else Spacing.xxl)
-    ) {
-        Icon(Icons.Default.FolderOpen, contentDescription = null)
-        Spacer(modifier = Modifier.width(Spacing.xs))
-        Text("Add folder")
     }
     }
 

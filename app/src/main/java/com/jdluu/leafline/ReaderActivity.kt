@@ -13,6 +13,7 @@ import android.os.Bundle
 import android.util.Log
 import android.view.ActionMode
 import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.Menu
 import android.view.MenuItem
 import android.view.WindowManager
@@ -281,6 +282,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     private var selectedHighlightTint: HighlightTint = DEFAULT_HIGHLIGHT_TINT
     private var currentBook: com.jdluu.leafline.library.LibraryBook? = null
     private var toolbarVisible = mutableStateOf(false)
+    private var isDrawerOpen = mutableStateOf(false)
     private var settingsSheetVisible = mutableStateOf(false)
     private var highlightTintSheetVisible = mutableStateOf(false)
     private var bookmarkSheetVisible = mutableStateOf(false)
@@ -766,10 +768,36 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         startActivity(Intent.createChooser(intent, "Export highlights"))
     }
 
+    private class ReaderOverlayTouchContainer(
+        context: Context,
+        private val isInteractive: () -> Boolean
+    ) : android.widget.FrameLayout(context) {
+
+        override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+            if (!isInteractive()) {
+                return false
+            }
+            return super.dispatchTouchEvent(ev)
+        }
+    }
+
     private fun addReaderOverlay() {
+        val touchContainer = ReaderOverlayTouchContainer(this) {
+            toolbarVisible.value ||
+            settingsSheetVisible.value ||
+            bookmarkSheetVisible.value ||
+            highlightsSheetVisible.value ||
+            searchSheetVisible.value ||
+            highlightTintSheetVisible.value ||
+            syncConflictState.value != null ||
+            isDrawerOpen.value
+        }
         val composeView = ComposeView(this).apply {
             setContent {
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+                LaunchedEffect(drawerState.isOpen) {
+                    isDrawerOpen.value = drawerState.isOpen
+                }
                 val scope = rememberCoroutineScope()
                 val searchState by bookSearcher.state.collectAsState()
                 val syncConflict by syncConflictState.collectAsState()
@@ -854,7 +882,8 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             android.view.ViewGroup.LayoutParams.MATCH_PARENT,
             android.view.ViewGroup.LayoutParams.MATCH_PARENT
         )
-        addContentView(composeView, layoutParams)
+        touchContainer.addView(composeView, layoutParams)
+        addContentView(touchContainer, layoutParams)
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {

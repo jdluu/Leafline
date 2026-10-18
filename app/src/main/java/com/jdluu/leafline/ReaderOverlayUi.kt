@@ -19,6 +19,7 @@ import android.view.WindowManager
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
@@ -295,11 +296,27 @@ internal fun ReaderOverlay(
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             if (toolbarVisible) {
+                // Tapping outside the toolbar dismisses it
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) {
+                            onDismissToolbar()
+                        }
+                )
+
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .align(Alignment.TopCenter)
                         .statusBarsPadding()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) {}
                 ) {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
@@ -411,6 +428,10 @@ internal fun ReaderOverlay(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .navigationBarsPadding()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) {}
                 )
             }
             SnackbarHost(

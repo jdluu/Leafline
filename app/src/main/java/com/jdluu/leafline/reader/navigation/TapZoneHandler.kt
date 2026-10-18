@@ -1,6 +1,7 @@
 package com.jdluu.leafline.reader.navigation
 
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.LifecycleCoroutineScope
 import com.jdluu.leafline.reader.PageTurnAnimation
 import com.jdluu.leafline.reader.ReaderSettings
@@ -57,25 +58,29 @@ class TapZoneHandler(
             val width = navigatorProvider()?.publicationView?.width ?: return false
             if (width <= 0) return false
             val settings = settingsProvider()
-            return when (
-                effectiveTapZoneAction(
-                    tapZoneAt(event.point.x / width),
-                    settings.tapZoneConfig,
-                    settings.epub.scroll == true
-                )
-            ) {
+            val ratio = event.point.x / width
+            Log.d("TapZoneHandler", "onTap: point=${event.point}, width=$width, ratio=$ratio")
+            val action = effectiveTapZoneAction(
+                tapZoneAt(ratio),
+                settings.tapZoneConfig,
+                settings.epub.scroll == true
+            )
+            Log.d("TapZoneHandler", "onTap action: $action")
+            return when (action) {
                 TapZoneAction.NONE -> false
                 TapZoneAction.TOGGLE_MENU -> {
                     onToggleMenu()
                     true
                 }
                 TapZoneAction.NEXT_PAGE -> {
-                    navigatorProvider()?.goForward(pageTurnAnimated(settings))
-                    true
+                    val handled = navigatorProvider()?.goForward(pageTurnAnimated(settings)) ?: false
+                    Log.d("TapZoneHandler", "goForward returned $handled")
+                    handled
                 }
                 TapZoneAction.PREVIOUS_PAGE -> {
-                    navigatorProvider()?.goBackward(pageTurnAnimated(settings))
-                    true
+                    val handled = navigatorProvider()?.goBackward(pageTurnAnimated(settings)) ?: false
+                    Log.d("TapZoneHandler", "goBackward returned $handled")
+                    handled
                 }
             }
         }
@@ -98,30 +103,44 @@ class TapZoneHandler(
     fun onReadingPositionChanged(locator: Locator) {
         val percent = try {
             ReadingProgressMath.percentageFromLocator(locator.toJSON().toString())
-        } catch (e: Exception) {
-            null
-        }?.roundToInt() ?: return
+                ?.times(100f)
+                ?.roundToInt()
+                ?: -1
+        } catch (_: Exception) {
+            -1
+        }
         val href = locator.href.toString()
+
         if (!primed) {
             primed = true
             lastHref = href
             lastPercent = percent
             return
         }
-        val changedResource = href != lastHref
-        val changedPage = abs(percent - lastPercent) >= 1
-        if (!changedResource && !changedPage) return
+
+        val hrefChanged = href != lastHref
+        val percentChanged = percent >= 0 && (lastPercent < 0 || abs(percent - lastPercent) >= 1)
+
+        if (!hrefChanged && !percentChanged) return
+
         lastHref = href
         lastPercent = percent
+
+        val message = when {
+            percent >= 0 -> "$percent percent"
+            locator.title?.isNotBlank() == true -> locator.title!!
+            else -> "Page changed"
+        }
+
         announceJob?.cancel()
         announceJob = scope.launch {
-            delay(PAGE_TURN_ANNOUNCE_DEBOUNCE_MS)
-            announcement = "Page $percent%"
-            onAnnouncement(announcement!!)
+            delay(DEBOUNCE_MILLIS)
+            announcement = message
+            onAnnouncement(message)
         }
     }
 
     companion object {
-        private const val PAGE_TURN_ANNOUNCE_DEBOUNCE_MS = 300L
+        private const val DEBOUNCE_MILLIS = 300L
     }
 }
