@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-18
+
 ### Added
 - Reading Statistics & Insights dashboard tracking today's reading duration, weekly aggregates, session count, and a 7-day visual activity breakdown in a Material 3 sheet.
 - Book detail reading activity metrics: total reading time, session count, and average session length.
