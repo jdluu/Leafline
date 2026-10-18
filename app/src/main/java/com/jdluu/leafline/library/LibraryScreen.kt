@@ -2,6 +2,7 @@ package com.jdluu.leafline.library
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import com.jdluu.leafline.library.cover.BitmapMemoryCache
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -267,13 +268,7 @@ fun LibraryScreen(
                         selected = readingStatusFilter == status,
                         onClick = { viewModel.setReadingStatusFilter(status) },
                         label = {
-                            Text(
-                                when (status) {
-                                    ReadingStatus.UNREAD -> "Unread"
-                                    ReadingStatus.READING -> "Reading"
-                                    ReadingStatus.FINISHED -> "Finished"
-                                }
-                            )
+                            Text(status.displayName)
                         }
                     )
                 }
@@ -873,6 +868,8 @@ private fun BookCollectionPickerSheet(
     onAddToCollection: (Long) -> Unit,
     onRemoveFromCollection: (Long) -> Unit
 ) {
+    var optimisticIds by remember(bookCollectionIds) { mutableStateOf(bookCollectionIds) }
+
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(modifier = Modifier.padding(Padding.screen)) {
             Text(
@@ -888,11 +885,16 @@ private fun BookCollectionPickerSheet(
                 )
             } else {
                 LazyColumn {
-                    items(collections) { collection ->
-                        val isMember = collection.id in bookCollectionIds
+                    items(collections, key = { it.id }) { collection ->
+                        val isMember = collection.id in optimisticIds
                         FilterChip(
                             selected = isMember,
                             onClick = {
+                                optimisticIds = if (isMember) {
+                                    optimisticIds - collection.id
+                                } else {
+                                    optimisticIds + collection.id
+                                }
                                 if (isMember) onRemoveFromCollection(collection.id)
                                 else onAddToCollection(collection.id)
                             },
@@ -1011,11 +1013,7 @@ fun BookGridTile(
                         .padding(horizontal = Spacing.xs, vertical = 2.dp)
                 ) {
                     Text(
-                        text = when (book.readingStatus) {
-                            ReadingStatus.READING -> "Reading"
-                            ReadingStatus.FINISHED -> "Finished"
-                            ReadingStatus.UNREAD -> ""
-                        },
+                        text = book.readingStatus.displayName,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onPrimary,
                         maxLines = 1
@@ -1106,13 +1104,13 @@ private fun CoverPlaceholder(title: String) {
 
 @Composable
 fun rememberCoverBitmap(path: String?): Bitmap? {
+    if (path == null) return null
+    val cached = remember(path) { BitmapMemoryCache.get(path) }
+    if (cached != null) return cached
+
     return produceState<Bitmap?>(initialValue = null, path) {
         value = withContext(Dispatchers.IO) {
-            try {
-                path?.let { BitmapFactory.decodeFile(it) }
-            } catch (e: Exception) {
-                null
-            }
+            BitmapMemoryCache.decodeSampledBitmap(path)
         }
     }.value
 }
@@ -1195,6 +1193,9 @@ private fun BookDetailSheet(
     onRemoveFromCollection: (Long) -> Unit,
     onOpen: () -> Unit
 ) {
+    var optimisticStatus by remember(book.readingStatus) { mutableStateOf(book.readingStatus) }
+    var optimisticCollectionIds by remember(bookCollectionIds) { mutableStateOf(bookCollectionIds) }
+
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
@@ -1256,11 +1257,7 @@ private fun BookDetailSheet(
             // Metadata section
             Text("Metadata", style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(Spacing.xs))
-            MetadataRow("Status", when (book.readingStatus) {
-                ReadingStatus.UNREAD -> "Unread"
-                ReadingStatus.READING -> "Reading"
-                ReadingStatus.FINISHED -> "Finished"
-            })
+            MetadataRow("Status", optimisticStatus.displayName)
             book.publisher?.let { MetadataRow("Publisher", it) }
             book.pageCount?.let { MetadataRow("Pages", it.toString()) }
             book.language?.let { MetadataRow("Language", it) }
@@ -1301,14 +1298,13 @@ private fun BookDetailSheet(
             ) {
                 ReadingStatus.entries.forEach { status ->
                     FilterChip(
-                        selected = book.readingStatus == status,
-                        onClick = { onSetReadingStatus(status) },
+                        selected = optimisticStatus == status,
+                        onClick = {
+                            optimisticStatus = status
+                            onSetReadingStatus(status)
+                        },
                         label = {
-                            Text(when (status) {
-                                ReadingStatus.UNREAD -> "Unread"
-                                ReadingStatus.READING -> "Reading"
-                                ReadingStatus.FINISHED -> "Finished"
-                            })
+                            Text(status.displayName)
                         }
                     )
                 }
@@ -1322,10 +1318,15 @@ private fun BookDetailSheet(
                 Spacer(Modifier.height(4.dp))
                 // Toggle row for each collection
                 collections.forEach { collection ->
-                    val isMember = collection.id in bookCollectionIds
+                    val isMember = collection.id in optimisticCollectionIds
                     FilterChip(
                         selected = isMember,
                         onClick = {
+                            optimisticCollectionIds = if (isMember) {
+                                optimisticCollectionIds - collection.id
+                            } else {
+                                optimisticCollectionIds + collection.id
+                            }
                             if (isMember) onRemoveFromCollection(collection.id)
                             else onAddToCollection(collection.id)
                         },

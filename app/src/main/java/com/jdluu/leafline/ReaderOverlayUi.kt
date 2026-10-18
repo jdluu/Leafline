@@ -1,6 +1,7 @@
 package com.jdluu.leafline
 
 import androidx.compose.material3.AlertDialog
+import androidx.activity.compose.BackHandler
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -209,6 +210,7 @@ import java.io.IOException
 internal fun ReaderOverlay(
     title: String,
     toolbarVisible: Boolean,
+    onDismissToolbar: () -> Unit = {},
     tocLinks: List<Pair<Link, Int>>,
     currentSettings: ReaderSettings,
     drawerState: DrawerState,
@@ -260,8 +262,13 @@ internal fun ReaderOverlay(
     onTtsPause: () -> Unit = {},
     onTtsStop: () -> Unit = {}
 ) {
+    BackHandler(enabled = toolbarVisible) {
+        onDismissToolbar()
+    }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
+        gesturesEnabled = drawerState.isOpen,
         drawerContent = {
             ModalDrawerSheet {
                 Text(
@@ -387,6 +394,14 @@ internal fun ReaderOverlay(
                 )
             }
 
+            if (toolbarVisible) {
+                ReaderBottomBar(
+                    currentLocatorJson = currentLocatorJson,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                )
+            }
             SnackbarHost(
                 hostState = snackbarHostState,
                 modifier = Modifier
@@ -1629,6 +1644,48 @@ internal fun MetadataRow(label: String, value: String) {
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.weight(1f)
         )
+    }
+}
+
+@Composable
+internal fun ReaderBottomBar(
+    currentLocatorJson: String?,
+    modifier: Modifier = Modifier
+) {
+    val percent = remember(currentLocatorJson) {
+        ReadingProgressMath.percentageFromLocator(currentLocatorJson)
+    }
+    val label = remember(currentLocatorJson) {
+        ReadingProgressMath.progressLabel(currentLocatorJson)
+    }
+    if (label != null && percent != null) {
+        Surface(
+            modifier = modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+            tonalElevation = 6.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                LinearProgressIndicator(
+                    progress = { (percent / 100.0).toFloat().coerceIn(0f, 1f) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(4.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+                Spacer(modifier = Modifier.height(Spacing.xs))
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }
 

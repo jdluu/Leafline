@@ -1,6 +1,7 @@
 package com.jdluu.leafline.reader.annotations
 
 import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.SwipeToDismissBoxValue
 import com.jdluu.leafline.library.data.Annotation
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -80,22 +81,39 @@ class HighlightUndoCoordinatorTest {
 
         assertEquals(listOf("delete", "snackbar", "restore"), order)
     }
+
+    @Test
+    fun `generic UndoCoordinator works for arbitrary string items`() = runTest {
+        val log = mutableListOf<String>()
+        val coordinator = UndoCoordinator<String>(
+            execute = { log.add("exec:$it") },
+            undo = { log.add("undo:$it") },
+            showUndoSnackbar = { SnackbarResult.ActionPerformed }
+        )
+
+        coordinator.executeWithUndo("item-123")
+
+        assertEquals(listOf("exec:item-123", "undo:item-123"), log)
+    }
 }
 
 class ConfirmHighlightDismissTest {
 
     @Test
     fun `end to start confirms the dismissal`() {
-        assertTrue(confirmHighlightDismiss(androidx.compose.material3.SwipeToDismissBoxValue.EndToStart))
+        assertTrue(confirmHighlightDismiss(SwipeToDismissBoxValue.EndToStart))
+        assertTrue(confirmEndToStartDismiss(SwipeToDismissBoxValue.EndToStart))
     }
 
     @Test
     fun `start to end never confirms`() {
-        assertFalse(confirmHighlightDismiss(androidx.compose.material3.SwipeToDismissBoxValue.StartToEnd))
+        assertFalse(confirmHighlightDismiss(SwipeToDismissBoxValue.StartToEnd))
+        assertFalse(confirmEndToStartDismiss(SwipeToDismissBoxValue.StartToEnd))
     }
 
     @Test
     fun `settled swipes never confirm`() {
-        assertFalse(confirmHighlightDismiss(androidx.compose.material3.SwipeToDismissBoxValue.Settled))
+        assertFalse(confirmHighlightDismiss(SwipeToDismissBoxValue.Settled))
+        assertFalse(confirmEndToStartDismiss(SwipeToDismissBoxValue.Settled))
     }
 }

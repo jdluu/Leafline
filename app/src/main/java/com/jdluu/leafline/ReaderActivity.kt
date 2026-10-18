@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.ActionMode
+import android.view.KeyEvent
 import android.view.Menu
 import android.view.MenuItem
 import android.view.WindowManager
@@ -301,6 +302,10 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     @OptIn(ExperimentalReadiumApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+        }
         bookmarkRepository = appContainer.bookmarkRepository
         annotationRepository = appContainer.annotationRepository
         libraryRepository = appContainer.libraryRepository
@@ -750,6 +755,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                 ReaderOverlay(
                     title = bookTitle.value,
                     toolbarVisible = toolbarVisible.value,
+                    onDismissToolbar = { toolbarVisible.value = false },
                     tocLinks = tocLinks.value,
                     currentSettings = currentSettings,
                     drawerState = drawerState,
@@ -823,6 +829,22 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             android.view.ViewGroup.LayoutParams.MATCH_PARENT
         )
         addContentView(composeView, layoutParams)
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (settingsController.settings.value.epub.scroll != true) {
+            when (keyCode) {
+                KeyEvent.KEYCODE_VOLUME_DOWN -> {
+                    navigator?.goForward(tapZoneHandler.pageTurnAnimated(settingsController.settings.value))
+                    return true
+                }
+                KeyEvent.KEYCODE_VOLUME_UP -> {
+                    navigator?.goBackward(tapZoneHandler.pageTurnAnimated(settingsController.settings.value))
+                    return true
+                }
+            }
+        }
+        return super.onKeyDown(keyCode, event)
     }
 
     override fun onExternalLinkActivated(url: AbsoluteUrl) {
