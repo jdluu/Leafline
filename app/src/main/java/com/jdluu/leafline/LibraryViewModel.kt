@@ -10,15 +10,19 @@ import com.jdluu.leafline.library.ReadingStatus
 import com.jdluu.leafline.library.cover.CoverLoader
 import com.jdluu.leafline.library.data.Collection
 import com.jdluu.leafline.library.data.LibraryRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -66,10 +70,12 @@ class LibraryViewModel(
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query.asStateFlow()
 
-    @OptIn(ExperimentalCoroutinesApi::class)
-    private val searchedBooks: Flow<List<LibraryBook>> = _query.flatMapLatest { query ->
-        if (query.isBlank()) repository.getAllBooks() else repository.searchBooks(query.trim())
-    }
+    @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
+    private val searchedBooks: Flow<List<LibraryBook>> = _query
+        .debounce { query -> if (query.isBlank()) 0L else 200L }
+        .flatMapLatest { query ->
+            if (query.isBlank()) repository.getAllBooks() else repository.searchBooks(query.trim())
+        }
 
     /** Collections available in the library. */
     val collections: StateFlow<List<Collection>> = repository.getAllCollections()
@@ -84,7 +90,20 @@ class LibraryViewModel(
     val selectedCollection: StateFlow<Long?> = _selectedCollection.asStateFlow()
 
     /** Book stableIds that belong to the currently selected collection. */
-    private val _collectionBookIds = MutableStateFlow<Set<String>?>(null)
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val collectionBookIds: StateFlow<Set<String>?> = _selectedCollection
+        .flatMapLatest { collectionId ->
+            if (collectionId == null) {
+                flowOf(null)
+            } else {
+                repository.observeBookIdsForCollection(collectionId).map { it.toSet() }
+            }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = null
+        )
 
     /** Currently selected reading status filter (null = show all). */
     private val _readingStatusFilter = MutableStateFlow<ReadingStatus?>(null)
@@ -95,7 +114,7 @@ class LibraryViewModel(
             searchedBooks,
             _sort,
             _selectedCollection,
-            _collectionBookIds,
+            collectionBookIds,
             _readingStatusFilter
         ) { books, sort, collectionId, bookIds, statusFilter ->
             val byCollection = if (collectionId == null || bookIds == null) {
@@ -116,27 +135,8 @@ class LibraryViewModel(
         )
 
     init {
-        // When selected collection changes, load its book IDs
-        viewModelScope.launch {
-            _selectedCollection.collect { collectionId ->
-                if (collectionId == null) {
-                    _collectionBookIds.value = null
-                } else {
-                    val ids = repository.getBookIdsForCollection(collectionId)
-                    _collectionBookIds.value = ids.toSet()
-                }
-            }
-        }
-        // Refresh book IDs when collections data changes
-        viewModelScope.launch {
-            collections.collect {
-                val sel = _selectedCollection.value ?: return@collect
-                val ids = repository.getBookIdsForCollection(sel)
-                _collectionBookIds.value = ids.toSet()
-            }
-        }
-        // Cover loading (existing logic)
-        viewModelScope.launch {
+        // Cover loading on IO dispatcher to prevent main thread blocking
+        viewModelScope.launch(Dispatchers.IO) {
             books.collect { list ->
                 for (book in list) {
                     if (book.coverPath != null) continue
@@ -146,7 +146,7 @@ class LibraryViewModel(
                     } catch (e: Exception) {
                         null
                     }
-                    if (path != null && path != book.coverPath) {
+                    if (path != null) {
                         repository.setCoverPath(book.stableId, path)
                     }
                 }

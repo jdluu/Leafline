@@ -103,6 +103,11 @@ class LibraryRepositoryImpl(
         flow.first()
     }
 
+    override fun observeBookIdsForCollection(collectionId: Long): Flow<List<String>> {
+        val dao = collectionDao ?: return emptyFlow()
+        return dao.getBookIdsForCollection(collectionId)
+    }
+
     // -- Reading status --
 
     override suspend fun setReadingStatus(stableId: String, status: ReadingStatus) = withContext(ioDispatcher) {

@@ -3,6 +3,7 @@ package com.jdluu.leafline.library.data
 import com.jdluu.leafline.library.LibraryBook
 import com.jdluu.leafline.library.ReadingStatus
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 
 interface LibraryRepository {
     fun getAllBooks(): Flow<List<LibraryBook>>
@@ -26,6 +27,7 @@ interface LibraryRepository {
     suspend fun removeBookFromCollection(collectionId: Long, bookStableId: String)
     fun getCollectionsForBook(bookStableId: String): Flow<List<Collection>>
     suspend fun getBookIdsForCollection(collectionId: Long): List<String>
+    fun observeBookIdsForCollection(collectionId: Long): Flow<List<String>> = emptyFlow()
 
     // -- Reading status --
     suspend fun setReadingStatus(stableId: String, status: ReadingStatus)

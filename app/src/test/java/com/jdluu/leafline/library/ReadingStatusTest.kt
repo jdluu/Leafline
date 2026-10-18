@@ -22,6 +22,13 @@ class ReadingStatusTest {
     }
 
     @Test
+    fun `display names match expected labels`() {
+        assertEquals("Unread", ReadingStatus.UNREAD.displayName)
+        assertEquals("Reading", ReadingStatus.READING.displayName)
+        assertEquals("Finished", ReadingStatus.FINISHED.displayName)
+    }
+
+    @Test
     fun `fromDb parses valid values`() {
         assertEquals(ReadingStatus.UNREAD, ReadingStatus.fromDb("unread"))
         assertEquals(ReadingStatus.READING, ReadingStatus.fromDb("reading"))

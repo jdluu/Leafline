@@ -22,10 +22,32 @@ fun interface CoverLoader {
 /**
  * Opens an imported EPUB with Readium and extracts its cover into the
  * [CoverCache].
+ *
+ * Caches Readium parser dependencies to avoid heavy re-instantiations
+ * across repeated cover extractions.
  */
-class EpubCoverLoader(private val context: Context) : CoverLoader {
+class EpubCoverLoader(
+    private val context: Context,
+    private val cache: CoverCache = CoverCache(CoverCache.coversDirectory(context.filesDir))
+) : CoverLoader {
 
-    private val cache = CoverCache(CoverCache.coversDirectory(context.filesDir))
+    private val httpClient by lazy { DefaultHttpClient() }
+    private val assetRetriever by lazy {
+        AssetRetriever(
+            contentResolver = context.contentResolver,
+            httpClient = httpClient
+        )
+    }
+    private val publicationOpener by lazy {
+        PublicationOpener(
+            publicationParser = DefaultPublicationParser(
+                context,
+                httpClient = httpClient,
+                assetRetriever = assetRetriever,
+                pdfFactory = null
+            )
+        )
+    }
 
     override suspend fun loadCoverPath(book: LibraryBook): String? = withContext(Dispatchers.IO) {
         cache.existingCoverPath(book.stableId)?.let { return@withContext it }
@@ -47,19 +69,6 @@ class EpubCoverLoader(private val context: Context) : CoverLoader {
     }
 
     private suspend fun openPublication(file: File): Publication? {
-        val httpClient = DefaultHttpClient()
-        val assetRetriever = AssetRetriever(
-            contentResolver = context.contentResolver,
-            httpClient = httpClient
-        )
-        val publicationOpener = PublicationOpener(
-            publicationParser = DefaultPublicationParser(
-                context,
-                httpClient = httpClient,
-                assetRetriever = assetRetriever,
-                pdfFactory = null
-            )
-        )
         val asset = assetRetriever.retrieve(file).getOrElse { return null }
         return publicationOpener.open(asset, allowUserInteraction = false).getOrElse { null }
     }
