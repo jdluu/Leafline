@@ -34,7 +34,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - In-memory LRU bitmap cache (`BitmapMemoryCache`) for cover thumbnails with power-of-two downsampling and RGB_565 format.
 - Optimistic UI updates when toggling reading status chips and collection filters in the library.
 
+### Fixed
+- Fixed page turning, horizontal swiping, and tap-zone gesture interception in `ReaderActivity` by wrapping the Compose overlay in a passthrough `ReaderOverlayTouchContainer` when reading HUD is hidden.
+- Fixed reader toolbar dismissal by introducing a full-screen tap-to-dismiss background scrim when toolbars are visible.
+
 ### Changed
+- Streamlined `LibraryScreen` layout to eliminate visual clutter and component overlap: consolidated TopAppBar into Search, Sort, and an overflow menu (MoreVert), removed floating folder button overlapping book cards, embedded headers/shelves directly in `LazyVerticalGrid` for unified scrolling, and added generous bottom padding so the grid clears the FAB.
 - Centralized `ReadingStatus` as the single source of truth for display names.
 - Optimized EPUB cover loading by reusing Readium parser components across requests.
 - Generalized highlight undo handling to an open-closed `UndoCoordinator<T>` interface.
