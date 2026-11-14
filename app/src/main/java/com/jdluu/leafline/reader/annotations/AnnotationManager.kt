@@ -40,6 +40,7 @@ class AnnotationManager(
     private val onAnnotationNavigated: () -> Unit,
 ) {
 
+    @Deprecated("Use com.jdluu.leafline.reader.selection.TextSelectionManager instead")
     fun selectionActionMode(): ActionMode.Callback {
         return object : ActionMode.Callback {
             override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {

@@ -75,7 +75,9 @@ import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
@@ -264,6 +266,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     private val searchDecorationPlanner = SearchDecorationPlanner()
     private lateinit var syncManager: com.jdluu.leafline.reader.sync.ReaderSyncManager
     private lateinit var annotationManager: com.jdluu.leafline.reader.annotations.AnnotationManager
+    private lateinit var textSelectionManager: com.jdluu.leafline.reader.selection.TextSelectionManager
     private var ttsFactory: AndroidTtsNavigatorFactory? = null
     private var ttsNavigator: AndroidTtsNavigator? = null
     private var ttsJob: Job? = null
@@ -425,6 +428,26 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                 toolbarVisible.value = false
             }
         )
+        textSelectionManager = com.jdluu.leafline.reader.selection.TextSelectionManager(
+            context = this,
+            scope = lifecycleScope,
+            navigatorProvider = { navigator },
+            onHighlight = { annotationManager.saveSelectionAsHighlight() },
+            onSnackbar = { msg -> lifecycleScope.launch { snackbarHostState.showSnackbar(msg) } },
+            onSnackbarWithAction = { msg, actionLabel, onAction ->
+                lifecycleScope.launch {
+                    val result = snackbarHostState.showSnackbar(
+                        message = msg,
+                        actionLabel = actionLabel,
+                        duration = SnackbarDuration.Long
+                    )
+                    if (result == SnackbarResult.ActionPerformed) {
+                        onAction()
+                    }
+                }
+            },
+            bookTitleProvider = { currentBook?.title ?: publication?.metadata?.title }
+        )
         bookmarkManager = com.jdluu.leafline.reader.bookmarks.BookmarkManager(
             scope = lifecycleScope,
             repository = bookmarkRepository,
@@ -510,7 +533,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                 initialPreferences = savedSettings.toNavigatorPreferences(),
                 listener = this,
                 configuration = EpubNavigatorFragment.Configuration(
-                    selectionActionModeCallback = annotationManager.selectionActionMode()
+                    selectionActionModeCallback = textSelectionManager.selectionActionMode()
                 )
             )
 

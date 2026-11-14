@@ -21,6 +21,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Reader text selection actions via custom `ActionMode.Callback` (`TextSelectionManager`):
+  - **Highlight**: Creates an annotation with chosen or default tint.
+  - **Copy**: Copies selected text to system clipboard.
+  - **Define**: Offline-first dictionary lookup supporting ColorDict / GoldenDict (`colordict.intent.action.SEARCH`), Android 10+ system define (`android.intent.action.DEFINE`), and dictionary process text actions, with an explicit privacy-first DuckDuckGo web search fallback.
+  - **Share**: Android system share sheet with book title context.
+  - **Process Text Actions**: Dynamically registered system `ACTION_PROCESS_TEXT` tools (e.g. Translate, Wikipedia, AnkiDroid) integrated into overflow menu.
+  - Package visibility `<queries>` in `AndroidManifest.xml` for `PROCESS_TEXT`, `colordict.intent.action.SEARCH`, and `ACTION_DEFINE` on Android 11+ (API 30+).
+
+
 ## [0.1.0] - 2026-10-18
 
 ### Added
