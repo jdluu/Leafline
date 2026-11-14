@@ -25,7 +25,7 @@ and collections:
 **The reader** — paginated text with real typography: chapter headings, italics,
 and paragraph indents, with reading chrome out of the way:
 
-<img src="screenshots/reader.png" alt="Leafline reader showing chapter one of Pride and Prejudice" width="320" />
+<img src="screenshots/reader.png" alt="Leafline reader showing the chapter opening of Frankenstein with justified serif text" width="320" />
 
 ## Features
 
