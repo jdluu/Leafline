@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-15
+
 ### Added
 - **Advanced Book Search**: Comprehensive in-book search enhancements with search options, scoped chapter filtering, and persistent search history.
   - Search options chips: Match Case (case-sensitive), Whole Word matching, and Regular Expression (regex) with immediate syntax validation.
