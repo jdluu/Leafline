@@ -288,6 +288,55 @@ class LibraryViewModelTest {
 
         job.cancel()
     }
+
+    @Test
+    fun `tagCounts calculates frequency for distinct tags`() = runTest(dispatcher) {
+        val book1 = testBook("b1", "/p1", "h1", tags = listOf("sci-fi", "Favorite"))
+        val book2 = testBook("b2", "/p2", "h2", tags = listOf("Sci-Fi", "Classic"))
+        val repository = FakeLibraryRepository(books = flowOf(listOf(book1, book2)))
+        val viewModel = LibraryViewModel(repository)
+
+        val emissions = mutableListOf<Map<String, Int>>()
+        val job = launch {
+            viewModel.tagCounts.collect { emissions += it }
+        }
+        advanceUntilIdle()
+
+        assertEquals(mapOf("sci-fi" to 2, "favorite" to 1, "classic" to 1), emissions.last())
+        job.cancel()
+    }
+
+    @Test
+    fun `addTagToBooks appends tag to selected books that lack it`() = runTest(dispatcher) {
+        val book1 = testBook("b1", "/p1", "h1", tags = listOf("fiction"))
+        val book2 = testBook("b2", "/p2", "h2", tags = listOf("fiction", "favorite"))
+        val repository = FakeLibraryRepository(
+            books = flowOf(listOf(book1, book2)),
+            booksById = mapOf("b1" to book1, "b2" to book2)
+        )
+        val viewModel = LibraryViewModel(repository)
+
+        viewModel.addTagToBooks(setOf("b1", "b2"), "favorite")
+        advanceUntilIdle()
+
+        assertEquals(listOf("b1" to listOf("fiction", "favorite")), repository.updatedTags)
+    }
+
+    @Test
+    fun `removeTagFromBooks removes tag from selected books that have it`() = runTest(dispatcher) {
+        val book1 = testBook("b1", "/p1", "h1", tags = listOf("fiction", "favorite"))
+        val book2 = testBook("b2", "/p2", "h2", tags = listOf("history"))
+        val repository = FakeLibraryRepository(
+            books = flowOf(listOf(book1, book2)),
+            booksById = mapOf("b1" to book1, "b2" to book2)
+        )
+        val viewModel = LibraryViewModel(repository)
+
+        viewModel.removeTagFromBooks(setOf("b1", "b2"), "favorite")
+        advanceUntilIdle()
+
+        assertEquals(listOf("b1" to listOf("fiction")), repository.updatedTags)
+    }
 }
 
 private fun testBook(

@@ -128,6 +128,27 @@ class LibraryViewModel(
             initialValue = emptyList()
         )
 
+    /** Map of lowercase tag name to count of books bearing that tag. */
+    val tagCounts: StateFlow<Map<String, Int>> = repository.getAllBooks()
+        .map { list ->
+            val counts = mutableMapOf<String, Int>()
+            list.forEach { book ->
+                book.tags.forEach { rawTag ->
+                    val tag = rawTag.trim()
+                    if (tag.isNotEmpty()) {
+                        val key = tag.lowercase()
+                        counts[key] = (counts[key] ?: 0) + 1
+                    }
+                }
+            }
+            counts
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyMap()
+        )
+
     /** Currently selected tag filter (null = show all). */
     private val _selectedTag = MutableStateFlow<String?>(null)
     val selectedTag: StateFlow<String?> = _selectedTag.asStateFlow()
@@ -302,6 +323,33 @@ class LibraryViewModel(
         viewModelScope.launch {
             val book = repository.getBookByStableId(stableId) ?: return@launch
             repository.setTags(stableId, book.tags.filterNot { it.equals(tag, ignoreCase = true) })
+        }
+    }
+
+    fun addTagToBooks(stableIds: Set<String>, tag: String) {
+        val trimmed = tag.trim().removePrefix("#")
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch {
+            stableIds.forEach { stableId ->
+                val book = repository.getBookByStableId(stableId) ?: return@forEach
+                if (!book.tags.any { it.equals(trimmed, ignoreCase = true) }) {
+                    repository.setTags(stableId, book.tags + trimmed)
+                }
+            }
+        }
+    }
+
+    fun removeTagFromBooks(stableIds: Set<String>, tag: String) {
+        val trimmed = tag.trim().removePrefix("#")
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch {
+            stableIds.forEach { stableId ->
+                val book = repository.getBookByStableId(stableId) ?: return@forEach
+                val remaining = book.tags.filterNot { it.equals(trimmed, ignoreCase = true) }
+                if (remaining.size != book.tags.size) {
+                    repository.setTags(stableId, remaining)
+                }
+            }
         }
     }
 

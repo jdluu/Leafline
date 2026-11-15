@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -58,7 +59,9 @@ import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material.icons.automirrored.filled.Label
+import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -156,6 +159,8 @@ fun LibraryScreen(
     var showBatchDeleteConfirm by remember { mutableStateOf(false) }
     var showBatchStatusMenu by remember { mutableStateOf(false) }
     var showBatchCollectionDialog by remember { mutableStateOf(false) }
+    var showBatchTagDialog by remember { mutableStateOf(false) }
+    val tagCounts by viewModel.tagCounts.collectAsStateWithLifecycle()
 
     BackHandler(enabled = selectionMode) {
         selectionMode = false
@@ -208,6 +213,9 @@ fun LibraryScreen(
                                     }
                                 }
                             }
+                            IconButton(onClick = { showBatchTagDialog = true }) {
+                                Icon(Icons.AutoMirrored.Filled.Label, contentDescription = "Edit tags for selected books")
+                            }
                             if (collections.isNotEmpty()) {
                                 IconButton(onClick = { showBatchCollectionDialog = true }) {
                                     Icon(Icons.Default.CollectionsBookmark, contentDescription = "Add selected to collection")
@@ -252,7 +260,7 @@ fun LibraryScreen(
                 Box {
                     var menuExpanded by remember { mutableStateOf(false) }
                     IconButton(onClick = { menuExpanded = true }) {
-                        Icon(Icons.Default.Sort, contentDescription = "Sort library")
+                        Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort library")
                     }
                     LibrarySortMenu(
                         expanded = menuExpanded,
@@ -563,12 +571,33 @@ fun LibraryScreen(
                             }
                             items(allTags) { tag ->
                                 val isSelected = selectedTag.equals(tag, ignoreCase = true)
+                                val count = tagCounts[tag.trim().lowercase()] ?: 0
                                 FilterChip(
                                     selected = isSelected,
                                     onClick = {
                                         viewModel.selectTag(if (isSelected) null else tag)
                                     },
-                                    label = { Text("#$tag") },
+                                    label = {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Text("#$tag")
+                                            if (count > 0) {
+                                                Surface(
+                                                    shape = androidx.compose.foundation.shape.CircleShape,
+                                                    color = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.15f)
+                                                            else MaterialTheme.colorScheme.surfaceVariant
+                                                ) {
+                                                    Text(
+                                                        text = "$count",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    },
                                     trailingIcon = if (isSelected) {
                                         {
                                             Icon(
@@ -577,7 +606,8 @@ fun LibraryScreen(
                                                 modifier = Modifier.size(16.dp) // touch-target-ok: decorative chip icon
                                             )
                                         }
-                                    } else null
+                                    } else null,
+                                    modifier = Modifier.semantics { contentDescription = "Tag $tag, $count books" }
                                 )
                             }
                         }
@@ -779,6 +809,17 @@ fun LibraryScreen(
             dismissButton = {
                 TextButton(onClick = { showBatchDeleteConfirm = false }) { Text("Cancel") }
             }
+        )
+    }
+
+    // Batch tag dialog
+    if (showBatchTagDialog && selectedBookIds.isNotEmpty()) {
+        BatchTagDialog(
+            selectedBookCount = selectedBookIds.size,
+            allTags = allTags,
+            onAddTag = { tag -> viewModel.addTagToBooks(selectedBookIds, tag) },
+            onRemoveTag = { tag -> viewModel.removeTagFromBooks(selectedBookIds, tag) },
+            onDismiss = { showBatchTagDialog = false }
         )
     }
 
@@ -1284,7 +1325,7 @@ private fun LibrarySortMenu(
                 onClick = { onSelect(option) },
                 leadingIcon = {
                     if (option == selected) {
-                        Icon(Icons.Default.Sort, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = null)
                     }
                 }
             )
@@ -1500,7 +1541,7 @@ private fun CoverPlaceholder(title: String) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Icon(
-            imageVector = Icons.Default.MenuBook,
+            imageVector = Icons.AutoMirrored.Filled.MenuBook,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
         )
@@ -1649,7 +1690,7 @@ private fun BookDetailSheet(
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                Icons.Default.MenuBook,
+                                Icons.AutoMirrored.Filled.MenuBook,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -2127,4 +2168,124 @@ private fun ReadingInsightsSheet(
             }
         }
     }
+}
+
+
+@Composable
+private fun BatchTagDialog(
+    selectedBookCount: Int,
+    allTags: List<String>,
+    onAddTag: (String) -> Unit,
+    onRemoveTag: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var newTagInput by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit tags ($selectedBookCount books)") },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+            ) {
+                Text(
+                    text = "Add or remove tags across all $selectedBookCount selected books.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = newTagInput,
+                        onValueChange = { newTagInput = it.take(30) },
+                        placeholder = { Text("Add tag to all…") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(Modifier.width(Spacing.xs))
+                    IconButton(
+                        onClick = {
+                            val trimmed = newTagInput.trim().removePrefix("#")
+                            if (trimmed.isNotEmpty()) {
+                                onAddTag(trimmed)
+                                newTagInput = ""
+                            }
+                        },
+                        enabled = newTagInput.isNotBlank(),
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "Add tag to selected books")
+                    }
+                }
+
+                if (allTags.isNotEmpty()) {
+                    Spacer(Modifier.height(Spacing.xs))
+                    Text(
+                        text = "Library tags:",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+
+                    androidx.compose.foundation.layout.FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        allTags.forEach { tag ->
+                            Surface(
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier.padding(vertical = 2.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(start = 10.dp)
+                                ) {
+                                    Text(
+                                        text = "#$tag",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    IconButton(
+                                        onClick = { onAddTag(tag) },
+                                        modifier = Modifier.size(48.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Add,
+                                            contentDescription = "Add tag #$tag to selected books",
+                                            modifier = Modifier.size(18.dp) // touch-target-ok: decorative icon in 48dp IconButton
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = { onRemoveTag(tag) },
+                                        modifier = Modifier.size(48.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Remove tag #$tag from selected books",
+                                            modifier = Modifier.size(18.dp) // touch-target-ok: decorative icon in 48dp IconButton
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.heightIn(min = 48.dp)
+            ) {
+                Text("Done")
+            }
+        }
+    )
 }

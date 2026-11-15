@@ -121,6 +121,21 @@ class BookDaoTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
+    fun searchBooks_matches_tags_case_insensitively() = runTest {
+        bookDao.insert(entity(stableId = "book-1", title = "Dune", authors = listOf("Frank Herbert")))
+        bookDao.insert(entity(stableId = "book-2", title = "Emma", authors = listOf("Jane Austen")))
+
+        bookDao.setTags("book-1", listOf("Sci-Fi", "Epic"))
+        bookDao.setTags("book-2", listOf("Romance", "Classic"))
+
+        val results = bookDao.searchBooks("sci-fi").first()
+
+        assertEquals(1, results.size)
+        assertEquals("book-1", results[0].stableId)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
     fun setRating_and_setTags_persist_correctly() = runTest {
         bookDao.insert(entity(stableId = "book-1", title = "Dune", authors = listOf("Frank Herbert")))
 
