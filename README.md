@@ -30,6 +30,7 @@ and paragraph indents, with reading chrome out of the way:
 ## Features
 
 - **EPUB reading** — Read EPUB 2 and EPUB 3 books in a paginated or scrolled view
+- **Navigation history & quick return** — History back/forward navigation stack and floating return capsule when jumping between chapters, footnotes, links, search results, and bookmarks
 - **On-device library** — Import your own EPUB files with cover thumbnails
 - **Progress sync** — Sync reading progress between your devices using any
   KOReader-compatible sync server you host yourself
