@@ -1,13 +1,12 @@
 package com.jdluu.leafline.reader.selection
 
 import android.content.Context
-import android.content.Intent
-import android.content.pm.ActivityInfo
-import android.content.pm.PackageManager
-import android.content.pm.ResolveInfo
 import android.view.ActionMode
 import android.view.Menu
+import android.view.MenuInflater
 import android.view.MenuItem
+import android.view.View
+import android.widget.PopupMenu
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -18,11 +17,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.Mockito.mock
-import org.mockito.Mockito.verify
-import org.mockito.Mockito.`when`
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.Shadows.shadowOf
 
 @RunWith(RobolectricTestRunner::class)
 class TextSelectionManagerTest {
@@ -35,6 +30,24 @@ class TextSelectionManagerTest {
     private val snackbars = mutableListOf<String>()
 
     private lateinit var textSelectionManager: TextSelectionManager
+
+    private class TestActionMode : ActionMode() {
+        var finished = false
+        override fun setTitle(title: CharSequence?) {}
+        override fun setTitle(resId: Int) {}
+        override fun setSubtitle(subtitle: CharSequence?) {}
+        override fun setSubtitle(resId: Int) {}
+        override fun setCustomView(view: View?) {}
+        override fun invalidate() {}
+        override fun finish() {
+            finished = true
+        }
+        override fun getMenu(): Menu = error("Not needed")
+        override fun getTitle(): CharSequence = ""
+        override fun getSubtitle(): CharSequence = ""
+        override fun getCustomView(): View? = null
+        override fun getMenuInflater(): MenuInflater = error("Not needed")
+    }
 
     @Before
     fun setUp() {
@@ -55,67 +68,63 @@ class TextSelectionManagerTest {
     @Test
     fun onCreateActionModePopulatesPrimaryMenuItems() {
         val callback = textSelectionManager.selectionActionMode()
-        val mockMode = mock(ActionMode::class.java)
-        val mockMenu = mock(Menu::class.java)
-        val mockItem = mock(MenuItem::class.java)
+        val mode = TestActionMode()
+        val popupMenu = PopupMenu(context, View(context))
+        val menu = popupMenu.menu
 
-        `when`(mockMenu.add(TextSelectionManager.GROUP_PRIMARY, TextSelectionManager.MENU_ITEM_HIGHLIGHT_ID, 1, "Highlight"))
-            .thenReturn(mockItem)
-        `when`(mockMenu.add(TextSelectionManager.GROUP_PRIMARY, TextSelectionManager.MENU_ITEM_COPY_ID, 2, "Copy"))
-            .thenReturn(mockItem)
-        `when`(mockMenu.add(TextSelectionManager.GROUP_PRIMARY, TextSelectionManager.MENU_ITEM_DEFINE_ID, 3, "Define"))
-            .thenReturn(mockItem)
-        `when`(mockMenu.add(TextSelectionManager.GROUP_PRIMARY, TextSelectionManager.MENU_ITEM_SHARE_ID, 4, "Share"))
-            .thenReturn(mockItem)
-
-        val result = callback.onCreateActionMode(mockMode, mockMenu)
+        val result = callback.onCreateActionMode(mode, menu)
         assertTrue(result)
 
-        verify(mockMenu).add(TextSelectionManager.GROUP_PRIMARY, TextSelectionManager.MENU_ITEM_HIGHLIGHT_ID, 1, "Highlight")
-        verify(mockMenu).add(TextSelectionManager.GROUP_PRIMARY, TextSelectionManager.MENU_ITEM_COPY_ID, 2, "Copy")
-        verify(mockMenu).add(TextSelectionManager.GROUP_PRIMARY, TextSelectionManager.MENU_ITEM_DEFINE_ID, 3, "Define")
-        verify(mockMenu).add(TextSelectionManager.GROUP_PRIMARY, TextSelectionManager.MENU_ITEM_SHARE_ID, 4, "Share")
+        assertEquals("Highlight", menu.findItem(TextSelectionManager.MENU_ITEM_HIGHLIGHT_ID)?.title)
+        assertEquals("Copy", menu.findItem(TextSelectionManager.MENU_ITEM_COPY_ID)?.title)
+        assertEquals("Define", menu.findItem(TextSelectionManager.MENU_ITEM_DEFINE_ID)?.title)
+        assertEquals("Share", menu.findItem(TextSelectionManager.MENU_ITEM_SHARE_ID)?.title)
     }
 
     @Test
     fun onActionItemClickedDelegatesHighlightAndFinishesMode() {
         val callback = textSelectionManager.selectionActionMode()
-        val mockMode = mock(ActionMode::class.java)
-        val mockItem = mock(MenuItem::class.java)
-        `when`(mockItem.itemId).thenReturn(TextSelectionManager.MENU_ITEM_HIGHLIGHT_ID)
+        val mode = TestActionMode()
+        val popupMenu = PopupMenu(context, View(context))
+        val menu = popupMenu.menu
+        callback.onCreateActionMode(mode, menu)
 
-        val handled = callback.onActionItemClicked(mockMode, mockItem)
+        val highlightItem = menu.findItem(TextSelectionManager.MENU_ITEM_HIGHLIGHT_ID)
+        val handled = callback.onActionItemClicked(mode, highlightItem)
         assertTrue(handled)
         assertTrue(highlightCalled)
-        verify(mockMode).finish()
+        assertTrue(mode.finished)
     }
 
     @Test
     fun onActionItemClickedFinishesOnCopy() = testScope.runTest {
         val callback = textSelectionManager.selectionActionMode()
-        val mockMode = mock(ActionMode::class.java)
-        val mockItem = mock(MenuItem::class.java)
-        `when`(mockItem.itemId).thenReturn(TextSelectionManager.MENU_ITEM_COPY_ID)
+        val mode = TestActionMode()
+        val popupMenu = PopupMenu(context, View(context))
+        val menu = popupMenu.menu
+        callback.onCreateActionMode(mode, menu)
 
-        val handled = callback.onActionItemClicked(mockMode, mockItem)
+        val copyItem = menu.findItem(TextSelectionManager.MENU_ITEM_COPY_ID)
+        val handled = callback.onActionItemClicked(mode, copyItem)
         assertTrue(handled)
-        verify(mockMode).finish()
+        assertTrue(mode.finished)
 
         testDispatcher.scheduler.advanceUntilIdle()
-        // Since navigator returns null, it reports no text selected
         assertTrue(snackbars.contains("No text selected"))
     }
 
     @Test
     fun onActionItemClickedFinishesOnDefine() = testScope.runTest {
         val callback = textSelectionManager.selectionActionMode()
-        val mockMode = mock(ActionMode::class.java)
-        val mockItem = mock(MenuItem::class.java)
-        `when`(mockItem.itemId).thenReturn(TextSelectionManager.MENU_ITEM_DEFINE_ID)
+        val mode = TestActionMode()
+        val popupMenu = PopupMenu(context, View(context))
+        val menu = popupMenu.menu
+        callback.onCreateActionMode(mode, menu)
 
-        val handled = callback.onActionItemClicked(mockMode, mockItem)
+        val defineItem = menu.findItem(TextSelectionManager.MENU_ITEM_DEFINE_ID)
+        val handled = callback.onActionItemClicked(mode, defineItem)
         assertTrue(handled)
-        verify(mockMode).finish()
+        assertTrue(mode.finished)
 
         testDispatcher.scheduler.advanceUntilIdle()
         assertTrue(snackbars.contains("No text selected"))
@@ -124,13 +133,15 @@ class TextSelectionManagerTest {
     @Test
     fun onActionItemClickedFinishesOnShare() = testScope.runTest {
         val callback = textSelectionManager.selectionActionMode()
-        val mockMode = mock(ActionMode::class.java)
-        val mockItem = mock(MenuItem::class.java)
-        `when`(mockItem.itemId).thenReturn(TextSelectionManager.MENU_ITEM_SHARE_ID)
+        val mode = TestActionMode()
+        val popupMenu = PopupMenu(context, View(context))
+        val menu = popupMenu.menu
+        callback.onCreateActionMode(mode, menu)
 
-        val handled = callback.onActionItemClicked(mockMode, mockItem)
+        val shareItem = menu.findItem(TextSelectionManager.MENU_ITEM_SHARE_ID)
+        val handled = callback.onActionItemClicked(mode, shareItem)
         assertTrue(handled)
-        verify(mockMode).finish()
+        assertTrue(mode.finished)
 
         testDispatcher.scheduler.advanceUntilIdle()
         assertTrue(snackbars.contains("No text selected"))
@@ -139,12 +150,12 @@ class TextSelectionManagerTest {
     @Test
     fun unhandledMenuItemReturnsFalse() {
         val callback = textSelectionManager.selectionActionMode()
-        val mockMode = mock(ActionMode::class.java)
-        val mockItem = mock(MenuItem::class.java)
-        `when`(mockItem.itemId).thenReturn(9999)
-        `when`(mockItem.groupId).thenReturn(9999)
+        val mode = TestActionMode()
+        val popupMenu = PopupMenu(context, View(context))
+        val menu = popupMenu.menu
+        val customItem = menu.add(99, 9999, 0, "Custom")
 
-        val handled = callback.onActionItemClicked(mockMode, mockItem)
+        val handled = callback.onActionItemClicked(mode, customItem)
         assertFalse(handled)
     }
 }
