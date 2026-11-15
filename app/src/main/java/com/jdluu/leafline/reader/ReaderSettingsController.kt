@@ -21,6 +21,7 @@ class ReaderSettingsController(
     private val applyWindowBrightness: (Float?) -> Unit,
     private val applyKeepScreenOn: (Boolean) -> Unit = {},
     private val applyOrientation: (ReaderOrientation) -> Unit = {},
+    private val applyThemeBackground: (com.jdluu.leafline.reader.theme.ReaderTheme?) -> Unit = {},
     private val save: (ReaderSettings) -> Unit
 ) {
 
@@ -34,10 +35,14 @@ class ReaderSettingsController(
      * them to the navigator, applies display/window policies, then persists them.
      */
     fun submit(settings: ReaderSettings) {
+        val previousTheme = _settings.value.theme
         _settings.value = settings
         submitToNavigator(settings)
         applyKeepScreenOn(settings.keepScreenOn)
         applyOrientation(settings.orientation)
+        if (previousTheme != settings.theme) {
+            applyThemeBackground(settings.theme)
+        }
         save(settings)
     }
 

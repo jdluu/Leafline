@@ -22,6 +22,7 @@ class ReaderSettingsControllerTest {
         val windowBrightness = mutableListOf<Float?>()
         val keepScreenOnValues = mutableListOf<Boolean>()
         val orientationValues = mutableListOf<ReaderOrientation>()
+        val themeBackgroundValues = mutableListOf<ReaderTheme?>()
         val persisted = mutableListOf<ReaderSettings>()
         val controller = ReaderSettingsController(
             initialSettings = initial,
@@ -29,6 +30,7 @@ class ReaderSettingsControllerTest {
             applyWindowBrightness = { windowBrightness += it; ordering += "window" },
             applyKeepScreenOn = { keepScreenOnValues += it; ordering += "keepScreenOn" },
             applyOrientation = { orientationValues += it; ordering += "orientation" },
+            applyThemeBackground = { themeBackgroundValues += it; ordering += "themeBackground" },
             save = { persisted += it; ordering += "save" }
         )
     }
@@ -52,10 +54,11 @@ class ReaderSettingsControllerTest {
         harness.controller.submit(target)
 
         assertEquals(target, harness.controller.settings.value)
-        assertEquals(listOf("navigator", "keepScreenOn", "orientation", "save"), harness.ordering)
+        assertEquals(listOf("navigator", "keepScreenOn", "orientation", "themeBackground", "save"), harness.ordering)
         assertEquals(listOf(target), harness.submitted)
         assertEquals(listOf(false), harness.keepScreenOnValues)
         assertEquals(listOf(ReaderOrientation.LANDSCAPE), harness.orientationValues)
+        assertEquals(listOf(ReaderTheme.DARK), harness.themeBackgroundValues)
         assertEquals(listOf(target), harness.persisted)
     }
 
@@ -115,7 +118,8 @@ class ReaderSettingsControllerTest {
 
         assertEquals(ReaderTheme.SEPIA, harness.controller.settings.value.theme)
         assertEquals(ReaderTheme.LIGHT, harness.controller.settings.value.preSepiaTheme)
-        assertEquals(listOf("navigator", "keepScreenOn", "orientation", "save"), harness.ordering)
+        assertEquals(listOf("navigator", "keepScreenOn", "orientation", "themeBackground", "save"), harness.ordering)
+        assertEquals(listOf(ReaderTheme.SEPIA), harness.themeBackgroundValues)
         assertEquals(ReaderTheme.SEPIA, harness.persisted.single().theme)
     }
 
@@ -127,6 +131,8 @@ class ReaderSettingsControllerTest {
 
         assertNull(harness.controller.settings.value.theme)
         assertNull(harness.controller.settings.value.preSepiaTheme)
+        assertEquals(listOf("navigator", "keepScreenOn", "orientation", "themeBackground", "save"), harness.ordering)
+        assertEquals(listOf(null as ReaderTheme?), harness.themeBackgroundValues)
         assertNull(harness.persisted.single().theme)
     }
 }

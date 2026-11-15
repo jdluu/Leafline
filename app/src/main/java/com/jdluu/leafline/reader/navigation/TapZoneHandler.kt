@@ -75,15 +75,28 @@ class TapZoneHandler(
                 TapZoneAction.NEXT_PAGE -> {
                     val handled = navigatorProvider()?.goForward(pageTurnAnimated(settings)) ?: false
                     Log.d("TapZoneHandler", "goForward returned $handled")
+                    if (handled && settings.hapticFeedback) {
+                        performHapticFeedback()
+                    }
                     handled
                 }
                 TapZoneAction.PREVIOUS_PAGE -> {
                     val handled = navigatorProvider()?.goBackward(pageTurnAnimated(settings)) ?: false
                     Log.d("TapZoneHandler", "goBackward returned $handled")
+                    if (handled && settings.hapticFeedback) {
+                        performHapticFeedback()
+                    }
                     handled
                 }
             }
         }
+    }
+
+    /** Emits a subtle haptic feedback click through the publication view. */
+    fun performHapticFeedback() {
+        navigatorProvider()?.publicationView?.performHapticFeedback(
+            android.view.HapticFeedbackConstants.KEYBOARD_TAP
+        )
     }
 
     /**

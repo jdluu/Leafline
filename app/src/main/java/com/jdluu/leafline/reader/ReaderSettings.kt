@@ -228,7 +228,12 @@ data class ReaderSettings(
      * When true, displays an unobtrusive minimal footer with current chapter and
      * progress at the bottom of the reading view when menus are hidden.
      */
-    val showMinimalHud: Boolean = true
+    val showMinimalHud: Boolean = true,
+    /**
+     * When true, emits subtle haptic feedback when turning pages via edge taps
+     * or volume keys.
+     */
+    val hapticFeedback: Boolean = false
 )
 
 /** Screen orientation policy inside the reading view. */

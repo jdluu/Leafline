@@ -18,6 +18,7 @@ import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 import android.view.ActionMode
 import android.view.KeyEvent
+import android.view.View
 import android.view.MotionEvent
 import android.view.Menu
 import android.view.MenuItem
@@ -144,6 +145,8 @@ import com.jdluu.leafline.reader.PageTurnAnimation
 import com.jdluu.leafline.reader.ReaderPreferencesStore
 import com.jdluu.leafline.reader.ReaderSettings
 import com.jdluu.leafline.reader.ReaderSettingsController
+import com.jdluu.leafline.reader.theme.ReaderTheme
+import com.jdluu.leafline.reader.theme.backgroundColor
 import com.jdluu.leafline.reader.StyleMode
 import com.jdluu.leafline.reader.TapZoneAction
 import com.jdluu.leafline.reader.TapZoneConfig
@@ -423,11 +426,13 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             applyWindowBrightness = ::applyBrightnessToWindow,
             applyKeepScreenOn = ::applyKeepScreenOn,
             applyOrientation = ::applyOrientation,
+            applyThemeBackground = { applyThemeBackground(it, animate = true) },
             save = readerPreferencesStore::save
         )
         applyBrightnessToWindow(savedSettings.brightness)
         applyKeepScreenOn(savedSettings.keepScreenOn)
         applyOrientation(savedSettings.orientation)
+        applyThemeBackground(savedSettings.theme, animate = false)
 
         annotationManager = com.jdluu.leafline.reader.annotations.AnnotationManager(
             context = this,
@@ -772,6 +777,42 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         }
     }
 
+    private var themeBgAnimator: android.animation.ValueAnimator? = null
+    private var currentThemeBgColor: Int? = null
+
+    private fun applyThemeBackground(theme: ReaderTheme?, animate: Boolean = true) {
+        val isSystemDark = (resources.configuration.uiMode and
+            android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+            android.content.res.Configuration.UI_MODE_NIGHT_YES
+        val targetColor = theme.backgroundColor(isSystemDark)
+        val fromColor = currentThemeBgColor ?: targetColor
+        currentThemeBgColor = targetColor
+
+        themeBgAnimator?.cancel()
+        val container = findViewById<View>(R.id.navigator_container)
+        val decorView = window.decorView
+
+        if (!animate || fromColor == targetColor) {
+            decorView.setBackgroundColor(targetColor)
+            container?.setBackgroundColor(targetColor)
+            return
+        }
+
+        themeBgAnimator = android.animation.ValueAnimator.ofObject(
+            android.animation.ArgbEvaluator(),
+            fromColor,
+            targetColor
+        ).apply {
+            duration = 250L
+            addUpdateListener { animator ->
+                val color = animator.animatedValue as Int
+                decorView.setBackgroundColor(color)
+                container?.setBackgroundColor(color)
+            }
+            start()
+        }
+    }
+
     private fun applyOrientation(orientation: ReaderOrientation) {
         requestedOrientation = when (orientation) {
             ReaderOrientation.AUTO -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
@@ -808,6 +849,8 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                 Log.w(TAG, "Could not close publication", e)
             }
         }
+        themeBgAnimator?.cancel()
+        themeBgAnimator = null
         super.onDestroy()
     }
 
@@ -1083,13 +1126,20 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             this::tapZoneHandler.isInitialized &&
             settingsController.settings.value.epub.scroll != true
         ) {
+            val settings = settingsController.settings.value
             when (keyCode) {
                 KeyEvent.KEYCODE_VOLUME_DOWN -> {
-                    navigator?.goForward(tapZoneHandler.pageTurnAnimated(settingsController.settings.value))
+                    val handled = navigator?.goForward(tapZoneHandler.pageTurnAnimated(settings)) ?: false
+                    if (handled && settings.hapticFeedback) {
+                        tapZoneHandler.performHapticFeedback()
+                    }
                     return true
                 }
                 KeyEvent.KEYCODE_VOLUME_UP -> {
-                    navigator?.goBackward(tapZoneHandler.pageTurnAnimated(settingsController.settings.value))
+                    val handled = navigator?.goBackward(tapZoneHandler.pageTurnAnimated(settings)) ?: false
+                    if (handled && settings.hapticFeedback) {
+                        tapZoneHandler.performHapticFeedback()
+                    }
                     return true
                 }
             }
