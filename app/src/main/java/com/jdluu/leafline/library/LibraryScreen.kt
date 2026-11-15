@@ -127,6 +127,9 @@ import com.jdluu.leafline.library.rescan.FolderRescanViewModel
 import com.jdluu.leafline.library.rescan.RescanSummary
 import com.jdluu.leafline.sync.ReadingProgressMath
 import com.jdluu.leafline.theme.IconSize
+import androidx.compose.material.icons.filled.SaveAlt
+import com.jdluu.leafline.library.backup.BackupRestoreSheet
+import com.jdluu.leafline.library.backup.LibraryBackupManager
 import com.jdluu.leafline.theme.Padding
 import com.jdluu.leafline.theme.Spacing
 import kotlinx.coroutines.Dispatchers
@@ -139,6 +142,7 @@ fun LibraryScreen(
     viewModel: LibraryViewModel,
     foldersViewModel: LibraryFolderViewModel? = null,
     folderRescanViewModel: FolderRescanViewModel? = null,
+    backupManager: LibraryBackupManager? = null,
     onImportEpub: () -> Unit,
     onAddLibraryFolder: () -> Unit = {},
     onReselectFolder: (String) -> Unit = {},
@@ -163,6 +167,7 @@ fun LibraryScreen(
     var detailSheetBook by remember { mutableStateOf<LibraryBook?>(null) }
     var showDeleteConfirm by remember { mutableStateOf<LibraryBook?>(null) }
     var showFolderSheet by remember { mutableStateOf(false) }
+    var showBackupSheet by remember { mutableStateOf(false) }
     var showInsightsSheet by remember { mutableStateOf(false) }
     var selectionMode by remember { mutableStateOf(false) }
     var selectedBookIds by remember { mutableStateOf(emptySet<String>()) }
@@ -323,6 +328,16 @@ fun LibraryScreen(
                                 showCollectionSheet = true
                             }
                         )
+                        if (backupManager != null) {
+                            DropdownMenuItem(
+                                text = { Text("Backup & restore") },
+                                leadingIcon = { Icon(Icons.Default.SaveAlt, contentDescription = null) },
+                                onClick = {
+                                    overflowMenuExpanded = false
+                                    showBackupSheet = true
+                                }
+                            )
+                        }
                         DropdownMenuItem(
                             text = { Text("Manage folders") },
                             leadingIcon = { Icon(Icons.Default.FolderOpen, contentDescription = null) },
@@ -540,6 +555,14 @@ fun LibraryScreen(
             onDismiss = { showCollectionSheet = false },
             onCreate = { showCreateDialog = true },
             onDelete = { collection -> viewModel.deleteCollection(collection.id) }
+        )
+    }
+
+    // Backup & restore sheet
+    if (showBackupSheet && backupManager != null) {
+        BackupRestoreSheet(
+            backupManager = backupManager,
+            onDismiss = { showBackupSheet = false }
         )
     }
 

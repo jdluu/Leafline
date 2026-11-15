@@ -364,6 +364,7 @@ fun LeaflineApp(activity: MainActivity) {
                         viewModel = libraryViewModel,
                         foldersViewModel = libraryFolderViewModel,
                         folderRescanViewModel = folderRescanViewModel,
+                        backupManager = activity.appContainer.backupManager,
                         onImportEpub = { importEpubLauncher.launch(arrayOf(MainActivity.EPUB_MIME_TYPE)) },
                         onAddLibraryFolder = { addLibraryFolderLauncher.launch(null) },
                         onReselectFolder = { uri ->

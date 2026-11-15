@@ -10,6 +10,9 @@ interface BookmarkDao {
     @Query("SELECT * FROM bookmarks WHERE bookId = :bookId ORDER BY createdAt DESC, id DESC")
     fun observeForBook(bookId: String): Flow<List<BookmarkEntity>>
 
+    @Query("SELECT * FROM bookmarks ORDER BY createdAt DESC, id DESC")
+    suspend fun getAllBookmarks(): List<BookmarkEntity>
+
     @Query("SELECT * FROM bookmarks WHERE bookId = :bookId ORDER BY createdAt DESC, id DESC")
     suspend fun getForBook(bookId: String): List<BookmarkEntity>
 

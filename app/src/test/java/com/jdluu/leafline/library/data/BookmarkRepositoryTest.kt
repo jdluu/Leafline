@@ -29,6 +29,10 @@ class BookmarkRepositoryTest {
             }
         }
 
+        override suspend fun getAllBookmarks(): List<BookmarkEntity> {
+            return stored.value
+        }
+
         override suspend fun getForBook(bookId: String): List<BookmarkEntity> {
             return observeForBook(bookId).first()
         }
