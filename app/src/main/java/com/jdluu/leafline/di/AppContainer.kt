@@ -15,6 +15,8 @@ import com.jdluu.leafline.library.data.ReadingSessionRepositoryImpl
 import com.jdluu.leafline.library.backup.LibraryBackupManager
 import com.jdluu.leafline.library.data.local.LeaflineDatabase
 import com.jdluu.leafline.library.data.local.RoomBookDataSource
+import com.jdluu.leafline.opds.OpdsClient
+import com.jdluu.leafline.opds.OpdsFeedStore
 import com.jdluu.leafline.sync.KoreaderSyncApi
 import com.jdluu.leafline.sync.KoreaderSyncClient
 
@@ -57,6 +59,10 @@ class AppContainer(context: Context) {
             annotationDao = database.annotationDao()
         )
     }
+
+    val opdsFeedStore: OpdsFeedStore by lazy { OpdsFeedStore.fromContext(context) }
+
+    val opdsClient: OpdsClient by lazy { OpdsClient() }
 }
 
 val Context.appContainer: AppContainer

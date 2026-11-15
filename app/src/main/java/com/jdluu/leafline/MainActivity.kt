@@ -30,6 +30,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
+import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -71,6 +72,10 @@ import com.jdluu.leafline.library.cover.EpubCoverLoader
 import com.jdluu.leafline.library.rescan.FolderRescanViewModel
 import com.jdluu.leafline.library.rescan.FolderRescanViewModelFactory
 import com.jdluu.leafline.library.rescan.createFolderRescanRunner
+import com.jdluu.leafline.opds.OpdsDownloadManager
+import com.jdluu.leafline.opds.OpdsViewModel
+import com.jdluu.leafline.opds.OpdsViewModelFactory
+import com.jdluu.leafline.opds.ui.OpdsScreen
 import com.jdluu.leafline.sync.KoreaderSyncConfig
 import com.jdluu.leafline.sync.KoreaderSyncConfigStore
 import com.jdluu.leafline.sync.SyncWorker
@@ -225,6 +230,7 @@ private fun getFileName(context: Context, uri: Uri): String? {
 
 private enum class LeaflineTab(val label: String) {
     Library("Library"),
+    Explore("Explore"),
     Settings("Settings")
 }
 
@@ -255,6 +261,23 @@ fun LeaflineApp(activity: MainActivity) {
                 importer = activity.appContainer.epubImporter,
                 repository = activity.appContainer.libraryRepository
             )
+        )
+    )
+
+    val opdsViewModel: OpdsViewModel = viewModel(
+        factory = OpdsViewModelFactory(
+            feedStore = activity.appContainer.opdsFeedStore,
+            opdsClient = activity.appContainer.opdsClient,
+            downloadManager = remember {
+                OpdsDownloadManager(
+                    context = activity.applicationContext,
+                    opdsClient = activity.appContainer.opdsClient,
+                    importer = activity.appContainer.epubImporter,
+                    repository = activity.appContainer.libraryRepository,
+                    scope = (activity as MainActivity).lifecycleScope
+                )
+            },
+            libraryRepository = activity.appContainer.libraryRepository
         )
     )
 
@@ -347,6 +370,7 @@ fun LeaflineApp(activity: MainActivity) {
                                 Icon(
                                     when (tab) {
                                         LeaflineTab.Library -> Icons.AutoMirrored.Filled.LibraryBooks
+                                        LeaflineTab.Explore -> Icons.Default.Explore
                                         LeaflineTab.Settings -> Icons.Default.Settings
                                     },
                                     contentDescription = tab.label
@@ -371,6 +395,18 @@ fun LeaflineApp(activity: MainActivity) {
                             pendingReplaceFolderUri = uri
                             addLibraryFolderLauncher.launch(null)
                         },
+                        onOpenBook = { book ->
+                            activity.startActivity(
+                                ReaderActivity.newIntent(activity, book.filePath)
+                            )
+                            @Suppress("DEPRECATION")
+                            activity.overridePendingTransition(
+                                android.R.anim.fade_in, 0
+                            )
+                        }
+                    )
+                    LeaflineTab.Explore -> OpdsScreen(
+                        viewModel = opdsViewModel,
                         onOpenBook = { book ->
                             activity.startActivity(
                                 ReaderActivity.newIntent(activity, book.filePath)
