@@ -1,6 +1,10 @@
 package com.jdluu.leafline
 
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
 import com.jdluu.leafline.library.LibraryBook
+import com.jdluu.leafline.library.LibraryLayout
+import com.jdluu.leafline.library.LibraryLayoutStore
 import com.jdluu.leafline.library.ReadingStatus
 import com.jdluu.leafline.library.data.Collection
 import com.jdluu.leafline.library.data.LibraryRepository
@@ -39,6 +43,37 @@ class LibraryViewModelTest {
     fun tearDown() {
         Dispatchers.resetMain()
     }
+
+    @Test
+    fun `layout defaults to GRID and toggles between LIST and GRID`() =
+        runTest(dispatcher) {
+            val viewModel = LibraryViewModel(FakeLibraryRepository(books = flowOf(emptyList())))
+
+            assertEquals(LibraryLayout.GRID, viewModel.layout.value)
+
+            viewModel.toggleLayout()
+            assertEquals(LibraryLayout.LIST, viewModel.layout.value)
+
+            viewModel.toggleLayout()
+            assertEquals(LibraryLayout.GRID, viewModel.layout.value)
+        }
+
+    @Test
+    fun `setLayout persists to store when present`() =
+        runTest(dispatcher) {
+            val context: Context = ApplicationProvider.getApplicationContext()
+            val store = LibraryLayoutStore.fromContext(context)
+            val viewModel = LibraryViewModel(
+                repository = FakeLibraryRepository(books = flowOf(emptyList())),
+                layoutStore = store
+            )
+
+            assertEquals(LibraryLayout.GRID, viewModel.layout.value)
+
+            viewModel.setLayout(LibraryLayout.LIST)
+            assertEquals(LibraryLayout.LIST, viewModel.layout.value)
+            assertEquals(LibraryLayout.LIST, store.load())
+        }
 
     @Test
     fun `isLibraryLoaded starts false and turns true after the library emits`() =

@@ -11,12 +11,13 @@ class LibraryViewModelFactory(
     private val repository: LibraryRepository,
     private val coverLoader: CoverLoader? = null,
     private val sortStore: LibrarySortStore? = null,
-    private val readingSessionRepository: ReadingSessionRepository? = null
+    private val readingSessionRepository: ReadingSessionRepository? = null,
+    private val layoutStore: LibraryLayoutStore? = null
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(LibraryViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return LibraryViewModel(repository, coverLoader, sortStore, readingSessionRepository) as T
+            return LibraryViewModel(repository, coverLoader, sortStore, readingSessionRepository, layoutStore) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

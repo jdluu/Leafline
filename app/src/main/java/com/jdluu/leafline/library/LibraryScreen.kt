@@ -53,7 +53,9 @@ import com.jdluu.leafline.library.data.ReadingAggregate
 import java.time.LocalDate
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Eco
@@ -140,6 +142,7 @@ fun LibraryScreen(
     val books by viewModel.sortedBooks.collectAsStateWithLifecycle()
     val isLibraryLoaded by viewModel.isLibraryLoaded.collectAsStateWithLifecycle()
     val currentSort by viewModel.sort.collectAsStateWithLifecycle()
+    val layout by viewModel.layout.collectAsStateWithLifecycle()
     val query by viewModel.query.collectAsStateWithLifecycle()
     val collections by viewModel.collections.collectAsStateWithLifecycle()
     val selectedCollection by viewModel.selectedCollection.collectAsStateWithLifecycle()
@@ -274,6 +277,14 @@ fun LibraryScreen(
                         onDismiss = { menuExpanded = false }
                     )
                 }
+                IconButton(
+                    onClick = { viewModel.toggleLayout() }
+                ) {
+                    Icon(
+                        imageVector = if (layout == LibraryLayout.GRID) Icons.AutoMirrored.Filled.ViewList else Icons.Default.GridView,
+                        contentDescription = if (layout == LibraryLayout.GRID) "Switch to list view" else "Switch to grid view"
+                    )
+                }
                 Box {
                     var overflowMenuExpanded by remember { mutableStateOf(false) }
                     IconButton(onClick = { overflowMenuExpanded = true }) {
@@ -322,122 +333,26 @@ fun LibraryScreen(
         )
         }
 
+        LibraryFilterBar(
+            searchActive = searchActive,
+            query = query,
+            onQueryChange = viewModel::setQuery,
+            onCloseSearch = {
+                viewModel.setQuery("")
+                searchActive = false
+            },
+            collections = collections,
+            selectedCollection = selectedCollection,
+            onSelectCollection = { viewModel.selectCollection(it) },
+            readingStatusFilter = readingStatusFilter,
+            onSelectReadingStatus = { viewModel.setReadingStatusFilter(it) },
+            allTags = allTags,
+            selectedTag = selectedTag,
+            tagCounts = tagCounts,
+            onSelectTag = { viewModel.selectTag(it) }
+        )
+
         if (books.isEmpty()) {
-            if (searchActive) {
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = viewModel::setQuery,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Padding.screen, vertical = 4.dp)
-                        .semantics { contentDescription = "Search title or author" },
-                    placeholder = { Text("Search title or author") },
-                    singleLine = true,
-                    trailingIcon = {
-                        IconButton(
-                            onClick = {
-                                viewModel.setQuery("")
-                                searchActive = false
-                            }
-                        ) {
-                            Icon(Icons.Default.Close, contentDescription = "Clear search")
-                        }
-                    }
-                )
-            }
-
-            if (collections.isNotEmpty()) {
-                androidx.compose.foundation.lazy.LazyRow(
-                    modifier = Modifier.padding(horizontal = Padding.screen, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
-                ) {
-                    item {
-                        FilterChip(
-                            selected = selectedCollection == null,
-                            onClick = { viewModel.selectCollection(null) },
-                            label = { Text("All") },
-                            modifier = Modifier.semantics { contentDescription = "All collections" }
-                        )
-                    }
-                    items(collections) { collection ->
-                        FilterChip(
-                            selected = selectedCollection == collection.id,
-                            onClick = { viewModel.selectCollection(collection.id) },
-                            label = { Text(collection.name) },
-                            trailingIcon = if (selectedCollection == collection.id) {
-                                {
-                                    Icon(
-                                        Icons.Default.Close,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp) // touch-target-ok: decorative chip icon
-                                    )
-                                }
-                            } else null
-                        )
-                    }
-                }
-            }
-
-            androidx.compose.foundation.lazy.LazyRow(
-                modifier = Modifier.padding(horizontal = Padding.screen, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
-            ) {
-                item {
-                    FilterChip(
-                        selected = readingStatusFilter == null,
-                        onClick = { viewModel.setReadingStatusFilter(null) },
-                        label = { Text("All") },
-                        modifier = Modifier.semantics { contentDescription = "All reading statuses" }
-                    )
-                }
-                ReadingStatus.entries.forEach { status ->
-                    item {
-                        FilterChip(
-                            selected = readingStatusFilter == status,
-                            onClick = { viewModel.setReadingStatusFilter(status) },
-                            label = {
-                                Text(status.displayName)
-                            }
-                        )
-                    }
-                }
-            }
-
-            if (allTags.isNotEmpty()) {
-                androidx.compose.foundation.lazy.LazyRow(
-                    modifier = Modifier.padding(horizontal = Padding.screen, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
-                ) {
-                    item {
-                        FilterChip(
-                            selected = selectedTag == null,
-                            onClick = { viewModel.selectTag(null) },
-                            label = { Text("All tags") },
-                            modifier = Modifier.semantics { contentDescription = "All tags" }
-                        )
-                    }
-                    items(allTags) { tag ->
-                        val isSelected = selectedTag.equals(tag, ignoreCase = true)
-                        FilterChip(
-                            selected = isSelected,
-                            onClick = {
-                                viewModel.selectTag(if (isSelected) null else tag)
-                            },
-                            label = { Text("#$tag") },
-                            trailingIcon = if (isSelected) {
-                                {
-                                    Icon(
-                                        Icons.Default.Close,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp) // touch-target-ok: decorative chip icon
-                                    )
-                                }
-                            } else null
-                        )
-                    }
-                }
-            }
-
             when {
                 !isLibraryLoaded -> LibraryLoadingState()
                 query.isNotBlank() -> LibraryEmptyState(
@@ -463,6 +378,73 @@ fun LibraryScreen(
                     onAction = onImportEpub
                 )
             }
+        } else if (layout == LibraryLayout.LIST) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = Padding.screen, end = Padding.screen, top = Spacing.xs, bottom = 88.dp),
+                verticalArrangement = Arrangement.spacedBy(Padding.compact)
+            ) {
+                if (continueReadingBooks.isNotEmpty()) {
+                    item {
+                        Column(modifier = Modifier.padding(top = Spacing.xs)) {
+                            Text(
+                                "Continue reading",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            androidx.compose.foundation.lazy.LazyRow(
+                                modifier = Modifier.padding(vertical = Spacing.xs),
+                                horizontalArrangement = Arrangement.spacedBy(Padding.compact)
+                            ) {
+                                items(continueReadingBooks, key = { it.stableId }) { book ->
+                                    ContinueReadingTile(book = book, onClick = { onOpenBook(book) })
+                                }
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    Text(
+                        text = if (readingStatusFilter != null) readingStatusFilter!!.displayName else "All books",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(top = Spacing.xs)
+                    )
+                }
+
+                items(items = books, key = { it.stableId }) { book ->
+                    val isSelected = selectedBookIds.contains(book.stableId)
+                    BookListRow(
+                        book = book,
+                        isSelected = isSelected,
+                        selectionMode = selectionMode,
+                        onClick = {
+                            if (selectionMode) {
+                                selectedBookIds = if (isSelected) selectedBookIds - book.stableId else selectedBookIds + book.stableId
+                            } else {
+                                onOpenBook(book)
+                            }
+                        },
+                        onLongClick = {
+                            if (selectionMode) {
+                                selectedBookIds = if (isSelected) selectedBookIds - book.stableId else selectedBookIds + book.stableId
+                            } else {
+                                detailSheetBook = book
+                            }
+                        },
+                        collections = collections,
+                        bookCollectionIds = viewModel
+                            .collectionIdsForBook(book.stableId)
+                            .collectAsStateWithLifecycle(emptySet())
+                            .value,
+                        onAddToCollection = { collectionId ->
+                            viewModel.addBookToCollection(book.stableId, collectionId)
+                        },
+                        onRemoveFromCollection = { collectionId ->
+                            viewModel.removeBookFromCollection(book.stableId, collectionId)
+                        }
+                    )
+                }
+            }
         } else {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(rememberLibraryGridColumns()),
@@ -471,151 +453,6 @@ fun LibraryScreen(
                 verticalArrangement = Arrangement.spacedBy(Padding.compact),
                 horizontalArrangement = Arrangement.spacedBy(Padding.compact)
             ) {
-                if (searchActive) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        OutlinedTextField(
-                            value = query,
-                            onValueChange = viewModel::setQuery,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp)
-                                .semantics { contentDescription = "Search title or author" },
-                            placeholder = { Text("Search title or author") },
-                            singleLine = true,
-                            trailingIcon = {
-                                IconButton(
-                                    onClick = {
-                                        viewModel.setQuery("")
-                                        searchActive = false
-                                    }
-                                ) {
-                                    Icon(Icons.Default.Close, contentDescription = "Clear search")
-                                }
-                            }
-                        )
-                    }
-                }
-
-                if (collections.isNotEmpty()) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        androidx.compose.foundation.lazy.LazyRow(
-                            modifier = Modifier.padding(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
-                        ) {
-                            item {
-                                FilterChip(
-                                    selected = selectedCollection == null,
-                                    onClick = { viewModel.selectCollection(null) },
-                                    label = { Text("All") },
-                                    modifier = Modifier.semantics { contentDescription = "All collections" }
-                                )
-                            }
-                            items(collections) { collection ->
-                                FilterChip(
-                                    selected = selectedCollection == collection.id,
-                                    onClick = { viewModel.selectCollection(collection.id) },
-                                    label = { Text(collection.name) },
-                                    trailingIcon = if (selectedCollection == collection.id) {
-                                        {
-                                            Icon(
-                                                Icons.Default.Close,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(16.dp) // touch-target-ok: decorative chip icon
-                                            )
-                                        }
-                                    } else null
-                                )
-                            }
-                        }
-                    }
-                }
-
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    androidx.compose.foundation.lazy.LazyRow(
-                        modifier = Modifier.padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
-                    ) {
-                        item {
-                            FilterChip(
-                                selected = readingStatusFilter == null,
-                                onClick = { viewModel.setReadingStatusFilter(null) },
-                                label = { Text("All") },
-                                modifier = Modifier.semantics { contentDescription = "All reading statuses" }
-                            )
-                        }
-                        ReadingStatus.entries.forEach { status ->
-                            item {
-                                FilterChip(
-                                    selected = readingStatusFilter == status,
-                                    onClick = { viewModel.setReadingStatusFilter(status) },
-                                    label = {
-                                        Text(status.displayName)
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-
-                if (allTags.isNotEmpty()) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        androidx.compose.foundation.lazy.LazyRow(
-                            modifier = Modifier.padding(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
-                        ) {
-                            item {
-                                FilterChip(
-                                    selected = selectedTag == null,
-                                    onClick = { viewModel.selectTag(null) },
-                                    label = { Text("All tags") },
-                                    modifier = Modifier.semantics { contentDescription = "All tags" }
-                                )
-                            }
-                            items(allTags) { tag ->
-                                val isSelected = selectedTag.equals(tag, ignoreCase = true)
-                                val count = tagCounts[tag.trim().lowercase()] ?: 0
-                                FilterChip(
-                                    selected = isSelected,
-                                    onClick = {
-                                        viewModel.selectTag(if (isSelected) null else tag)
-                                    },
-                                    label = {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                        ) {
-                                            Text("#$tag")
-                                            if (count > 0) {
-                                                Surface(
-                                                    shape = androidx.compose.foundation.shape.CircleShape,
-                                                    color = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.15f)
-                                                            else MaterialTheme.colorScheme.surfaceVariant
-                                                ) {
-                                                    Text(
-                                                        text = "$count",
-                                                        style = MaterialTheme.typography.labelSmall,
-                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    },
-                                    trailingIcon = if (isSelected) {
-                                        {
-                                            Icon(
-                                                Icons.Default.Close,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(16.dp) // touch-target-ok: decorative chip icon
-                                            )
-                                        }
-                                    } else null,
-                                    modifier = Modifier.semantics { contentDescription = "Tag $tag, $count books" }
-                                )
-                            }
-                        }
-                    }
-                }
-
                 if (continueReadingBooks.isNotEmpty()) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
                         Column(modifier = Modifier.padding(top = Spacing.xs)) {
@@ -1257,7 +1094,7 @@ private fun RescanSummaryRow(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun BookCollectionPickerSheet(
+internal fun BookCollectionPickerSheet(
     bookStableId: String,
     collections: List<Collection>,
     bookCollectionIds: Set<Long>,
@@ -1539,7 +1376,7 @@ fun BookGridTile(
 }
 
 @Composable
-private fun CoverPlaceholder(title: String) {
+internal fun CoverPlaceholder(title: String) {
     Column(
         modifier = Modifier
             .fillMaxSize()
