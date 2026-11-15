@@ -1,10 +1,12 @@
 package com.jdluu.leafline.library.cover
 
+import android.content.ComponentCallbacks2
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -66,5 +68,38 @@ class BitmapMemoryCacheTest {
 
         assertNull(BitmapMemoryCache.get("/path/to/cover1.jpg"))
         assertNull(BitmapMemoryCache.get("/path/to/cover2.jpg"))
+        assertEquals(0, BitmapMemoryCache.sizeKb())
+    }
+
+    @Test
+    fun `onTrimMemory with critical level clears all entries`() {
+        val bitmap = Bitmap.createBitmap(100, 100, Bitmap.Config.RGB_565)
+        BitmapMemoryCache.put("/path/to/cover.jpg", bitmap)
+        assertTrue(BitmapMemoryCache.sizeKb() > 0)
+
+        BitmapMemoryCache.onTrimMemory(ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL)
+        assertNull(BitmapMemoryCache.get("/path/to/cover.jpg"))
+        assertEquals(0, BitmapMemoryCache.sizeKb())
+    }
+
+    @Test
+    fun `onTrimMemory with moderate level trims cache`() {
+        val bitmap1 = Bitmap.createBitmap(100, 100, Bitmap.Config.RGB_565)
+        val bitmap2 = Bitmap.createBitmap(100, 100, Bitmap.Config.RGB_565)
+        BitmapMemoryCache.put("/path/to/cover1.jpg", bitmap1)
+        BitmapMemoryCache.put("/path/to/cover2.jpg", bitmap2)
+
+        BitmapMemoryCache.onTrimMemory(ComponentCallbacks2.TRIM_MEMORY_MODERATE)
+        assertTrue(BitmapMemoryCache.sizeKb() <= BitmapMemoryCache.cacheSizeKb / 2)
+    }
+
+    @Test
+    fun `trimToSize evicts old entries when downsized`() {
+        val bitmap = Bitmap.createBitmap(100, 100, Bitmap.Config.RGB_565)
+        BitmapMemoryCache.put("/path/to/cover.jpg", bitmap)
+
+        BitmapMemoryCache.trimToSize(0)
+        assertEquals(0, BitmapMemoryCache.sizeKb())
+        assertNull(BitmapMemoryCache.get("/path/to/cover.jpg"))
     }
 }
