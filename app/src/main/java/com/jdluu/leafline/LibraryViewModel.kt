@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.jdluu.leafline.library.ImportedBookReconciler
 import com.jdluu.leafline.library.LibraryBook
 import com.jdluu.leafline.library.LibrarySort
+import com.jdluu.leafline.library.LibraryLayout
+import com.jdluu.leafline.library.LibraryLayoutStore
 import com.jdluu.leafline.library.LibrarySortStore
 import com.jdluu.leafline.library.ReadingStatus
 import com.jdluu.leafline.library.cover.CoverLoader
@@ -34,7 +36,8 @@ class LibraryViewModel(
     private val repository: LibraryRepository,
     private val coverLoader: CoverLoader? = null,
     private val sortStore: LibrarySortStore? = null,
-    private val readingSessionRepository: ReadingSessionRepository? = null
+    private val readingSessionRepository: ReadingSessionRepository? = null,
+    private val layoutStore: LibraryLayoutStore? = null
 ) : ViewModel() {
 
     val books: StateFlow<List<LibraryBook>> = repository.getAllBooks()
@@ -70,6 +73,9 @@ class LibraryViewModel(
 
     private val _sort = MutableStateFlow(sortStore?.load() ?: LibrarySort.RECENT)
     val sort: StateFlow<LibrarySort> = _sort.asStateFlow()
+
+    private val _layout = MutableStateFlow(layoutStore?.load() ?: LibraryLayout.GRID)
+    val layout: StateFlow<LibraryLayout> = _layout.asStateFlow()
 
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query.asStateFlow()
@@ -238,6 +244,17 @@ class LibraryViewModel(
         if (_sort.value == sort) return
         _sort.value = sort
         sortStore?.save(sort)
+    }
+
+    fun setLayout(layout: LibraryLayout) {
+        if (_layout.value == layout) return
+        _layout.value = layout
+        layoutStore?.save(layout)
+    }
+
+    fun toggleLayout() {
+        val next = if (_layout.value == LibraryLayout.GRID) LibraryLayout.LIST else LibraryLayout.GRID
+        setLayout(next)
     }
 
     fun setQuery(query: String) {

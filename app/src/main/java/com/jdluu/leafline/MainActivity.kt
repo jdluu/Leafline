@@ -63,6 +63,7 @@ import com.jdluu.leafline.library.LibraryFolderViewModel
 import com.jdluu.leafline.library.LibraryFolderViewModelFactory
 import com.jdluu.leafline.library.LocalEpubDocumentScanner
 import com.jdluu.leafline.library.LibraryScreen
+import com.jdluu.leafline.library.LibraryLayoutStore
 import com.jdluu.leafline.library.LibrarySortStore
 import com.jdluu.leafline.library.LibraryViewModelFactory
 import com.jdluu.leafline.library.SafFolderMetadata
@@ -235,7 +236,8 @@ fun LeaflineApp(activity: MainActivity) {
             repository = activity.appContainer.libraryRepository,
             coverLoader = EpubCoverLoader(activity.applicationContext),
             sortStore = LibrarySortStore.fromContext(activity),
-            readingSessionRepository = activity.appContainer.readingSessionRepository
+            readingSessionRepository = activity.appContainer.readingSessionRepository,
+            layoutStore = LibraryLayoutStore.fromContext(activity)
         )
     )
 
