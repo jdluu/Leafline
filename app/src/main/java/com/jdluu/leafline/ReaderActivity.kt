@@ -27,6 +27,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -326,6 +328,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     private var bookmarks = mutableStateOf<List<Bookmark>>(emptyList())
     private var annotations = mutableStateOf<List<Annotation>>(emptyList())
     private var currentLocation = mutableStateOf<Locator?>(null)
+    private val isLoadingPublication = mutableStateOf(true)
     private var pageAnnouncement = mutableStateOf<String?>(null)
     @Volatile
     private var activeSearchResultId: Int? = null
@@ -408,37 +411,24 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             )
         )
 
-        var savedLocatorJson: String? = null
-        var savedBook: com.jdluu.leafline.library.LibraryBook? = null
-        {
-            try {
-                val lookupPath = epubFile!!.canonicalPath
-                savedBook = runBlocking {
-                    libraryRepository.getBookByFilePath(lookupPath)
-                        ?: libraryRepository.getBookByFilePath(epubFile!!.absolutePath)
-                }
-                if (savedBook == null) {
-                    Log.w(TAG, "No library book found for path: $lookupPath")
-                }
-                savedLocatorJson = savedBook?.lastLocatorJson
-                bookStableId = savedBook?.stableId
-                // Update reading status to READING when opening
-                savedBook?.let { book ->
-                    if (book.readingStatus == ReadingStatus.UNREAD) {
-                        lifecycleScope.launch {
-                            libraryRepository.setReadingStatus(book.stableId, ReadingStatus.READING)
-                        }
-                    }
-                    lifecycleScope.launch {
-                        val agg = appContainer.readingSessionRepository.getAggregateForBook(book.stableId)
-                        lifetimeActiveDurationMillis = agg.activeDurationMillis
-                    }
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "Could not load saved locator", e)
-            }
-        }
-        currentBook = savedBook
+        val animatorScale = android.provider.Settings.Global.getFloat(
+            contentResolver,
+            android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+            1f
+        )
+        val savedSettings = readerPreferencesStore.load(initialReduceMotion = animatorScale == 0f)
+        settingsController = ReaderSettingsController(
+            initialSettings = savedSettings,
+            submitToNavigator = { navigator?.submitPreferences(it.toNavigatorPreferences()) },
+            applyWindowBrightness = ::applyBrightnessToWindow,
+            applyKeepScreenOn = ::applyKeepScreenOn,
+            applyOrientation = ::applyOrientation,
+            save = readerPreferencesStore::save
+        )
+        applyBrightnessToWindow(savedSettings.brightness)
+        applyKeepScreenOn(savedSettings.keepScreenOn)
+        applyOrientation(savedSettings.orientation)
+
         annotationManager = com.jdluu.leafline.reader.annotations.AnnotationManager(
             context = this,
             scope = lifecycleScope,
@@ -497,217 +487,218 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         )
         syncManager.initialize()
 
-        val initialLocator: Locator? = savedLocatorJson?.let { json ->
+        setContentView(R.layout.activity_reader)
+        addReaderOverlay()
+
+        val targetFile = epubFile!!
+        lifecycleScope.launch {
             try {
-                Locator.Companion.fromJSON(org.json.JSONObject(json))
-            } catch (e: Exception) {
-                Log.w(TAG, "Could not parse saved locator, starting at beginning", e)
-                null
-            }
-        }
-
-        try {
-            val publication = runBlocking {
-                val asset = assetRetriever.retrieve(epubFile!!).getOrElse {
-                    throw RuntimeException("Failed to retrieve asset: $it")
+                val (loadedBook, pub) = withContext(Dispatchers.IO) {
+                    val lookupPath = targetFile.canonicalPath
+                    val book = libraryRepository.getBookByFilePath(lookupPath)
+                        ?: libraryRepository.getBookByFilePath(targetFile.absolutePath)
+                    val asset = assetRetriever.retrieve(targetFile).getOrElse {
+                        throw RuntimeException("Failed to retrieve asset: $it")
+                    }
+                    val openedPub = publicationOpener.open(asset, allowUserInteraction = true).getOrElse {
+                        throw RuntimeException("Failed to open publication: $it")
+                    }
+                    book to openedPub
                 }
-                publicationOpener.open(asset, allowUserInteraction = true).getOrElse {
-                    throw RuntimeException("Failed to open publication: $it")
-                }
-            }
 
-            bookTitle.value = publication.metadata.title ?: "Reading"
-            tocLinks.value = flattenToc(publication.tableOfContents)
-            this@ReaderActivity.publication = publication
-            val ttsFactory = runCatching {
-                AndroidTtsNavigatorFactory(application, publication)
-            }.getOrNull()
-            this@ReaderActivity.ttsFactory = ttsFactory
-            ttsController = ReaderTtsController(
-                initialState = if (ttsFactory != null) ReaderTtsState.IDLE else ReaderTtsState.UNAVAILABLE,
-                scope = lifecycleScope,
-                onPlay = { handleTtsPlay() },
-                onPause = { handleTtsPause() },
-                onStop = { handleTtsStop() },
-                onSetRate = { rate -> handleTtsRateChange(rate) },
-                onSkipPrevious = { ttsNavigator?.skipToPreviousUtterance() },
-                onSkipNext = { ttsNavigator?.skipToNextUtterance() },
-                onError = { message ->
-                    if (message != null) {
-                        Toast.makeText(this@ReaderActivity, message, Toast.LENGTH_SHORT).show()
+                currentBook = loadedBook
+                val stableId = loadedBook?.stableId ?: intentBookId
+                bookStableId = stableId
+                val savedLocatorJson = loadedBook?.lastLocatorJson
+                loadedBook?.let { book ->
+                    if (book.readingStatus == ReadingStatus.UNREAD) {
+                        launch { libraryRepository.setReadingStatus(book.stableId, ReadingStatus.READING) }
+                    }
+                    launch {
+                        val agg = appContainer.readingSessionRepository.getAggregateForBook(book.stableId)
+                        lifetimeActiveDurationMillis = agg.activeDurationMillis
                     }
                 }
-            )
-            searchHistoryStore = SearchHistoryStore.create(this)
-            bookSearcher = BookSearcher(
-                scope = lifecycleScope,
-                searchFactory = { query, options ->
-                    this@ReaderActivity.publication?.search(
-                        query = query,
-                        options = SearchService.Options(
-                            caseSensitive = options.caseSensitive,
-                            wholeWord = options.wholeWord,
-                            regularExpression = options.regex
-                        )
-                    )
+
+                val initialLocator: Locator? = savedLocatorJson?.let { json ->
+                    try {
+                        Locator.Companion.fromJSON(org.json.JSONObject(json))
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Could not parse saved locator, starting at beginning", e)
+                        null
+                    }
                 }
-            )
 
-            val animatorScale = android.provider.Settings.Global.getFloat(
-                contentResolver,
-                android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
-                1f
-            )
-            val savedSettings = readerPreferencesStore.load(initialReduceMotion = animatorScale == 0f)
-            settingsController = ReaderSettingsController(
-                initialSettings = savedSettings,
-                submitToNavigator = { navigator?.submitPreferences(it.toNavigatorPreferences()) },
-                applyWindowBrightness = ::applyBrightnessToWindow,
-                applyKeepScreenOn = ::applyKeepScreenOn,
-                applyOrientation = ::applyOrientation,
-                save = readerPreferencesStore::save
-            )
-            applyBrightnessToWindow(savedSettings.brightness)
-            applyKeepScreenOn(savedSettings.keepScreenOn)
-            applyOrientation(savedSettings.orientation)
-
-            val navigatorFactory = EpubNavigatorFactory(publication)
-            val fragmentFactory = navigatorFactory.createFragmentFactory(
-                initialLocator = initialLocator,
-                initialPreferences = savedSettings.toNavigatorPreferences(),
-                listener = this,
-                configuration = EpubNavigatorFragment.Configuration(
-                    selectionActionModeCallback = textSelectionManager.selectionActionMode()
-                )
-            )
-
-            supportFragmentManager.fragmentFactory = fragmentFactory
-
-            setContentView(R.layout.activity_reader)
-
-            val restoredNavigator = supportFragmentManager.findFragmentByTag(NAVIGATOR_TAG)
-            if (restoredNavigator == null) {
-                supportFragmentManager.commitNow {
-                    add(R.id.navigator_container, EpubNavigatorFragment::class.java, null, NAVIGATOR_TAG)
-                }
-            }
-            navigator = supportFragmentManager.findFragmentByTag(NAVIGATOR_TAG) as EpubNavigatorFragment
-            tapZoneHandler = com.jdluu.leafline.reader.navigation.TapZoneHandler(
-                context = this,
-                scope = lifecycleScope,
-                navigatorProvider = { navigator },
-                settingsProvider = { settingsController.settings.value },
-                onToggleMenu = { toolbarVisible.value = !toolbarVisible.value },
-                onAnnouncement = { announcement -> pageAnnouncement.value = announcement }
-            )
-            navigator?.addInputListener(tapZoneHandler.inputListener)
-            lifecycleScope.launch {
-                navigator?.currentLocator?.collect { locator ->
-                    tapZoneHandler.onReadingPositionChanged(locator)
-                }
-            }
-            lifecycleScope.launch {
-                navigationHistory.jumpNotice.collect { notice ->
-                    jumpNoticeDismissJob?.cancel()
-                    if (notice != null) {
-                        jumpNoticeDismissJob = launch {
-                            delay(12_000L)
-                            navigationHistory.dismissJumpNotice()
+                bookTitle.value = pub.metadata.title ?: loadedBook?.title ?: "Reading"
+                tocLinks.value = flattenToc(pub.tableOfContents)
+                this@ReaderActivity.publication = pub
+                val ttsFactory = runCatching {
+                    AndroidTtsNavigatorFactory(application, pub)
+                }.getOrNull()
+                this@ReaderActivity.ttsFactory = ttsFactory
+                ttsController = ReaderTtsController(
+                    initialState = if (ttsFactory != null) ReaderTtsState.IDLE else ReaderTtsState.UNAVAILABLE,
+                    scope = lifecycleScope,
+                    onPlay = { handleTtsPlay() },
+                    onPause = { handleTtsPause() },
+                    onStop = { handleTtsStop() },
+                    onSetRate = { rate -> handleTtsRateChange(rate) },
+                    onSkipPrevious = { ttsNavigator?.skipToPreviousUtterance() },
+                    onSkipNext = { ttsNavigator?.skipToNextUtterance() },
+                    onError = { message ->
+                        if (message != null) {
+                            Toast.makeText(this@ReaderActivity, message, Toast.LENGTH_SHORT).show()
                         }
                     }
-                }
-            }
+                )
+                searchHistoryStore = SearchHistoryStore.create(this@ReaderActivity)
+                bookSearcher = BookSearcher(
+                    scope = lifecycleScope,
+                    searchFactory = { query, options ->
+                        this@ReaderActivity.publication?.search(
+                            query = query,
+                            options = SearchService.Options(
+                                caseSensitive = options.caseSensitive,
+                                wholeWord = options.wholeWord,
+                                regularExpression = options.regex
+                            )
+                        )
+                    }
+                )
 
-            bookStableId?.let { stableId ->
-                if (!sessionRestored) {
-                    val initialProg = initialLocator?.locations?.totalProgression
-                        ?: initialLocator?.locations?.progression
-                    sessionRecorder.startSession(
-                        bookId = stableId,
-                        initialLocatorJson = savedLocatorJson,
-                        initialProgression = initialProg
+                val navigatorFactory = EpubNavigatorFactory(pub)
+                val fragmentFactory = navigatorFactory.createFragmentFactory(
+                    initialLocator = initialLocator,
+                    initialPreferences = settingsController.settings.value.toNavigatorPreferences(),
+                    listener = this@ReaderActivity,
+                    configuration = EpubNavigatorFragment.Configuration(
+                        selectionActionModeCallback = textSelectionManager.selectionActionMode()
                     )
+                )
+
+                supportFragmentManager.fragmentFactory = fragmentFactory
+
+                supportFragmentManager.commitNow {
+                    replace(R.id.navigator_container, EpubNavigatorFragment::class.java, null, NAVIGATOR_TAG)
                 }
-                lifecycleScope.launch {
+                navigator = supportFragmentManager.findFragmentByTag(NAVIGATOR_TAG) as EpubNavigatorFragment
+                tapZoneHandler = com.jdluu.leafline.reader.navigation.TapZoneHandler(
+                    context = this@ReaderActivity,
+                    scope = lifecycleScope,
+                    navigatorProvider = { navigator },
+                    settingsProvider = { settingsController.settings.value },
+                    onToggleMenu = { toolbarVisible.value = !toolbarVisible.value },
+                    onAnnouncement = { announcement -> pageAnnouncement.value = announcement }
+                )
+                navigator?.addInputListener(tapZoneHandler.inputListener)
+                launch {
                     navigator?.currentLocator?.collect { locator ->
-                        val locatorJson = locator.toJSON().toString()
-                        currentLocation.value = locator
-                        val progression = locator.locations.totalProgression
-                            ?: locator.locations.progression
-                        sessionRecorder.updateLocation(locatorJson, progression)
+                        tapZoneHandler.onReadingPositionChanged(locator)
                     }
                 }
-                lifecycleScope.launch {
-                    @OptIn(FlowPreview::class)
-                    navigator?.currentLocator
-                        ?.debounce(500L)
-                        ?.collect { locator ->
-                            try {
-                                libraryRepository.saveLastLocator(
-                                    stableId,
-                                    locator.toJSON().toString(),
-                                    System.currentTimeMillis()
-                                )
-                            } catch (e: Exception) {
-                                Log.w(TAG, "Could not save reading position", e)
+                launch {
+                    navigationHistory.jumpNotice.collect { notice ->
+                        jumpNoticeDismissJob?.cancel()
+                        if (notice != null) {
+                            jumpNoticeDismissJob = launch {
+                                delay(12_000L)
+                                navigationHistory.dismissJumpNotice()
                             }
                         }
+                    }
                 }
-                lifecycleScope.launch {
-                    run { lifecycleScope.launch { syncManager.pullRemoteProgress() } }
-                }
-                lifecycleScope.launch {
-                    try {
-                        bookmarkRepository.observeBookmarks(stableId).collect { stored ->
-                            bookmarks.value = stored
+
+                stableId?.let { id ->
+                    if (!sessionRestored) {
+                        val initialProg = initialLocator?.locations?.totalProgression
+                            ?: initialLocator?.locations?.progression
+                        sessionRecorder.startSession(
+                            bookId = id,
+                            initialLocatorJson = savedLocatorJson,
+                            initialProgression = initialProg
+                        )
+                    }
+                    launch {
+                        navigator?.currentLocator?.collect { locator ->
+                            val locatorJson = locator.toJSON().toString()
+                            currentLocation.value = locator
+                            val progression = locator.locations.totalProgression
+                                ?: locator.locations.progression
+                            sessionRecorder.updateLocation(locatorJson, progression)
                         }
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Could not observe bookmarks", e)
                     }
-                }
-                lifecycleScope.launch {
-                    try {
-                        annotationRepository.observeAnnotations(stableId).collect { stored ->
-                            annotations.value = stored
-                            annotationManager.applyDecorations()
+                    launch {
+                        @OptIn(FlowPreview::class)
+                        navigator?.currentLocator
+                            ?.debounce(500L)
+                            ?.collect { locator ->
+                                try {
+                                    libraryRepository.saveLastLocator(
+                                        id,
+                                        locator.toJSON().toString(),
+                                        System.currentTimeMillis()
+                                    )
+                                } catch (e: Exception) {
+                                    Log.w(TAG, "Could not save reading position", e)
+                                }
+                            }
+                    }
+                    launch {
+                        syncManager.pullRemoteProgress()
+                    }
+                    launch {
+                        try {
+                            bookmarkRepository.observeBookmarks(id).collect { stored ->
+                                bookmarks.value = stored
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Could not observe bookmarks", e)
                         }
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Could not observe annotations", e)
+                    }
+                    launch {
+                        try {
+                            annotationRepository.observeAnnotations(id).collect { stored ->
+                                annotations.value = stored
+                                annotationManager.applyDecorations()
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Could not observe annotations", e)
+                        }
                     }
                 }
+
+                navigator?.addDecorationListener(
+                    ANNOTATION_DECORATION_GROUP,
+                    object : DecorableNavigator.Listener {
+                        override fun onDecorationActivated(
+                            event: DecorableNavigator.OnActivatedEvent
+                        ): Boolean {
+                            val annotationId = event.decoration.id
+                                .removePrefix(ANNOTATION_DECORATION_PREFIX)
+                                .toLongOrNull() ?: return false
+                            val target = annotations.value.firstOrNull { it.id == annotationId }
+                                ?: return false
+                            val message = target.note ?: annotationExcerpt(target)
+                            Toast.makeText(this@ReaderActivity, message, Toast.LENGTH_SHORT).show()
+                            return true
+                        }
+                    }
+                )
+
+                launch {
+                    bookSearcher.state.collect { state ->
+                        if (state.status is BookSearchStatus.Completed) {
+                            applySearchDecorations()
+                        }
+                    }
+                }
+
+                isLoadingPublication.value = false
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to open publication", e)
+                Toast.makeText(this@ReaderActivity, "Failed to open EPUB: ${e.message}", Toast.LENGTH_LONG).show()
+                finish()
             }
-
-            navigator?.addDecorationListener(
-                ANNOTATION_DECORATION_GROUP,
-                object : DecorableNavigator.Listener {
-                    override fun onDecorationActivated(
-                        event: DecorableNavigator.OnActivatedEvent
-                    ): Boolean {
-                        val annotationId = event.decoration.id
-                            .removePrefix(ANNOTATION_DECORATION_PREFIX)
-                            .toLongOrNull() ?: return false
-                        val target = annotations.value.firstOrNull { it.id == annotationId }
-                            ?: return false
-                        val message = target.note ?: annotationExcerpt(target)
-                        Toast.makeText(this@ReaderActivity, message, Toast.LENGTH_SHORT).show()
-                        return true
-                    }
-                }
-            )
-
-            lifecycleScope.launch {
-                bookSearcher.state.collect { state ->
-                    if (state.status is BookSearchStatus.Completed) {
-                        applySearchDecorations()
-                    }
-                }
-            }
-
-            addReaderOverlay()
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to open publication", e)
-            Toast.makeText(this, "Failed to open EPUB: ${e.message}", Toast.LENGTH_LONG).show()
-            finish()
         }
     }
 
@@ -926,6 +917,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
 
     private fun addReaderOverlay() {
         val touchContainer = ReaderOverlayTouchContainer(this) {
+            isLoadingPublication.value ||
             toolbarVisible.value ||
             settingsSheetVisible.value ||
             bookmarkSheetVisible.value ||
@@ -937,7 +929,22 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         }
         val composeView = ComposeView(this).apply {
             setContent {
-                val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+                val isLoading by isLoadingPublication
+                Crossfade(
+                    targetState = !isLoading && this@ReaderActivity::bookSearcher.isInitialized,
+                    animationSpec = tween(durationMillis = 300),
+                    label = "reader_loading_crossfade"
+                ) { isReady ->
+                    if (!isReady) {
+                        ReaderLoadingScreen(
+                            title = bookTitle.value.takeUnless { it == "Reading" } ?: currentBook?.title,
+                            onBack = {
+                                finish()
+                                overridePendingTransition(0, android.R.anim.fade_out)
+                            }
+                        )
+                    } else {
+                        val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                 LaunchedEffect(drawerState.isOpen) {
                     isDrawerOpen.value = drawerState.isOpen
                 }
@@ -1059,6 +1066,8 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                         } catch (_: Exception) {}
                     }
                 )
+                    }
+                }
             }
         }
         val layoutParams = android.view.ViewGroup.LayoutParams(
@@ -1070,7 +1079,10 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (settingsController.settings.value.epub.scroll != true) {
+        if (this::settingsController.isInitialized &&
+            this::tapZoneHandler.isInitialized &&
+            settingsController.settings.value.epub.scroll != true
+        ) {
             when (keyCode) {
                 KeyEvent.KEYCODE_VOLUME_DOWN -> {
                     navigator?.goForward(tapZoneHandler.pageTurnAnimated(settingsController.settings.value))
