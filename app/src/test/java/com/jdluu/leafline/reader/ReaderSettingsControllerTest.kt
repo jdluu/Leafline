@@ -135,4 +135,21 @@ class ReaderSettingsControllerTest {
         assertEquals(listOf(null as ReaderTheme?), harness.themeBackgroundValues)
         assertNull(harness.persisted.single().theme)
     }
+
+    @Test
+    fun `cycleMinimalHudMode cycles sequentially through all modes`() {
+        val harness = Harness(initial = ReaderSettings(minimalHudMode = MinimalHudMode.CHAPTER_AND_PERCENT))
+
+        harness.controller.cycleMinimalHudMode()
+        assertEquals(MinimalHudMode.PERCENT_ONLY, harness.controller.settings.value.minimalHudMode)
+
+        harness.controller.cycleMinimalHudMode()
+        assertEquals(MinimalHudMode.TIME_REMAINING, harness.controller.settings.value.minimalHudMode)
+
+        harness.controller.cycleMinimalHudMode()
+        assertEquals(MinimalHudMode.CHAPTER_ONLY, harness.controller.settings.value.minimalHudMode)
+
+        harness.controller.cycleMinimalHudMode()
+        assertEquals(MinimalHudMode.CHAPTER_AND_PERCENT, harness.controller.settings.value.minimalHudMode)
+    }
 }

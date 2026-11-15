@@ -221,6 +221,7 @@ import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.publication.Link
 import org.readium.r2.shared.publication.Locator
 import com.jdluu.leafline.reader.navigation.NavigationHistoryManager
+import com.jdluu.leafline.reader.navigation.ReaderScrubberHelper
 import org.readium.r2.shared.publication.Publication
 import org.readium.r2.shared.publication.services.search.search
 import org.readium.r2.shared.util.AbsoluteUrl
@@ -1005,6 +1006,24 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                 val canNavigateHistoryBack by navigationHistory.canGoBack.collectAsState()
                 val canNavigateHistoryForward by navigationHistory.canGoForward.collectAsState()
                 val jumpNotice by navigationHistory.jumpNotice.collectAsState()
+                val tocList = tocLinks.value
+                val readingOrder = publication?.readingOrder.orEmpty()
+                val (chapterItems, currentIndex) = remember(tocList, readingOrder, currentChapterHref, currentLocation.value) {
+                    if (tocList.isNotEmpty()) {
+                        val idx = if (currentChapterHref != null) {
+                            tocList.indexOfFirst { (link, _) -> matchesChapter(link.href.toString(), currentChapterHref) }
+                        } else -1
+                        Pair(tocList.map { it.first }, idx)
+                    } else {
+                        val curHref = currentLocation.value?.href?.toString()
+                        val idx = if (curHref != null) {
+                            readingOrder.indexOfFirst { matchesChapter(it.href.toString(), curHref) }
+                        } else -1
+                        Pair(readingOrder, idx)
+                    }
+                }
+                val canSkipPrev = ReaderScrubberHelper.canSkipPrevious(currentIndex)
+                val canSkipNext = ReaderScrubberHelper.canSkipNext(currentIndex, chapterItems.size)
                 ReaderOverlay(
                     canNavigateHistoryBack = canNavigateHistoryBack,
                     canNavigateHistoryForward = canNavigateHistoryForward,
@@ -1099,6 +1118,26 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     bookActiveDurationMillis = lifetimeActiveDurationMillis + (if (::sessionRecorder.isInitialized) sessionRecorder.currentActiveDurationMillis() else 0L),
                     activeFootnote = activeFootnote.value,
                     onDismissFootnote = { activeFootnote.value = null },
+                    chapterTitles = remember(chapterItems) { chapterItems.map { it.title ?: "" } },
+                    canSkipPreviousChapter = canSkipPrev,
+                    canSkipNextChapter = canSkipNext,
+                    onPreviousChapter = {
+                        ReaderScrubberHelper.resolvePreviousChapterIndex(currentIndex)?.let {
+                            navigateToTocLink(chapterItems[it])
+                        }
+                    },
+                    onNextChapter = {
+                        ReaderScrubberHelper.resolveNextChapterIndex(currentIndex, chapterItems.size)?.let {
+                            navigateToTocLink(chapterItems[it])
+                        }
+                    },
+                    onSeekToPercentage = { percent ->
+                        val targetIndex = ReaderScrubberHelper.findChapterTarget(percent, chapterItems.size)
+                        if (targetIndex != null && targetIndex in chapterItems.indices) {
+                            navigateToTocLink(chapterItems[targetIndex])
+                        }
+                    },
+                    onCycleMinimalHudMode = { settingsController.cycleMinimalHudMode() },
                     onJumpToFootnote = { locatorJson ->
                         try {
                             val locator = Locator.fromJSON(org.json.JSONObject(locatorJson))

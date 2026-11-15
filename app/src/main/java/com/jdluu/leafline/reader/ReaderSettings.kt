@@ -180,6 +180,20 @@ fun toggleSepia(settings: ReaderSettings): ReaderSettings {
 }
 
 /**
+ * Display format modes for the minimal reading footer shown when menus are hidden.
+ */
+enum class MinimalHudMode {
+    /** Both chapter title and percentage (e.g. "Chapter 3 • 42%"). */
+    CHAPTER_AND_PERCENT,
+    /** Reading percentage only (e.g. "42%"). */
+    PERCENT_ONLY,
+    /** Estimated remaining reading time (e.g. "~25 min left"). */
+    TIME_REMAINING,
+    /** Chapter title only (e.g. "Chapter 3"). */
+    CHAPTER_ONLY
+}
+
+/**
  * Everything persisted by [ReaderPreferencesStore]: the Readium EPUB
  * preferences plus the Leafline-specific interaction settings. The theme is
  * held as a [ReaderTheme] outside [epub] so the domain stays independent of
@@ -229,6 +243,7 @@ data class ReaderSettings(
      * progress at the bottom of the reading view when menus are hidden.
      */
     val showMinimalHud: Boolean = true,
+    val minimalHudMode: MinimalHudMode = MinimalHudMode.CHAPTER_AND_PERCENT,
     /**
      * When true, emits subtle haptic feedback when turning pages via edge taps
      * or volume keys.
