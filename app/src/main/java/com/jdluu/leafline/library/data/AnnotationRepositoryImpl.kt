@@ -25,6 +25,11 @@ class AnnotationRepositoryImpl(
             annotationDao.getForBook(bookId).map { it.toAnnotation() }
         }
 
+    override suspend fun getAllAnnotations(): List<Annotation> =
+        withContext(ioDispatcher) {
+            annotationDao.getAllAnnotations().map { it.toAnnotation() }
+        }
+
     override suspend fun addAnnotation(
         bookId: String,
         locatorJson: String,
