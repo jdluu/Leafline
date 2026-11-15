@@ -34,3 +34,16 @@ fun Theme.toReaderTheme(): ReaderTheme {
         Theme.SEPIA -> ReaderTheme.SEPIA
     }
 }
+
+/**
+ * Returns the standard background color Int for this theme.
+ * When theme is null, falls back to light or dark depending on [isDark].
+ */
+fun ReaderTheme?.backgroundColor(isDark: Boolean = false): Int {
+    return when (this) {
+        ReaderTheme.LIGHT -> 0xFFFFFFFF.toInt()
+        ReaderTheme.DARK -> 0xFF121212.toInt()
+        ReaderTheme.SEPIA -> 0xFFFAF4E8.toInt()
+        null -> if (isDark) 0xFF121212.toInt() else 0xFFFFFFFF.toInt()
+    }
+}

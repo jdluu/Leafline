@@ -88,6 +88,14 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SearchOff
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import com.jdluu.leafline.reader.navigation.filterVisibleTocLinks
+import com.jdluu.leafline.reader.navigation.findAncestorKeysForIndex
+import com.jdluu.leafline.reader.navigation.tocLinkKey
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.WbSunny
@@ -344,9 +352,35 @@ internal fun ReaderOverlay(
             matchesChapter(link.href.toString(), currentChapterHref)
         }
     }
+    var collapsedTocKeys by remember { mutableStateOf(setOf<String>()) }
+    val allParentKeys = remember(tocLinks) {
+        tocLinks.filter { (link, _) -> link.children.isNotEmpty() }
+            .map { (link, _) -> tocLinkKey(link) }
+            .toSet()
+    }
+    val hasNestedTocItems = allParentKeys.isNotEmpty()
+
+    LaunchedEffect(activeTocIndex, drawerState.isOpen) {
+        if (activeTocIndex >= 0) {
+            val ancestors = findAncestorKeysForIndex(tocLinks, activeTocIndex)
+            if (ancestors.any { it in collapsedTocKeys }) {
+                collapsedTocKeys = collapsedTocKeys - ancestors
+            }
+        }
+    }
+
+    val visibleTocLinks = remember(tocLinks, collapsedTocKeys) {
+        filterVisibleTocLinks(tocLinks, collapsedTocKeys)
+    }
+
     LaunchedEffect(drawerState.isOpen) {
         if (drawerState.isOpen && activeTocIndex >= 0) {
-            tocListState.animateScrollToItem(activeTocIndex)
+            val visibleIndex = visibleTocLinks.indexOfFirst { (link, _) ->
+                matchesChapter(link.href.toString(), currentChapterHref)
+            }
+            if (visibleIndex >= 0) {
+                tocListState.animateScrollToItem(visibleIndex)
+            }
         }
     }
 
@@ -355,19 +389,64 @@ internal fun ReaderOverlay(
         gesturesEnabled = drawerState.isOpen,
         drawerContent = {
             ModalDrawerSheet {
-                Text(
-                    "Contents",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(Padding.screen)
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Padding.screen, vertical = Spacing.sm),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            "Contents",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        if (tocLinks.isNotEmpty()) {
+                            Text(
+                                text = if (tocLinks.size == 1) "1 section" else "${tocLinks.size} sections",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    if (hasNestedTocItems) {
+                        TextButton(
+                            onClick = {
+                                collapsedTocKeys = if (collapsedTocKeys.isEmpty()) {
+                                    allParentKeys
+                                } else {
+                                    emptySet()
+                                }
+                            }
+                        ) {
+                            Text(if (collapsedTocKeys.isEmpty()) "Collapse all" else "Expand all")
+                        }
+                    }
+                }
+                HorizontalDivider(modifier = Modifier.padding(horizontal = Padding.screen))
                 Spacer(modifier = Modifier.height(4.dp))
                 LazyColumn(state = tocListState) {
-                    itemsIndexed(tocLinks) { index, (link, depth) ->
-                        val isCurrent = index == activeTocIndex
+                    items(
+                        items = visibleTocLinks,
+                        key = { (link, _) -> tocLinkKey(link) }
+                    ) { (link, depth) ->
+                        val isCurrent = matchesChapter(link.href.toString(), currentChapterHref)
+                        val key = tocLinkKey(link)
+                        val hasChildren = link.children.isNotEmpty()
+                        val isExpanded = hasChildren && key !in collapsedTocKeys
                         TocItem(
                             link = link,
                             depth = depth,
                             isCurrent = isCurrent,
+                            hasChildren = hasChildren,
+                            isExpanded = isExpanded,
+                            onToggleExpand = {
+                                collapsedTocKeys = if (isExpanded) {
+                                    collapsedTocKeys + key
+                                } else {
+                                    collapsedTocKeys - key
+                                }
+                            },
                             onClick = { onTocClick(link) }
                         )
                     }
@@ -1524,6 +1603,7 @@ internal fun BookSearchSheet(
         var lastSubmittedQuery by remember { mutableStateOf(state.query) }
         var lastSubmittedOptions by remember { mutableStateOf(state.options) }
         val focusRequester = remember { FocusRequester() }
+        val keyboardController = LocalSoftwareKeyboardController.current
 
         Column(
             modifier = Modifier
@@ -1557,7 +1637,11 @@ internal fun BookSearchSheet(
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 trailingIcon = {
                     if (query.isNotEmpty()) {
-                        IconButton(onClick = { query = "" }) {
+                        IconButton(onClick = {
+                            query = ""
+                            lastSubmittedQuery = null
+                            onClearSearch()
+                        }) {
                             Icon(Icons.Default.Close, contentDescription = "Clear search query")
                         }
                     }
@@ -1565,8 +1649,11 @@ internal fun BookSearchSheet(
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(
                     onSearch = {
+                        keyboardController?.hide()
                         val normalized = BookSearchQuery.normalize(query)
                         if (normalized != null) {
+                            lastSubmittedQuery = normalized
+                            lastSubmittedOptions = options
                             onSubmitSearch(normalized, options)
                         }
                     }
@@ -1684,7 +1771,16 @@ internal fun BookSearchSheet(
                         recentSearches.forEach { recentQuery ->
                             InputChip(
                                 selected = false,
-                                onClick = { query = recentQuery },
+                                onClick = {
+                                    query = recentQuery
+                                    keyboardController?.hide()
+                                    val normalized = BookSearchQuery.normalize(recentQuery)
+                                    if (normalized != null) {
+                                        lastSubmittedQuery = normalized
+                                        lastSubmittedOptions = options
+                                        onSubmitSearch(normalized, options)
+                                    }
+                                },
                                 label = { Text(recentQuery) },
                                 trailingIcon = {
                                     Icon(
@@ -1708,6 +1804,38 @@ internal fun BookSearchSheet(
                         "Search across chapters, footnotes, and text",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        } else if (state.status is BookSearchStatus.Completed && state.results.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = false)
+                    .padding(Padding.screen),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SearchOff,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.size(48.dp) // touch-target-ok: decorative icon
+                    )
+                    Text(
+                        text = "No matches found for \"$query\"",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = "Check spelling or adjust search filters",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
                     )
                 }
             }
@@ -1799,13 +1927,16 @@ internal fun SearchResultRow(
 
 @Composable
 internal fun searchExcerpt(result: BookSearchResult): AnnotatedString {
+    val highlightBg = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+    val highlightColor = MaterialTheme.colorScheme.primary
     return buildAnnotatedString {
         append(result.excerptBefore)
         if (result.excerptMatch.isNotEmpty()) {
             withStyle(
                 SpanStyle(
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary
+                    fontWeight = FontWeight.Bold,
+                    color = highlightColor,
+                    background = highlightBg
                 )
             ) {
                 append(result.excerptMatch)
@@ -2206,6 +2337,36 @@ internal fun ReaderSettingsSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
+            Spacer(modifier = Modifier.height(Spacing.sm))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .defaultMinSize(minHeight = 48.dp)
+                    .toggleable(
+                        value = settings.hapticFeedback,
+                        role = Role.Switch,
+                        onValueChange = { haptic ->
+                            onSettingsChange(settings.copy(hapticFeedback = haptic))
+                        }
+                    ),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Haptic feedback",
+                    style = MaterialTheme.typography.labelLarge
+                )
+                Switch(
+                    checked = settings.hapticFeedback,
+                    onCheckedChange = null
+                )
+            }
+            Text(
+                "Subtle vibration when turning pages via edge taps or volume keys",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
             Spacer(modifier = Modifier.height(Spacing.lg))
         }
     }
@@ -2255,6 +2416,9 @@ internal fun TocItem(
     link: Link,
     depth: Int,
     isCurrent: Boolean = false,
+    hasChildren: Boolean = false,
+    isExpanded: Boolean = true,
+    onToggleExpand: () -> Unit = {},
     onClick: () -> Unit
 ) {
     val indent = (depth * 16).dp
@@ -2275,7 +2439,12 @@ internal fun TocItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = indent + 12.dp, top = 12.dp, bottom = 12.dp, end = 12.dp),
+                .padding(
+                    start = indent + 12.dp,
+                    top = if (hasChildren) 4.dp else 12.dp,
+                    bottom = if (hasChildren) 4.dp else 12.dp,
+                    end = if (hasChildren) 4.dp else 12.dp
+                ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -2297,6 +2466,18 @@ internal fun TocItem(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
+            if (hasChildren) {
+                IconButton(
+                    onClick = onToggleExpand,
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = if (isExpanded) "Collapse section" else "Expand section",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
     }
 }

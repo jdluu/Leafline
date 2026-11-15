@@ -41,7 +41,8 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
             previewFootnotes = preferences.getBoolean(KEY_PREVIEW_FOOTNOTES, true),
             keepScreenOn = preferences.getBoolean(KEY_KEEP_SCREEN_ON, true),
             orientation = enumFromName(KEY_ORIENTATION, ReaderOrientation.AUTO),
-            showMinimalHud = preferences.getBoolean(KEY_SHOW_MINIMAL_HUD, true)
+            showMinimalHud = preferences.getBoolean(KEY_SHOW_MINIMAL_HUD, true),
+            hapticFeedback = preferences.getBoolean(KEY_HAPTIC_FEEDBACK, false)
         )
     }
 
@@ -66,6 +67,7 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
             .putBoolean(KEY_KEEP_SCREEN_ON, settings.keepScreenOn)
             .putString(KEY_ORIENTATION, settings.orientation.name)
             .putBoolean(KEY_SHOW_MINIMAL_HUD, settings.showMinimalHud)
+            .putBoolean(KEY_HAPTIC_FEEDBACK, settings.hapticFeedback)
             .apply()
     }
 
@@ -220,6 +222,7 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
         private const val KEY_KEEP_SCREEN_ON = "reader_keep_screen_on"
         private const val KEY_ORIENTATION = "reader_orientation"
         private const val KEY_SHOW_MINIMAL_HUD = "reader_show_minimal_hud"
+        private const val KEY_HAPTIC_FEEDBACK = "reader_haptic_feedback"
         internal const val PREFS_NAME = "leafline_reader_prefs"
 
         fun fromContext(context: Context): ReaderPreferencesStore {

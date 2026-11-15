@@ -50,6 +50,7 @@ class ReaderPreferencesStoreTest {
         assertEquals(true, loaded.keepScreenOn)
         assertEquals(ReaderOrientation.AUTO, loaded.orientation)
         assertEquals(true, loaded.showMinimalHud)
+        assertEquals(false, loaded.hapticFeedback)
     }
 
     @Test
@@ -77,7 +78,8 @@ class ReaderPreferencesStoreTest {
                 previewFootnotes = false,
                 keepScreenOn = false,
                 orientation = ReaderOrientation.PORTRAIT,
-                showMinimalHud = false
+                showMinimalHud = false,
+                hapticFeedback = true
             )
         )
 
@@ -99,6 +101,7 @@ class ReaderPreferencesStoreTest {
         assertEquals(false, loaded.keepScreenOn)
         assertEquals(ReaderOrientation.PORTRAIT, loaded.orientation)
         assertEquals(false, loaded.showMinimalHud)
+        assertEquals(true, loaded.hapticFeedback)
     }
 
     @Test
