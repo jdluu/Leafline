@@ -21,6 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **TTS Sleep Timer & Audio Navigation Controls**:
+  - Sleep timer bottom sheet with configurable countdowns (15 min, 30 min, 45 min, 60 min) or End of Chapter auto-pause.
+  - Active countdown indicator in the reader quick controls chip (`MM:SS` format) and within the sleep timer configuration sheet.
+  - Audio navigation controls in reader quick controls with sentence/utterance skip backward (`Prev`) and skip forward (`Next`).
+  - Chapter boundary detection for End of Chapter sleep timer ensuring playback automatically pauses when crossing chapter href boundaries.
+  - Cancellation upon manual playback stop or natural end of publication.
+
 ## [0.2.0] - 2026-11-15
 
 ### Added
