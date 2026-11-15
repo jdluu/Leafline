@@ -30,7 +30,7 @@ import com.jdluu.leafline.theme.Spacing
 
 /**
  * Reusable filter and search header for the library view.
- * Encapsulates search bar, collection filters, reading status chips, and tag chips.
+ * Encapsulates search bar, collection filters, reading status chips, progress range chips, and tag chips.
  */
 @Composable
 fun LibraryFilterBar(
@@ -40,9 +40,12 @@ fun LibraryFilterBar(
     onCloseSearch: () -> Unit,
     collections: List<Collection>,
     selectedCollection: Long?,
+    collectionCounts: Map<Long, Int> = emptyMap(),
     onSelectCollection: (Long?) -> Unit,
     readingStatusFilter: ReadingStatus?,
     onSelectReadingStatus: (ReadingStatus?) -> Unit,
+    progressFilter: ProgressFilter = ProgressFilter.ALL,
+    onSelectProgressFilter: (ProgressFilter) -> Unit = {},
     allTags: List<String>,
     selectedTag: String?,
     tagCounts: Map<String, Int> = emptyMap(),
@@ -84,11 +87,33 @@ fun LibraryFilterBar(
                     )
                 }
                 items(collections, key = { it.id }) { collection ->
+                    val isSelected = selectedCollection == collection.id
+                    val count = collectionCounts[collection.id] ?: 0
                     FilterChip(
-                        selected = selectedCollection == collection.id,
+                        selected = isSelected,
                         onClick = { onSelectCollection(collection.id) },
-                        label = { Text(collection.name) },
-                        trailingIcon = if (selectedCollection == collection.id) {
+                        label = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(collection.name)
+                                if (count > 0) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.15f)
+                                        else MaterialTheme.colorScheme.surfaceVariant
+                                    ) {
+                                        Text(
+                                            text = "$count",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        },
+                        trailingIcon = if (isSelected) {
                             {
                                 Icon(
                                     Icons.Default.Close,
@@ -122,6 +147,23 @@ fun LibraryFilterBar(
                         label = {
                             Text(status.displayName)
                         }
+                    )
+                }
+            }
+        }
+
+        LazyRow(
+            modifier = Modifier.padding(horizontal = Padding.screen, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+        ) {
+            ProgressFilter.entries.forEach { filter ->
+                item(key = filter.name) {
+                    FilterChip(
+                        selected = progressFilter == filter,
+                        onClick = {
+                            onSelectProgressFilter(if (progressFilter == filter) ProgressFilter.ALL else filter)
+                        },
+                        label = { Text(filter.displayName) }
                     )
                 }
             }
@@ -168,17 +210,7 @@ fun LibraryFilterBar(
                                     }
                                 }
                             }
-                        },
-                        trailingIcon = if (isSelected) {
-                            {
-                                Icon(
-                                    Icons.Default.Close,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp) // touch-target-ok: decorative chip icon
-                                )
-                            }
-                        } else null,
-                        modifier = Modifier.semantics { contentDescription = "Tag $tag, $count books" }
+                        }
                     )
                 }
             }

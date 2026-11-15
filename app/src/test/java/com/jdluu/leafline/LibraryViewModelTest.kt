@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.jdluu.leafline.library.LibraryBook
 import com.jdluu.leafline.library.LibraryLayout
+import com.jdluu.leafline.library.LibrarySort
+import com.jdluu.leafline.library.ProgressFilter
 import com.jdluu.leafline.library.LibraryLayoutStore
 import com.jdluu.leafline.library.ReadingStatus
 import com.jdluu.leafline.library.data.Collection
@@ -375,6 +377,66 @@ class LibraryViewModelTest {
 
         assertEquals(listOf("b1" to listOf("fiction")), repository.updatedTags)
     }
+
+    @Test
+    fun `setSort updates sort and tapping same sort toggles sortAscending`() = runTest(dispatcher) {
+        val repository = FakeLibraryRepository(books = flowOf(emptyList()))
+        val viewModel = LibraryViewModel(repository)
+
+        viewModel.setSort(LibrarySort.TITLE)
+        assertEquals(LibrarySort.TITLE, viewModel.sort.value)
+        assertTrue(viewModel.sortAscending.value)
+
+        // Tapping same sort toggles direction
+        viewModel.setSort(LibrarySort.TITLE)
+        assertEquals(LibrarySort.TITLE, viewModel.sort.value)
+        org.junit.Assert.assertFalse(viewModel.sortAscending.value)
+    }
+
+    @Test
+    fun `setProgressFilter filters books according to reading progress`() = runTest(dispatcher) {
+        val locatorMid = """{"locations":{"progression":0.5},"href":"c1.html"}"""
+        val locatorDone = """{"locations":{"progression":1.0},"href":"c1.html"}"""
+        val bookUnread = testBook("b1", "/p1", "h1")
+        val bookReading = testBook("b2", "/p2", "h2", lastLocatorJson = locatorMid, readingStatus = ReadingStatus.READING)
+        val bookFinished = testBook("b3", "/p3", "h3", lastLocatorJson = locatorDone, readingStatus = ReadingStatus.FINISHED)
+        val repository = FakeLibraryRepository(books = flowOf(listOf(bookUnread, bookReading, bookFinished)))
+        val viewModel = LibraryViewModel(repository)
+
+        val emissions = mutableListOf<List<LibraryBook>>()
+        val job = launch {
+            viewModel.sortedBooks.collect { emissions += it }
+        }
+        advanceUntilIdle()
+        assertEquals(3, emissions.last().size)
+
+        viewModel.setProgressFilter(ProgressFilter.IN_PROGRESS)
+        advanceUntilIdle()
+        assertEquals(1, emissions.last().size)
+        assertEquals("b2", emissions.last().first().stableId)
+
+        viewModel.setProgressFilter(ProgressFilter.FINISHED)
+        advanceUntilIdle()
+        assertEquals(1, emissions.last().size)
+        assertEquals("b3", emissions.last().first().stableId)
+
+        viewModel.setProgressFilter(ProgressFilter.ALL)
+        advanceUntilIdle()
+        assertEquals(3, emissions.last().size)
+
+        job.cancel()
+    }
+
+    @Test
+    fun `renameCollection calls repository renameCollection`() = runTest(dispatcher) {
+        val repository = FakeLibraryRepository(books = flowOf(emptyList()))
+        val viewModel = LibraryViewModel(repository)
+
+        viewModel.renameCollection(42L, "Classics")
+        advanceUntilIdle()
+
+        assertEquals(listOf(42L to "Classics"), repository.renamedCollections)
+    }
 }
 
 private fun testBook(
@@ -419,6 +481,7 @@ private class FakeLibraryRepository(
     val updatedReadingStatuses = mutableListOf<Pair<String, ReadingStatus>>()
     val updatedRatings = mutableListOf<Pair<String, Int?>>()
     val updatedTags = mutableListOf<Pair<String, List<String>>>()
+    val renamedCollections = mutableListOf<Pair<Long, String>>()
     override fun getAllBooks(): Flow<List<LibraryBook>> = books
 
     override fun searchBooks(query: String): Flow<List<LibraryBook>> = books
@@ -470,7 +533,7 @@ private class FakeLibraryRepository(
 
     override suspend fun deleteCollection(id: Long) = error("not used")
 
-    override suspend fun renameCollection(id: Long, name: String) = error("not used")
+    override suspend fun renameCollection(id: Long, name: String) { renamedCollections += id to name }
 
     override suspend fun addBookToCollection(collectionId: Long, bookStableId: String) {
         addedToCollection += collectionId to bookStableId

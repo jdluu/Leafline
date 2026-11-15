@@ -63,6 +63,10 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.Edit
+import com.jdluu.leafline.library.ProgressFilter
 import androidx.compose.material.icons.filled.Eco
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.MenuBook
@@ -151,6 +155,11 @@ fun LibraryScreen(
     val books by viewModel.sortedBooks.collectAsStateWithLifecycle()
     val isLibraryLoaded by viewModel.isLibraryLoaded.collectAsStateWithLifecycle()
     val currentSort by viewModel.sort.collectAsStateWithLifecycle()
+    val currentSortAscending by viewModel.sortAscending.collectAsStateWithLifecycle()
+    val progressFilter by viewModel.progressFilter.collectAsStateWithLifecycle()
+    val collectionCounts by viewModel.collectionCounts.collectAsStateWithLifecycle()
+    var renameCollectionTarget by remember { mutableStateOf<Collection?>(null) }
+    var renameCollectionName by remember { mutableStateOf("") }
     val layout by viewModel.layout.collectAsStateWithLifecycle()
     val query by viewModel.query.collectAsStateWithLifecycle()
     val collections by viewModel.collections.collectAsStateWithLifecycle()
@@ -280,9 +289,13 @@ fun LibraryScreen(
                     LibrarySortMenu(
                         expanded = menuExpanded,
                         selected = currentSort,
+                        ascending = currentSortAscending,
                         onSelect = { sort ->
                             viewModel.setSort(sort)
                             menuExpanded = false
+                        },
+                        onToggleDirection = {
+                            viewModel.toggleSortDirection()
                         },
                         onDismiss = { menuExpanded = false }
                     )
@@ -363,9 +376,12 @@ fun LibraryScreen(
             },
             collections = collections,
             selectedCollection = selectedCollection,
+            collectionCounts = collectionCounts,
             onSelectCollection = { viewModel.selectCollection(it) },
             readingStatusFilter = readingStatusFilter,
             onSelectReadingStatus = { viewModel.setReadingStatusFilter(it) },
+            progressFilter = progressFilter,
+            onSelectProgressFilter = { viewModel.setProgressFilter(it) },
             allTags = allTags,
             selectedTag = selectedTag,
             tagCounts = tagCounts,
@@ -552,9 +568,43 @@ fun LibraryScreen(
     if (showCollectionSheet) {
         CollectionManagementSheet(
             collections = collections,
+            collectionCounts = collectionCounts,
             onDismiss = { showCollectionSheet = false },
             onCreate = { showCreateDialog = true },
+            onRename = { collection ->
+                renameCollectionName = collection.name
+                renameCollectionTarget = collection
+            },
             onDelete = { collection -> viewModel.deleteCollection(collection.id) }
+        )
+    }
+
+    renameCollectionTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = { renameCollectionTarget = null },
+            title = { Text("Rename collection") },
+            text = {
+                OutlinedTextField(
+                    value = renameCollectionName,
+                    onValueChange = { renameCollectionName = it },
+                    placeholder = { Text("Collection name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (renameCollectionName.isNotBlank()) {
+                            viewModel.renameCollection(target.id, renameCollectionName.trim())
+                            renameCollectionTarget = null
+                        }
+                    }
+                ) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { renameCollectionTarget = null }) { Text("Cancel") }
+            }
         )
     }
 
@@ -822,8 +872,10 @@ private fun LibraryEmptyState(
 @Composable
 private fun CollectionManagementSheet(
     collections: List<Collection>,
+    collectionCounts: Map<Long, Int> = emptyMap(),
     onDismiss: () -> Unit,
     onCreate: () -> Unit,
+    onRename: (Collection) -> Unit,
     onDelete: (Collection) -> Unit
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
@@ -855,6 +907,7 @@ private fun CollectionManagementSheet(
             } else {
                 LazyColumn {
                     items(collections) { collection ->
+                        val count = collectionCounts[collection.id] ?: 0
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -868,11 +921,24 @@ private fun CollectionManagementSheet(
                                 modifier = Modifier.size(24.dp) // touch-target-ok: decorative icon in row
                             )
                             Spacer(Modifier.width(Padding.compact))
-                            Text(
-                                collection.name,
-                                style = MaterialTheme.typography.bodyLarge,
-                                modifier = Modifier.weight(1f)
-                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    collection.name,
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                                Text(
+                                    if (count == 1) "1 book" else "$count books",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            IconButton(onClick = { onRename(collection) }) {
+                                Icon(
+                                    Icons.Default.Edit,
+                                    contentDescription = "Rename ${collection.name}",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                             IconButton(onClick = { onDelete(collection) }) {
                                 Icon(
                                     Icons.Default.Delete,
@@ -1182,17 +1248,57 @@ internal fun BookCollectionPickerSheet(
 private fun LibrarySortMenu(
     expanded: Boolean,
     selected: LibrarySort,
+    ascending: Boolean,
     onSelect: (LibrarySort) -> Unit,
+    onToggleDirection: () -> Unit,
     onDismiss: () -> Unit
 ) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        DropdownMenuItem(
+            text = {
+                Text(
+                    if (ascending) "Order: Ascending" else "Order: Descending",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            },
+            onClick = onToggleDirection,
+            leadingIcon = {
+                Icon(
+                    if (ascending) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        )
+        HorizontalDivider()
         LibrarySort.entries.forEachIndexed { index, option ->
+            val isSelected = option == selected
             DropdownMenuItem(
-                text = { Text(option.label) },
+                text = {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(option.label)
+                        if (isSelected) {
+                            Text(
+                                if (ascending) "A-Z / 1st" else "Z-A / latest",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                },
                 onClick = { onSelect(option) },
                 leadingIcon = {
-                    if (option == selected) {
-                        Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = null)
+                    if (isSelected) {
+                        Icon(
+                            if (ascending) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
                     }
                 }
             )
