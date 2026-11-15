@@ -24,6 +24,7 @@ fi
 
 nearby=$(find app/src/main/java -name '*.kt' -type f -print0 \
     | xargs -0 awk '
+        FNR == 1 { iconButtonLine = 0 }
         /IconButton\(/ { iconButtonLine = FNR }
         /\.size\((4[0-7]|[0-3]?[0-9])(\.[0-9]+)?\.dp/ \
             && iconButtonLine && FNR > iconButtonLine && FNR - iconButtonLine <= 5 {

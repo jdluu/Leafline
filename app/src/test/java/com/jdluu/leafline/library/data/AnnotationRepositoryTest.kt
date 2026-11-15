@@ -28,6 +28,10 @@ class AnnotationRepositoryTest {
             }
         }
 
+        override suspend fun getAllAnnotations(): List<AnnotationEntity> {
+            return stored.value
+        }
+
         override suspend fun getForBook(bookId: String): List<AnnotationEntity> {
             return observeForBook(bookId).first()
         }

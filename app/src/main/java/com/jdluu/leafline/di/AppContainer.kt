@@ -12,6 +12,7 @@ import com.jdluu.leafline.library.data.LibraryRepository
 import com.jdluu.leafline.library.data.LibraryRepositoryImpl
 import com.jdluu.leafline.library.data.ReadingSessionRepository
 import com.jdluu.leafline.library.data.ReadingSessionRepositoryImpl
+import com.jdluu.leafline.library.backup.LibraryBackupManager
 import com.jdluu.leafline.library.data.local.LeaflineDatabase
 import com.jdluu.leafline.library.data.local.RoomBookDataSource
 import com.jdluu.leafline.sync.KoreaderSyncApi
@@ -47,6 +48,15 @@ class AppContainer(context: Context) {
     val epubImporter: EpubImporter by lazy { ReadiumEpubImporter(context) }
 
     val koreaderSyncApi: KoreaderSyncApi by lazy { KoreaderSyncClient() }
+
+    val backupManager: LibraryBackupManager by lazy {
+        LibraryBackupManager(
+            bookDao = database.bookDao(),
+            collectionDao = database.collectionDao(),
+            bookmarkDao = database.bookmarkDao(),
+            annotationDao = database.annotationDao()
+        )
+    }
 }
 
 val Context.appContainer: AppContainer

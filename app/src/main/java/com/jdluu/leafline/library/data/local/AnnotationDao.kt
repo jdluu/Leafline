@@ -10,6 +10,9 @@ interface AnnotationDao {
     @Query("SELECT * FROM annotations WHERE bookId = :bookId ORDER BY createdAt DESC, id DESC")
     fun observeForBook(bookId: String): Flow<List<AnnotationEntity>>
 
+    @Query("SELECT * FROM annotations ORDER BY createdAt DESC, id DESC")
+    suspend fun getAllAnnotations(): List<AnnotationEntity>
+
     @Query("SELECT * FROM annotations WHERE bookId = :bookId ORDER BY createdAt DESC, id DESC")
     suspend fun getForBook(bookId: String): List<AnnotationEntity>
 
