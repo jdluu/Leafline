@@ -17,6 +17,8 @@ interface LibraryRepository {
     suspend fun addBook(book: LibraryBook): Long
     suspend fun updateBook(book: LibraryBook)
     suspend fun deleteBook(stableId: String)
+    suspend fun setRating(stableId: String, rating: Int?)
+    suspend fun setTags(stableId: String, tags: List<String>)
 
     // -- Collections --
     fun getAllCollections(): Flow<List<Collection>>

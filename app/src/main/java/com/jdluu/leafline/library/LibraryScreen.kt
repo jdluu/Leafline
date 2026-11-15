@@ -33,6 +33,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material3.InputChip
+import androidx.compose.material3.AssistChip
 import androidx.compose.material.icons.filled.BarChart
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
@@ -135,6 +139,8 @@ fun LibraryScreen(
     val collections by viewModel.collections.collectAsStateWithLifecycle()
     val selectedCollection by viewModel.selectedCollection.collectAsStateWithLifecycle()
     val readingStatusFilter by viewModel.readingStatusFilter.collectAsStateWithLifecycle()
+    val allTags by viewModel.allTags.collectAsStateWithLifecycle()
+    val selectedTag by viewModel.selectedTag.collectAsStateWithLifecycle()
     val continueReadingBooks by viewModel.continueReadingBooks.collectAsStateWithLifecycle()
     var searchActive by remember { mutableStateOf(false) }
     var showCollectionSheet by remember { mutableStateOf(false) }
@@ -387,6 +393,41 @@ fun LibraryScreen(
                 }
             }
 
+            if (allTags.isNotEmpty()) {
+                androidx.compose.foundation.lazy.LazyRow(
+                    modifier = Modifier.padding(horizontal = Padding.screen, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+                ) {
+                    item {
+                        FilterChip(
+                            selected = selectedTag == null,
+                            onClick = { viewModel.selectTag(null) },
+                            label = { Text("All tags") },
+                            modifier = Modifier.semantics { contentDescription = "All tags" }
+                        )
+                    }
+                    items(allTags) { tag ->
+                        val isSelected = selectedTag.equals(tag, ignoreCase = true)
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = {
+                                viewModel.selectTag(if (isSelected) null else tag)
+                            },
+                            label = { Text("#$tag") },
+                            trailingIcon = if (isSelected) {
+                                {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp) // touch-target-ok: decorative chip icon
+                                    )
+                                }
+                            } else null
+                        )
+                    }
+                }
+            }
+
             when {
                 !isLibraryLoaded -> LibraryLoadingState()
                 query.isNotBlank() -> LibraryEmptyState(
@@ -400,6 +441,10 @@ fun LibraryScreen(
                 readingStatusFilter != null -> LibraryEmptyState(
                     title = "No books with this status",
                     body = "Try a different filter"
+                )
+                selectedTag != null -> LibraryEmptyState(
+                    title = "No books with this tag",
+                    body = "Try selecting a different tag or clear the filter"
                 )
                 else -> LibraryEmptyState(
                     title = "Your library awaits",
@@ -496,6 +541,43 @@ fun LibraryScreen(
                                     label = {
                                         Text(status.displayName)
                                     }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (allTags.isNotEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        androidx.compose.foundation.lazy.LazyRow(
+                            modifier = Modifier.padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+                        ) {
+                            item {
+                                FilterChip(
+                                    selected = selectedTag == null,
+                                    onClick = { viewModel.selectTag(null) },
+                                    label = { Text("All tags") },
+                                    modifier = Modifier.semantics { contentDescription = "All tags" }
+                                )
+                            }
+                            items(allTags) { tag ->
+                                val isSelected = selectedTag.equals(tag, ignoreCase = true)
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = {
+                                        viewModel.selectTag(if (isSelected) null else tag)
+                                    },
+                                    label = { Text("#$tag") },
+                                    trailingIcon = if (isSelected) {
+                                        {
+                                            Icon(
+                                                Icons.Default.Close,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp) // touch-target-ok: decorative chip icon
+                                            )
+                                        }
+                                    } else null
                                 )
                             }
                         }
@@ -648,9 +730,11 @@ fun LibraryScreen(
 
     // Book detail sheet (long-press)
     detailSheetBook?.let { book ->
+        val currentBook = books.find { it.stableId == book.stableId } ?: book
         BookDetailSheet(
-            book = book,
+            book = currentBook,
             collections = collections,
+            availableTags = allTags,
             bookCollectionIds = viewModel
                 .collectionIdsForBook(book.stableId)
                 .collectAsStateWithLifecycle(emptySet())
@@ -661,6 +745,9 @@ fun LibraryScreen(
                 showDeleteConfirm = book
             },
             onSetReadingStatus = { status -> viewModel.setBookReadingStatus(book.stableId, status) },
+            onSetRating = { rating -> viewModel.setRating(book.stableId, rating) },
+            onAddTag = { tag -> viewModel.addTag(book.stableId, tag) },
+            onRemoveTag = { tag -> viewModel.removeTag(book.stableId, tag) },
             onAddToCollection = { id -> viewModel.addBookToCollection(book.stableId, id) },
             onRemoveFromCollection = { id -> viewModel.removeBookFromCollection(book.stableId, id) },
             onOpen = {
@@ -1343,6 +1430,44 @@ fun BookGridTile(
                     modifier = Modifier.padding(top = 2.dp)
                 )
             }
+            if ((book.rating != null && book.rating > 0) || book.tags.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (book.rating != null && book.rating > 0) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(end = Spacing.xs)
+                        ) {
+                            Icon(
+                                Icons.Default.Star,
+                                contentDescription = "${book.rating} stars",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(14.dp) // touch-target-ok: decorative star icon
+                            )
+                            Spacer(Modifier.width(2.dp))
+                            Text(
+                                text = "${book.rating}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                    if (book.tags.isNotEmpty()) {
+                        Text(
+                            text = book.tags.joinToString(" ") { "#$it" },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.secondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -1475,15 +1600,21 @@ private fun BookDetailSheet(
     book: LibraryBook,
     collections: List<Collection>,
     bookCollectionIds: Set<Long>,
+    availableTags: List<String> = emptyList(),
     onDismiss: () -> Unit,
     onDelete: () -> Unit,
     onSetReadingStatus: (ReadingStatus) -> Unit,
+    onSetRating: (Int?) -> Unit,
+    onAddTag: (String) -> Unit,
+    onRemoveTag: (String) -> Unit,
     onAddToCollection: (Long) -> Unit,
     onRemoveFromCollection: (Long) -> Unit,
     onOpen: () -> Unit,
     onGetReadingStats: suspend () -> ReadingAggregate = { ReadingAggregate.EMPTY }
 ) {
     var optimisticStatus by remember(book.readingStatus) { mutableStateOf(book.readingStatus) }
+    var optimisticRating by remember(book.rating) { mutableStateOf(book.rating) }
+    var optimisticTags by remember(book.tags) { mutableStateOf(book.tags) }
     var optimisticCollectionIds by remember(bookCollectionIds) { mutableStateOf(bookCollectionIds) }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
@@ -1548,6 +1679,10 @@ private fun BookDetailSheet(
             Text("Metadata", style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(Spacing.xs))
             MetadataRow("Status", optimisticStatus.displayName)
+            optimisticRating?.let { MetadataRow("Rating", "$it / 5 stars") }
+            if (optimisticTags.isNotEmpty()) {
+                MetadataRow("Tags", optimisticTags.joinToString(", ") { "#$it" })
+            }
             book.publisher?.let { MetadataRow("Publisher", it) }
             book.pageCount?.let { MetadataRow("Pages", it.toString()) }
             book.language?.let { MetadataRow("Language", it) }
@@ -1615,6 +1750,141 @@ private fun BookDetailSheet(
                             Text(status.displayName)
                         }
                     )
+                }
+            }
+
+            Spacer(Modifier.height(Spacing.sm))
+
+            // Rating
+            Text("Rating:", style = MaterialTheme.typography.labelMedium)
+            Row(
+                modifier = Modifier.padding(top = Spacing.xs),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                for (star in 1..5) {
+                    val isFilled = (optimisticRating ?: 0) >= star
+                    IconButton(
+                        onClick = {
+                            val newRating = if (optimisticRating == star) null else star
+                            optimisticRating = newRating
+                            onSetRating(newRating)
+                        },
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isFilled) Icons.Default.Star else Icons.Default.StarBorder,
+                            contentDescription = "$star of 5 stars",
+                            tint = if (isFilled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                        )
+                    }
+                }
+                Spacer(Modifier.width(Spacing.xs))
+                Text(
+                    text = if (optimisticRating != null && optimisticRating!! > 0) "${optimisticRating}/5" else "Unrated",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (optimisticRating != null) {
+                    Spacer(Modifier.width(Spacing.xs))
+                    TextButton(
+                        onClick = {
+                            optimisticRating = null
+                            onSetRating(null)
+                        }
+                    ) {
+                        Text("Clear")
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(Spacing.sm))
+
+            // Tags
+            Text("Tags:", style = MaterialTheme.typography.labelMedium)
+            Spacer(Modifier.height(Spacing.xs))
+
+            if (optimisticTags.isNotEmpty()) {
+                androidx.compose.foundation.layout.FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    optimisticTags.forEach { tag ->
+                        InputChip(
+                            selected = true,
+                            onClick = {
+                                optimisticTags = optimisticTags - tag
+                                onRemoveTag(tag)
+                            },
+                            label = { Text("#$tag") },
+                            trailingIcon = {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = "Remove tag $tag",
+                                    modifier = Modifier.size(16.dp) // touch-target-ok: decorative chip icon
+                                )
+                            }
+                        )
+                    }
+                }
+                Spacer(Modifier.height(Spacing.xs))
+            }
+
+            var newTagInput by remember { mutableStateOf("") }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                OutlinedTextField(
+                    value = newTagInput,
+                    onValueChange = { newTagInput = it },
+                    placeholder = { Text("Add a tag…") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(Modifier.width(Spacing.xs))
+                IconButton(
+                    onClick = {
+                        val trimmed = newTagInput.trim()
+                        if (trimmed.isNotEmpty() && !optimisticTags.any { it.equals(trimmed, ignoreCase = true) }) {
+                            optimisticTags = optimisticTags + trimmed
+                            onAddTag(trimmed)
+                            newTagInput = ""
+                        }
+                    },
+                    enabled = newTagInput.isNotBlank(),
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Add tag")
+                }
+            }
+
+            val unassignedLibraryTags = availableTags.filterNot { tag ->
+                optimisticTags.any { it.equals(tag, ignoreCase = true) }
+            }
+            if (unassignedLibraryTags.isNotEmpty()) {
+                Spacer(Modifier.height(Spacing.xs))
+                Text(
+                    "Suggested:",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                androidx.compose.foundation.layout.FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp)
+                ) {
+                    unassignedLibraryTags.take(8).forEach { tag ->
+                        AssistChip(
+                            onClick = {
+                                optimisticTags = optimisticTags + tag
+                                onAddTag(tag)
+                            },
+                            label = { Text("+$tag") }
+                        )
+                    }
                 }
             }
 

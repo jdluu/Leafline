@@ -12,8 +12,9 @@ object ImportedBookReconciler {
             coverPath = existing.coverPath ?: imported.coverPath,
             koreaderHash = existing.koreaderHash ?: imported.koreaderHash,
             lastReadAtEpochMillis = existing.lastReadAtEpochMillis,
-            readingStatus = existing.readingStatus
+            readingStatus = existing.readingStatus,
+            rating = existing.rating,
+            tags = existing.tags
         )
     }
 }
-

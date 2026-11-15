@@ -58,6 +58,14 @@ class LibraryRepositoryImpl(
         dataSource.delete(stableId)
     }
 
+    override suspend fun setRating(stableId: String, rating: Int?) = withContext(ioDispatcher) {
+        dataSource.setRating(stableId, rating)
+    }
+
+    override suspend fun setTags(stableId: String, tags: List<String>) = withContext(ioDispatcher) {
+        dataSource.setTags(stableId, tags)
+    }
+
     // -- Collections --
 
     override fun getAllCollections(): Flow<List<Collection>> {

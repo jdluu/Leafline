@@ -19,5 +19,7 @@ data class LibraryBook(
     val koreaderHash: String? = null,
     val lastReadAtEpochMillis: Long? = null,
     val lastLocatorJson: String? = null,
-    val readingStatus: ReadingStatus = UNREAD
+    val readingStatus: ReadingStatus = UNREAD,
+    val rating: Int? = null,
+    val tags: List<String> = emptyList()
 )

@@ -22,6 +22,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Book Ratings & Custom Tags**:
+  - Interactive 1–5 star rating control in the Book Detail sheet with unrated/clear options.
+  - Custom tag management in the Book Detail sheet with tag creation, deletion chips, and library suggestions.
+  - Tag filter chip carousel in the Library view to isolate books by custom tags.
+  - "Rating" sort order (`LibrarySort.RATING`) to sort library books from highest to lowest rated.
+  - Visual rating indicators and tag badges on library book grid tiles.
+  - Non-destructive Room migration (`MIGRATION_9_10`, version 10) preserving user ratings and tags during library re-scans and EPUB re-imports.
 - **TTS Sleep Timer & Audio Navigation Controls**:
   - Sleep timer bottom sheet with configurable countdowns (15 min, 30 min, 45 min, 60 min) or End of Chapter auto-pause.
   - Active countdown indicator in the reader quick controls chip (`MM:SS` format) and within the sleep timer configuration sheet.

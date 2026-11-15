@@ -113,25 +113,62 @@ class LibraryViewModel(
     private val _readingStatusFilter = MutableStateFlow<ReadingStatus?>(null)
     val readingStatusFilter: StateFlow<ReadingStatus?> = _readingStatusFilter.asStateFlow()
 
-    val sortedBooks: StateFlow<List<LibraryBook>> =
+    /** All distinct tags currently in the library, sorted alphabetically. */
+    val allTags: StateFlow<List<String>> = repository.getAllBooks()
+        .map { list ->
+            list.flatMap { it.tags }
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .distinct()
+                .sorted()
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    /** Currently selected tag filter (null = show all). */
+    private val _selectedTag = MutableStateFlow<String?>(null)
+    val selectedTag: StateFlow<String?> = _selectedTag.asStateFlow()
+
+    private data class LibraryFilterCriteria(
+        val sort: LibrarySort,
+        val collectionId: Long?,
+        val bookIds: Set<String>?,
+        val statusFilter: ReadingStatus?,
+        val tagFilter: String?
+    )
+
+    private val filterCriteria: Flow<LibraryFilterCriteria> =
         combine(
-            searchedBooks,
             _sort,
             _selectedCollection,
             collectionBookIds,
-            _readingStatusFilter
-        ) { books, sort, collectionId, bookIds, statusFilter ->
-            val byCollection = if (collectionId == null || bookIds == null) {
+            _readingStatusFilter,
+            _selectedTag
+        ) { sort, collectionId, bookIds, statusFilter, tagFilter ->
+            LibraryFilterCriteria(sort, collectionId, bookIds, statusFilter, tagFilter)
+        }
+
+    val sortedBooks: StateFlow<List<LibraryBook>> =
+        combine(searchedBooks, filterCriteria) { books, criteria ->
+            val byCollection = if (criteria.collectionId == null || criteria.bookIds == null) {
                 books
             } else {
-                books.filter { it.stableId in bookIds }
+                books.filter { it.stableId in criteria.bookIds }
             }
-            val byStatus = if (statusFilter == null) {
+            val byStatus = if (criteria.statusFilter == null) {
                 byCollection
             } else {
-                byCollection.filter { it.readingStatus == statusFilter }
+                byCollection.filter { it.readingStatus == criteria.statusFilter }
             }
-            sort.sorted(byStatus)
+            val byTag = if (criteria.tagFilter == null) {
+                byStatus
+            } else {
+                byStatus.filter { book -> book.tags.any { it.equals(criteria.tagFilter, ignoreCase = true) } }
+            }
+            criteria.sort.sorted(byTag)
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -232,6 +269,40 @@ class LibraryViewModel(
 
     fun setReadingStatusFilter(status: ReadingStatus?) {
         _readingStatusFilter.value = status
+    }
+
+    fun selectTag(tag: String?) {
+        _selectedTag.value = tag
+    }
+
+    fun setRating(stableId: String, rating: Int?) {
+        viewModelScope.launch {
+            repository.setRating(stableId, rating)
+        }
+    }
+
+    fun setTags(stableId: String, tags: List<String>) {
+        viewModelScope.launch {
+            repository.setTags(stableId, tags)
+        }
+    }
+
+    fun addTag(stableId: String, tag: String) {
+        val trimmed = tag.trim()
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch {
+            val book = repository.getBookByStableId(stableId) ?: return@launch
+            if (!book.tags.any { it.equals(trimmed, ignoreCase = true) }) {
+                repository.setTags(stableId, book.tags + trimmed)
+            }
+        }
+    }
+
+    fun removeTag(stableId: String, tag: String) {
+        viewModelScope.launch {
+            val book = repository.getBookByStableId(stableId) ?: return@launch
+            repository.setTags(stableId, book.tags.filterNot { it.equals(tag, ignoreCase = true) })
+        }
     }
 
     fun setBookReadingStatus(stableId: String, status: ReadingStatus) {

@@ -44,7 +44,7 @@ and paragraph indents, with reading chrome out of the way:
 - **Text-to-speech & sleep timer** — Optional on-device reading aloud with configurable playback
   speed, sentence-by-sentence skip navigation, countdown sleep timer (15/30/45/60 min or End of Chapter) with auto-pause, synchronized page turning, and spoken utterance highlighting
 - **Library management** — Multi-selection batch actions (mark status, assign
-  collections, delete), collections, reading status filters, and search
+  collections, delete), collections, reading status filters, 1–5 star ratings, custom tags, tag filtering, and sorting (recent, title, author, rating)
 - **Offline-first** — Works fully offline once books are on the device
 - **No telemetry** — No analytics, crash reports, or usage data collected
 

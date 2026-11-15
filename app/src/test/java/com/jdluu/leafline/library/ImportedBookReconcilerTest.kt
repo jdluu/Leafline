@@ -31,6 +31,24 @@ class ImportedBookReconcilerTest {
     }
 
     @Test
+    fun `matching content preserves user rating and tags`() {
+        val existing = book(stableId = "legacy-id").copy(
+            rating = 5,
+            tags = listOf("favorite", "sci-fi")
+        )
+        val imported = book(stableId = "new-id").copy(
+            rating = null,
+            tags = emptyList()
+        )
+
+        val result = ImportedBookReconciler.merge(existing, imported)
+
+        assertNotNull(result)
+        assertEquals(5, result?.rating)
+        assertEquals(listOf("favorite", "sci-fi"), result?.tags)
+    }
+
+    @Test
     fun `different content is not reconciled`() {
         val existing = book(stableId = "existing", fileHash = "old-hash")
         val imported = book(stableId = "imported", fileHash = "new-hash")
