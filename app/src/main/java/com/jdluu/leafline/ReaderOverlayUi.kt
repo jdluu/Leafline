@@ -93,6 +93,8 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import com.jdluu.leafline.reader.navigation.ReaderNavigationDrawerContent
+import com.jdluu.leafline.reader.navigation.ReaderNavigationTab
 import com.jdluu.leafline.reader.navigation.filterVisibleTocLinks
 import com.jdluu.leafline.reader.navigation.findAncestorKeysForIndex
 import com.jdluu.leafline.reader.MinimalHudMode
@@ -355,41 +357,22 @@ internal fun ReaderOverlay(
     }
 
     var sleepTimerSheetVisible by remember { mutableStateOf(false) }
-    val tocListState = rememberLazyListState()
-    val activeTocIndex = remember(tocLinks, currentChapterHref) {
-        tocLinks.indexOfFirst { (link, _) ->
-            matchesChapter(link.href.toString(), currentChapterHref)
-        }
-    }
-    var collapsedTocKeys by remember { mutableStateOf(setOf<String>()) }
-    val allParentKeys = remember(tocLinks) {
-        tocLinks.filter { (link, _) -> link.children.isNotEmpty() }
-            .map { (link, _) -> tocLinkKey(link) }
-            .toSet()
-    }
-    val hasNestedTocItems = allParentKeys.isNotEmpty()
+    var selectedNavigationTab by remember { mutableStateOf(ReaderNavigationTab.CONTENTS) }
+    val scope = rememberCoroutineScope()
 
-    LaunchedEffect(activeTocIndex, drawerState.isOpen) {
-        if (activeTocIndex >= 0) {
-            val ancestors = findAncestorKeysForIndex(tocLinks, activeTocIndex)
-            if (ancestors.any { it in collapsedTocKeys }) {
-                collapsedTocKeys = collapsedTocKeys - ancestors
-            }
+    LaunchedEffect(bookmarkSheetVisible) {
+        if (bookmarkSheetVisible) {
+            selectedNavigationTab = ReaderNavigationTab.BOOKMARKS
+            drawerState.open()
+            onDismissBookmarks()
         }
     }
 
-    val visibleTocLinks = remember(tocLinks, collapsedTocKeys) {
-        filterVisibleTocLinks(tocLinks, collapsedTocKeys)
-    }
-
-    LaunchedEffect(drawerState.isOpen) {
-        if (drawerState.isOpen && activeTocIndex >= 0) {
-            val visibleIndex = visibleTocLinks.indexOfFirst { (link, _) ->
-                matchesChapter(link.href.toString(), currentChapterHref)
-            }
-            if (visibleIndex >= 0) {
-                tocListState.animateScrollToItem(visibleIndex)
-            }
+    LaunchedEffect(highlightsSheetVisible) {
+        if (highlightsSheetVisible) {
+            selectedNavigationTab = ReaderNavigationTab.HIGHLIGHTS
+            drawerState.open()
+            onDismissHighlights()
         }
     }
 
@@ -398,68 +381,32 @@ internal fun ReaderOverlay(
         gesturesEnabled = drawerState.isOpen,
         drawerContent = {
             ModalDrawerSheet {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Padding.screen, vertical = Spacing.sm),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            "Contents",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        if (tocLinks.isNotEmpty()) {
-                            Text(
-                                text = if (tocLinks.size == 1) "1 section" else "${tocLinks.size} sections",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                    if (hasNestedTocItems) {
-                        TextButton(
-                            onClick = {
-                                collapsedTocKeys = if (collapsedTocKeys.isEmpty()) {
-                                    allParentKeys
-                                } else {
-                                    emptySet()
-                                }
-                            }
-                        ) {
-                            Text(if (collapsedTocKeys.isEmpty()) "Collapse all" else "Expand all")
-                        }
-                    }
-                }
-                HorizontalDivider(modifier = Modifier.padding(horizontal = Padding.screen))
-                Spacer(modifier = Modifier.height(4.dp))
-                LazyColumn(state = tocListState) {
-                    items(
-                        items = visibleTocLinks,
-                        key = { (link, _) -> tocLinkKey(link) }
-                    ) { (link, depth) ->
-                        val isCurrent = matchesChapter(link.href.toString(), currentChapterHref)
-                        val key = tocLinkKey(link)
-                        val hasChildren = link.children.isNotEmpty()
-                        val isExpanded = hasChildren && key !in collapsedTocKeys
-                        TocItem(
-                            link = link,
-                            depth = depth,
-                            isCurrent = isCurrent,
-                            hasChildren = hasChildren,
-                            isExpanded = isExpanded,
-                            onToggleExpand = {
-                                collapsedTocKeys = if (isExpanded) {
-                                    collapsedTocKeys + key
-                                } else {
-                                    collapsedTocKeys - key
-                                }
-                            },
-                            onClick = { onTocClick(link) }
-                        )
-                    }
-                }
+                ReaderNavigationDrawerContent(
+                    selectedTab = selectedNavigationTab,
+                    onTabSelected = { selectedNavigationTab = it },
+                    tocLinks = tocLinks,
+                    currentChapterHref = currentChapterHref,
+                    onTocClick = { link ->
+                        scope.launch { drawerState.close() }
+                        onTocClick(link)
+                    },
+                    bookmarks = bookmarks,
+                    onBookmarkClick = { bookmark ->
+                        scope.launch { drawerState.close() }
+                        onBookmarkClick(bookmark)
+                    },
+                    onDeleteBookmark = onDeleteBookmark,
+                    annotations = annotations,
+                    onAnnotationClick = { annotation ->
+                        scope.launch { drawerState.close() }
+                        onAnnotationClick(annotation)
+                    },
+                    onDeleteAnnotation = onDeleteAnnotation,
+                    onRestoreAnnotation = onRestoreAnnotation,
+                    onEditAnnotation = onEditAnnotation,
+                    onChangeColor = onChangeColor,
+                    onExportAnnotations = onExportAnnotations
+                )
             }
         }
     ) {
@@ -516,12 +463,21 @@ internal fun ReaderOverlay(
                             bookmarkActionsEnabled = bookmarkActionsEnabled,
                             currentLocatorJson = currentLocatorJson,
                             onBack = onBack,
-                            onOpenToc = onOpenToc,
+                            onOpenToc = {
+                                selectedNavigationTab = ReaderNavigationTab.CONTENTS
+                                onOpenToc()
+                            },
                             onOpenSearch = onOpenSearch,
                             onOpenSettings = onOpenSettings,
                             onToggleBookmark = onToggleBookmark,
-                            onOpenBookmarks = onOpenBookmarks,
-                            onOpenHighlights = onOpenHighlights,
+                            onOpenBookmarks = {
+                                selectedNavigationTab = ReaderNavigationTab.BOOKMARKS
+                                scope.launch { drawerState.open() }
+                            },
+                            onOpenHighlights = {
+                                selectedNavigationTab = ReaderNavigationTab.HIGHLIGHTS
+                                scope.launch { drawerState.open() }
+                            },
                             canNavigateHistoryBack = canNavigateHistoryBack,
                             canNavigateHistoryForward = canNavigateHistoryForward,
                             onNavigateHistoryBack = onNavigateHistoryBack,
