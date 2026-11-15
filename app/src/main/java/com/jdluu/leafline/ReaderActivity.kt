@@ -201,6 +201,7 @@ import org.readium.r2.navigator.input.TapEvent
 import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.publication.Link
 import org.readium.r2.shared.publication.Locator
+import com.jdluu.leafline.reader.navigation.NavigationHistoryManager
 import org.readium.r2.shared.publication.Publication
 import org.readium.r2.shared.publication.services.search.search
 import org.readium.r2.shared.util.AbsoluteUrl
@@ -267,6 +268,8 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     private lateinit var syncManager: com.jdluu.leafline.reader.sync.ReaderSyncManager
     private lateinit var annotationManager: com.jdluu.leafline.reader.annotations.AnnotationManager
     private lateinit var textSelectionManager: com.jdluu.leafline.reader.selection.TextSelectionManager
+    private val navigationHistory = NavigationHistoryManager()
+    private var jumpNoticeDismissJob: Job? = null
     private var ttsFactory: AndroidTtsNavigatorFactory? = null
     private var ttsNavigator: AndroidTtsNavigator? = null
     private var ttsJob: Job? = null
@@ -275,6 +278,13 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
 
     /** Lazily wired once the navigator exists; see onCreate. */
     private val goToLocator: (org.readium.r2.shared.publication.Locator) -> Unit = { locator ->
+        currentLocation.value?.let { from ->
+            navigationHistory.recordJump(
+                from = from,
+                to = locator,
+                description = "Bookmark / Highlight"
+            )
+        }
         navigator?.go(locator, false)
     }
 
@@ -562,6 +572,17 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     tapZoneHandler.onReadingPositionChanged(locator)
                 }
             }
+            lifecycleScope.launch {
+                navigationHistory.jumpNotice.collect { notice ->
+                    jumpNoticeDismissJob?.cancel()
+                    if (notice != null) {
+                        jumpNoticeDismissJob = launch {
+                            delay(12_000L)
+                            navigationHistory.dismissJumpNotice()
+                        }
+                    }
+                }
+            }
 
             bookStableId?.let { stableId ->
                 if (!sessionRestored) {
@@ -661,6 +682,12 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     }
 
     private fun navigateToTocLink(link: Link) {
+        currentLocation.value?.let { from ->
+            navigationHistory.recordJump(
+                from = from,
+                description = link.title ?: "Chapter"
+            )
+        }
         navigator?.go(link, false)
         toolbarVisible.value = false
     }
@@ -705,6 +732,8 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         }
         ttsNavigator?.close()
         ttsNavigator = null
+        navigationHistory.clear()
+        jumpNoticeDismissJob?.cancel()
         super.onDestroy()
     }
 
@@ -725,6 +754,13 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         if (locator == null) {
             Toast.makeText(this, "Could not open this result", Toast.LENGTH_SHORT).show()
             return
+        }
+        currentLocation.value?.let { from ->
+            navigationHistory.recordJump(
+                from = from,
+                to = locator,
+                description = "Search result"
+            )
         }
         activeSearchResultId = result.id
         applySearchDecorations()
@@ -826,7 +862,16 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                 val syncConflict by syncConflictState.collectAsState()
                 val currentSettings by settingsController.settings.collectAsState()
                 val ttsState by ttsController.state.collectAsState()
+                val canNavigateHistoryBack by navigationHistory.canGoBack.collectAsState()
+                val canNavigateHistoryForward by navigationHistory.canGoForward.collectAsState()
+                val jumpNotice by navigationHistory.jumpNotice.collectAsState()
                 ReaderOverlay(
+                    canNavigateHistoryBack = canNavigateHistoryBack,
+                    canNavigateHistoryForward = canNavigateHistoryForward,
+                    jumpNotice = jumpNotice,
+                    onNavigateHistoryBack = { navigateHistoryBack() },
+                    onNavigateHistoryForward = { navigateHistoryForward() },
+                    onDismissJumpNotice = { navigationHistory.dismissJumpNotice() },
                     title = bookTitle.value,
                     toolbarVisible = toolbarVisible.value,
                     onDismissToolbar = { toolbarVisible.value = false },
@@ -934,6 +979,29 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         } catch (e: ActivityNotFoundException) {
             Toast.makeText(this, "No app available to open link", Toast.LENGTH_LONG).show()
         }
+    }
+
+    override fun onJumpToLocator(locator: Locator) {
+        val current = currentLocation.value ?: return
+        navigationHistory.recordJump(
+            from = current,
+            to = locator,
+            description = "Footnote / Link"
+        )
+    }
+
+    private fun navigateHistoryBack() {
+        val current = currentLocation.value ?: return
+        val target = navigationHistory.goBack(current) ?: return
+        navigator?.go(target, false)
+        pageAnnouncement.value = "Returned to previous location"
+    }
+
+    private fun navigateHistoryForward() {
+        val current = currentLocation.value ?: return
+        val target = navigationHistory.goForward(current) ?: return
+        navigator?.go(target, false)
+        pageAnnouncement.value = "Navigated forward"
     }
 
     private fun handleTtsPlay(): Boolean {

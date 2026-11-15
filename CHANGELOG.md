@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Reader Navigation History**: Non-sequential location history manager (`NavigationHistoryManager`) tracking jumps across table of contents, footnotes/internal hyperlinks, search results, bookmarks, and annotations.
+  - History Back and Forward action controls in the reader top app bar.
+  - Floating transient "Back to [source] • Return" return capsule at the bottom of the viewport with 12s auto-dismissal and guaranteed 48dp touch targets.
+  - Predictive system back button integration to return to jump origin prior to reader exit.
 - Reader text selection actions via custom `ActionMode.Callback` (`TextSelectionManager`):
   - **Highlight**: Creates an annotation with chosen or default tint.
   - **Copy**: Copies selected text to system clipboard.

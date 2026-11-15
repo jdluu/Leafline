@@ -25,6 +25,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import com.jdluu.leafline.theme.HIGHLIGHT_TINTS
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Redo
+import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material3.ButtonDefaults
+import com.jdluu.leafline.reader.navigation.JumpNotice
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -269,8 +274,17 @@ internal fun ReaderOverlay(
     onTtsPause: () -> Unit = {},
     onTtsStop: () -> Unit = {},
     onTtsRateChange: (Float) -> Unit = {},
-    bookActiveDurationMillis: Long = 0L
+    bookActiveDurationMillis: Long = 0L,
+    canNavigateHistoryBack: Boolean = false,
+    canNavigateHistoryForward: Boolean = false,
+    jumpNotice: JumpNotice? = null,
+    onNavigateHistoryBack: () -> Unit = {},
+    onNavigateHistoryForward: () -> Unit = {},
+    onDismissJumpNotice: () -> Unit = {}
 ) {
+    BackHandler(enabled = !toolbarVisible && jumpNotice != null) {
+        onNavigateHistoryBack()
+    }
     BackHandler(enabled = toolbarVisible) {
         onDismissToolbar()
     }
@@ -334,7 +348,11 @@ internal fun ReaderOverlay(
                             onOpenSettings = onOpenSettings,
                             onToggleBookmark = onToggleBookmark,
                             onOpenBookmarks = onOpenBookmarks,
-                            onOpenHighlights = onOpenHighlights
+                            onOpenHighlights = onOpenHighlights,
+                            canNavigateHistoryBack = canNavigateHistoryBack,
+                            canNavigateHistoryForward = canNavigateHistoryForward,
+                            onNavigateHistoryBack = onNavigateHistoryBack,
+                            onNavigateHistoryForward = onNavigateHistoryForward
                         )
                     }
                     BrightnessControl(
@@ -432,6 +450,17 @@ internal fun ReaderOverlay(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
                         ) {}
+                )
+            }
+            if (jumpNotice != null) {
+                JumpNoticeBanner(
+                    notice = jumpNotice,
+                    toolbarVisible = toolbarVisible,
+                    onReturn = onNavigateHistoryBack,
+                    onDismiss = onDismissJumpNotice,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
                 )
             }
             SnackbarHost(
@@ -739,7 +768,11 @@ internal fun ReaderTopBar(
     onOpenSettings: () -> Unit,
     onToggleBookmark: () -> Unit,
     onOpenBookmarks: () -> Unit,
-    onOpenHighlights: () -> Unit
+    onOpenHighlights: () -> Unit,
+    canNavigateHistoryBack: Boolean = false,
+    canNavigateHistoryForward: Boolean = false,
+    onNavigateHistoryBack: () -> Unit = {},
+    onNavigateHistoryForward: () -> Unit = {}
 ) {
     var moreMenuExpanded by remember { mutableStateOf(false) }
     val currentKey = remember(currentLocatorJson) {
@@ -759,10 +792,26 @@ internal fun ReaderTopBar(
         },
         navigationIcon = {
             IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
             }
         },
         actions = {
+            if (canNavigateHistoryBack) {
+                IconButton(onClick = onNavigateHistoryBack) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.Undo,
+                        contentDescription = "Back to previous location"
+                    )
+                }
+            }
+            if (canNavigateHistoryForward) {
+                IconButton(onClick = onNavigateHistoryForward) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.Redo,
+                        contentDescription = "Forward to next location"
+                    )
+                }
+            }
             IconButton(onClick = onOpenToc) {
                 Icon(Icons.Default.Menu, contentDescription = "Contents")
             }
@@ -1819,4 +1868,63 @@ internal fun ReaderBottomBar(
 internal fun formatEpochMillis(millis: Long): String {
     val sdf = java.text.SimpleDateFormat("MMM d, yyyy HH:mm", java.util.Locale.US)
     return sdf.format(java.util.Date(millis))
+}
+
+
+@Composable
+internal fun JumpNoticeBanner(
+    notice: JumpNotice,
+    toolbarVisible: Boolean,
+    onReturn: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.inverseSurface,
+        contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+        shadowElevation = 6.dp,
+        modifier = modifier
+            .padding(
+                horizontal = 16.dp,
+                vertical = if (toolbarVisible) 110.dp else 16.dp
+            )
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp)
+        ) {
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = null
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Back to " + notice.sourceDescription,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            TextButton(
+                onClick = onReturn,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.inversePrimary
+                )
+            ) {
+                Text(
+                    text = "Return",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            IconButton(onClick = onDismiss) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = "Dismiss jump notice"
+                )
+            }
+        }
+    }
 }
