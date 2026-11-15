@@ -3,6 +3,7 @@ package com.jdluu.leafline
 import android.app.Application
 import android.util.Log
 import com.jdluu.leafline.di.AppContainer
+import com.jdluu.leafline.library.cover.BitmapMemoryCache
 import com.jdluu.leafline.sync.KoreaderSyncConfigStore
 import com.jdluu.leafline.sync.SyncWorker
 import kotlinx.coroutines.CoroutineScope
@@ -36,5 +37,15 @@ class LeaflineApplication : Application() {
                 Log.w("LeaflineApp", "Failed to schedule background sync", e)
             }
         }
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        BitmapMemoryCache.onTrimMemory(level)
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        BitmapMemoryCache.clear()
     }
 }

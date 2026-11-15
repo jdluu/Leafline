@@ -1,7 +1,9 @@
 package com.jdluu.leafline.library.cover
 
+import android.content.ComponentCallbacks2
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.util.Log
 import android.util.LruCache
 
 /**
@@ -10,12 +12,14 @@ import android.util.LruCache
  * Keeps decoded bitmaps in memory to prevent repeated disk reads, allocation
  * churn, and GC jank during library scrolling. Decodes using [Bitmap.Config.RGB_565]
  * and power-of-two [BitmapFactory.Options.inSampleSize] to bound bitmap heap usage.
+ * Responds to system memory trim signals to keep overall app memory usage low.
  */
 object BitmapMemoryCache {
 
+    private const val TAG = "BitmapMemoryCache"
     private val maxMemoryKb = (Runtime.getRuntime().maxMemory() / 1024).toInt()
     // Allocate 1/8th of available memory to cover cache, minimum 4MB
-    private val cacheSizeKb = (maxMemoryKb / 8).coerceAtLeast(4 * 1024)
+    internal val cacheSizeKb = (maxMemoryKb / 8).coerceAtLeast(4 * 1024)
 
     private val lruCache = object : LruCache<String, Bitmap>(cacheSizeKb) {
         override fun sizeOf(key: String, bitmap: Bitmap): Int {
@@ -47,6 +51,38 @@ object BitmapMemoryCache {
         }
     }
 
+    fun sizeKb(): Int = synchronized(lruCache) {
+        lruCache.size()
+    }
+
+    fun trimToSize(maxSizeKb: Int) {
+        synchronized(lruCache) {
+            lruCache.trimToSize(maxSizeKb)
+        }
+    }
+
+    /**
+     * Responds to system memory trim notifications ([ComponentCallbacks2]).
+     */
+    fun onTrimMemory(level: Int) {
+        synchronized(lruCache) {
+            when {
+                level >= ComponentCallbacks2.TRIM_MEMORY_COMPLETE ||
+                level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL -> {
+                    lruCache.evictAll()
+                }
+                level >= ComponentCallbacks2.TRIM_MEMORY_MODERATE ||
+                level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND -> {
+                    lruCache.trimToSize(cacheSizeKb / 2)
+                }
+                level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW ||
+                level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN -> {
+                    lruCache.trimToSize((cacheSizeKb * 3) / 4)
+                }
+            }
+        }
+    }
+
     /**
      * Decodes a bitmap from disk downsampled to approximately [reqWidth] x [reqHeight].
      * If already cached in memory, returns the cached instance immediately.
@@ -72,14 +108,24 @@ object BitmapMemoryCache {
                 inSampleSize = calculateInSampleSize(boundsOptions, reqWidth, reqHeight)
                 inJustDecodeBounds = false
                 inPreferredConfig = Bitmap.Config.RGB_565
+                inTempStorage = ByteArray(16 * 1024)
             }
 
-            val bitmap = BitmapFactory.decodeFile(path, decodeOptions)
+            val bitmap = try {
+                BitmapFactory.decodeFile(path, decodeOptions)
+            } catch (oom: OutOfMemoryError) {
+                Log.w(TAG, "OOM decoding cover $path, clearing cache and retrying with larger sample size", oom)
+                clear()
+                decodeOptions.inSampleSize = (decodeOptions.inSampleSize * 2).coerceAtLeast(2)
+                runCatching { BitmapFactory.decodeFile(path, decodeOptions) }.getOrNull()
+            }
+
             if (bitmap != null) {
                 put(path, bitmap)
             }
             bitmap
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            Log.w(TAG, "Failed to decode cover at $path", e)
             null
         }
     }
