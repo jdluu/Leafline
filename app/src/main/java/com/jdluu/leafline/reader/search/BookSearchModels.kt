@@ -1,5 +1,16 @@
 package com.jdluu.leafline.reader.search
 
+/** Configuration options for in-book search runs. */
+data class SearchOptions(
+    val caseSensitive: Boolean = false,
+    val wholeWord: Boolean = false,
+    val regex: Boolean = false,
+    val chapterHref: String? = null
+) {
+    val isDefault: Boolean
+        get() = !caseSensitive && !wholeWord && !regex && chapterHref == null
+}
+
 /** A single search match shown in the search sheet. */
 data class BookSearchResult(
     val id: Int,
@@ -19,6 +30,7 @@ sealed interface BookSearchStatus {
 
 data class BookSearchState(
     val query: String? = null,
+    val options: SearchOptions = SearchOptions(),
     val status: BookSearchStatus = BookSearchStatus.Idle,
     val results: List<BookSearchResult> = emptyList()
 )
@@ -30,5 +42,15 @@ object BookSearchQuery {
     fun normalize(raw: String): String? {
         val normalized = raw.trim().replace(whitespaceRuns, " ")
         return normalized.ifEmpty { null }
+    }
+
+    /** Validates a regular expression pattern; returns error message or null if valid. */
+    fun validateRegex(pattern: String): String? {
+        return try {
+            Regex(pattern)
+            null
+        } catch (e: Exception) {
+            e.localizedMessage ?: "Invalid regular expression"
+        }
     }
 }

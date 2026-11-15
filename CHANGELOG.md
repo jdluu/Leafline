@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Advanced Book Search**: Comprehensive in-book search enhancements with search options, scoped chapter filtering, and persistent search history.
+  - Search options chips: Match Case (case-sensitive), Whole Word matching, and Regular Expression (regex) with immediate syntax validation.
+  - Scoped chapter filtering toggle to search the entire publication or restrict matches to the currently open chapter.
+  - Search history store (`SearchHistoryStore`) persisting recent queries on-device with single-tap query replay, individual chip removal, and clear all.
+  - Query clear button in search text input and debounced execution.
 - **Reader Navigation History**: Non-sequential location history manager (`NavigationHistoryManager`) tracking jumps across table of contents, footnotes/internal hyperlinks, search results, bookmarks, and annotations.
   - History Back and Forward action controls in the reader top app bar.
   - Floating transient "Back to [source] • Return" return capsule at the bottom of the viewport with 12s auto-dismissal and guaranteed 48dp touch targets.

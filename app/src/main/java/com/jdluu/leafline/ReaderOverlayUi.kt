@@ -1,5 +1,10 @@
 package com.jdluu.leafline
 
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.InputChip
+import com.jdluu.leafline.reader.search.SearchOptions
 import androidx.compose.material3.AlertDialog
 import androidx.activity.compose.BackHandler
 import android.content.ActivityNotFoundException
@@ -263,9 +268,14 @@ internal fun ReaderOverlay(
     onToggleSepia: () -> Unit,
     onOpenSearch: () -> Unit,
     onDismissSearch: () -> Unit,
-    onSubmitSearch: (String) -> Unit,
+    onSubmitSearch: (String, SearchOptions) -> Unit,
     onClearSearch: () -> Unit,
     onSearchResultClick: (BookSearchResult) -> Unit,
+    currentChapterTitle: String? = null,
+    currentChapterHref: String? = null,
+    recentSearches: List<String> = emptyList(),
+    onRemoveRecentSearch: (String) -> Unit = {},
+    onClearRecentSearches: () -> Unit = {},
     highlightTintSheetVisible: Boolean,
     onHighlightTintSelected: (HighlightTint) -> Unit,
     ttsState: ReaderTtsState = ReaderTtsState.UNAVAILABLE,
@@ -406,10 +416,15 @@ internal fun ReaderOverlay(
             if (searchSheetVisible) {
                 BookSearchSheet(
                     state = searchState,
+                    currentChapterTitle = currentChapterTitle,
+                    currentChapterHref = currentChapterHref,
+                    recentSearches = recentSearches,
                     onDismiss = onDismissSearch,
                     onSubmitSearch = onSubmitSearch,
                     onClearSearch = onClearSearch,
-                    onResultClick = onSearchResultClick
+                    onResultClick = onSearchResultClick,
+                    onRemoveRecentSearch = onRemoveRecentSearch,
+                    onClearRecentSearches = onClearRecentSearches
                 )
             }
 
@@ -1251,18 +1266,25 @@ internal fun AnnotationListSheet(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun BookSearchSheet(
     state: BookSearchState,
+    currentChapterTitle: String? = null,
+    currentChapterHref: String? = null,
+    recentSearches: List<String> = emptyList(),
     onDismiss: () -> Unit,
-    onSubmitSearch: (String) -> Unit,
+    onSubmitSearch: (String, SearchOptions) -> Unit,
     onClearSearch: () -> Unit,
-    onResultClick: (BookSearchResult) -> Unit
+    onResultClick: (BookSearchResult) -> Unit,
+    onRemoveRecentSearch: (String) -> Unit = {},
+    onClearRecentSearches: () -> Unit = {}
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         var query by remember { mutableStateOf(state.query.orEmpty()) }
-        var lastSubmitted by remember { mutableStateOf(state.query) }
+        var options by remember { mutableStateOf(state.options) }
+        var lastSubmittedQuery by remember { mutableStateOf(state.query) }
+        var lastSubmittedOptions by remember { mutableStateOf(state.options) }
         val focusRequester = remember { FocusRequester() }
 
         Column(
@@ -1270,10 +1292,20 @@ internal fun BookSearchSheet(
                 .fillMaxWidth()
                 .padding(horizontal = Padding.screen)
         ) {
-            Text(
-                "Search in book",
-                style = MaterialTheme.typography.titleMedium
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    "Search in book",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, contentDescription = "Close search")
+                }
+            }
+
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
@@ -1285,38 +1317,171 @@ internal fun BookSearchSheet(
                 singleLine = true,
                 placeholder = { Text("Find in this book") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search)
+                trailingIcon = {
+                    if (query.isNotEmpty()) {
+                        IconButton(onClick = { query = "" }) {
+                            Icon(Icons.Default.Close, contentDescription = "Clear search query")
+                        }
+                    }
+                },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(
+                    onSearch = {
+                        val normalized = BookSearchQuery.normalize(query)
+                        if (normalized != null) {
+                            onSubmitSearch(normalized, options)
+                        }
+                    }
+                )
             )
             LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
-            // Debounced auto search: restarting this effect on each keystroke
-            // cancels the pending submission until typing settles.
-            LaunchedEffect(query) {
+            // Search options filter chips
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(vertical = Spacing.xs),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+            ) {
+                FilterChip(
+                    selected = options.caseSensitive,
+                    onClick = { options = options.copy(caseSensitive = !options.caseSensitive) },
+                    label = { Text("Match case") },
+                    leadingIcon = if (options.caseSensitive) {
+                        { Icon(Icons.Default.Check, contentDescription = null) }
+                    } else null
+                )
+                FilterChip(
+                    selected = options.wholeWord,
+                    onClick = { options = options.copy(wholeWord = !options.wholeWord) },
+                    label = { Text("Whole word") },
+                    leadingIcon = if (options.wholeWord) {
+                        { Icon(Icons.Default.Check, contentDescription = null) }
+                    } else null
+                )
+                FilterChip(
+                    selected = options.regex,
+                    onClick = { options = options.copy(regex = !options.regex) },
+                    label = { Text("Regex") },
+                    leadingIcon = if (options.regex) {
+                        { Icon(Icons.Default.Check, contentDescription = null) }
+                    } else null
+                )
+                if (currentChapterHref != null) {
+                    val isChapterScoped = options.chapterHref != null
+                    FilterChip(
+                        selected = isChapterScoped,
+                        onClick = {
+                            options = options.copy(
+                                chapterHref = if (isChapterScoped) null else currentChapterHref
+                            )
+                        },
+                        label = {
+                            Text(
+                                if (isChapterScoped) {
+                                    "Chapter: ${currentChapterTitle ?: "Current"}"
+                                } else {
+                                    "All chapters"
+                                },
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        },
+                        leadingIcon = if (isChapterScoped) {
+                            { Icon(Icons.Default.Check, contentDescription = null) }
+                        } else null
+                    )
+                }
+            }
+
+            // Debounced auto search
+            LaunchedEffect(query, options) {
                 val normalized = BookSearchQuery.normalize(query)
                 when {
                     normalized == null -> {
-                        lastSubmitted = null
+                        lastSubmittedQuery = null
+                        lastSubmittedOptions = options
                         onClearSearch()
                     }
-                    normalized == lastSubmitted -> Unit
+                    normalized == lastSubmittedQuery && options == lastSubmittedOptions -> Unit
                     else -> {
                         delay(SEARCH_DEBOUNCE_MS)
-                        lastSubmitted = normalized
-                        onSubmitSearch(normalized)
+                        lastSubmittedQuery = normalized
+                        lastSubmittedOptions = options
+                        onSubmitSearch(normalized, options)
                     }
                 }
             }
 
-            SearchStatusText(state, Modifier.padding(top = 12.dp, bottom = 4.dp))
+            SearchStatusText(state, Modifier.padding(top = 4.dp, bottom = 4.dp))
         }
 
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f, fill = false)
-        ) {
-            items(state.results, key = { it.id }) { result ->
-                SearchResultRow(result = result, onClick = { onResultClick(result) })
+        if (query.isBlank()) {
+            if (recentSearches.isNotEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Padding.screen, vertical = Spacing.xs)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "Recent searches",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        TextButton(onClick = onClearRecentSearches) {
+                            Text("Clear all")
+                        }
+                    }
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+                    ) {
+                        recentSearches.forEach { recentQuery ->
+                            InputChip(
+                                selected = false,
+                                onClick = { query = recentQuery },
+                                label = { Text(recentQuery) },
+                                trailingIcon = {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "Remove $recentQuery from history",
+                                        modifier = Modifier.clickable { onRemoveRecentSearch(recentQuery) }
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(Padding.screen),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "Search across chapters, footnotes, and text",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = false)
+            ) {
+                items(state.results, key = { it.id }) { result ->
+                    SearchResultRow(result = result, onClick = { onResultClick(result) })
+                }
             }
         }
         Spacer(modifier = Modifier.navigationBarsPadding())
