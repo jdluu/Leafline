@@ -14,7 +14,7 @@ interface BookDao {
 
     @Query(
         "SELECT * FROM books " +
-            "WHERE title LIKE '%' || :query || '%' OR authors LIKE '%' || :query || '%' " +
+            "WHERE title LIKE '%' || :query || '%' OR authors LIKE '%' || :query || '%' OR tags LIKE '%' || :query || '%' " +
             "ORDER BY addedAtEpochMillis DESC"
     )
     fun searchBooks(query: String): Flow<List<BookEntity>>

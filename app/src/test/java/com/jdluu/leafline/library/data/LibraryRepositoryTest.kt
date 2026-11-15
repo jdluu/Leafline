@@ -394,4 +394,45 @@ class LibraryRepositoryTest {
         assertEquals(1, books.size)
         assertEquals("Updated Title", books[0].title)
     }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `searchBooks matches books by tags`() = runTest {
+        val repository = LibraryRepositoryImpl()
+
+        val book1 = LibraryBook(
+            stableId = "book-1",
+            title = "Book 1",
+            authors = listOf("Author A"),
+            language = null,
+            description = null,
+            publisher = null,
+            publishedAtEpochMillis = null,
+            filePath = "/books/b1.epub",
+            fileHash = "h1",
+            addedAtEpochMillis = 1000L,
+            pageCount = 50,
+            tags = listOf("Cyberpunk", "Favorite")
+        )
+        val book2 = LibraryBook(
+            stableId = "book-2",
+            title = "Book 2",
+            authors = listOf("Author B"),
+            language = null,
+            description = null,
+            publisher = null,
+            publishedAtEpochMillis = null,
+            filePath = "/books/b2.epub",
+            fileHash = "h2",
+            addedAtEpochMillis = 2000L,
+            pageCount = 50,
+            tags = listOf("Non-Fiction")
+        )
+        repository.addBook(book1)
+        repository.addBook(book2)
+
+        val results = repository.searchBooks("cyberpunk").first()
+        assertEquals(1, results.size)
+        assertEquals("book-1", results[0].stableId)
+    }
 }

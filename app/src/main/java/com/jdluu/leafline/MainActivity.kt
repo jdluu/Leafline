@@ -29,7 +29,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.LibraryBooks
+import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -344,7 +344,7 @@ fun LeaflineApp(activity: MainActivity) {
                             icon = {
                                 Icon(
                                     when (tab) {
-                                        LeaflineTab.Library -> Icons.Default.LibraryBooks
+                                        LeaflineTab.Library -> Icons.AutoMirrored.Filled.LibraryBooks
                                         LeaflineTab.Settings -> Icons.Default.Settings
                                     },
                                     contentDescription = tab.label

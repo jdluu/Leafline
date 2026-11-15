@@ -33,7 +33,8 @@ class InMemoryBookDataSource : BookDataSource {
                 val lowerQuery = normalized.lowercase()
                 all.filter { book ->
                     book.title.lowercase().contains(lowerQuery) ||
-                        book.authors.any { author -> author.lowercase().contains(lowerQuery) }
+                        book.authors.any { author -> author.lowercase().contains(lowerQuery) } ||
+                        book.tags.any { tag -> tag.lowercase().contains(lowerQuery) }
                 }
             }
         }
