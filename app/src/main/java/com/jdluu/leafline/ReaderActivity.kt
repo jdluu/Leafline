@@ -1166,20 +1166,35 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             settingsController.settings.value.epub.scroll != true
         ) {
             val settings = settingsController.settings.value
-            when (keyCode) {
-                KeyEvent.KEYCODE_VOLUME_DOWN -> {
-                    val handled = navigator?.goForward(tapZoneHandler.pageTurnAnimated(settings)) ?: false
-                    if (handled && settings.hapticFeedback) {
-                        tapZoneHandler.performHapticFeedback()
+            if (settings.volumeKeyNavigation) {
+                // If TTS is currently playing, let volume keys adjust audio output level
+                val isTtsSpeaking = this::ttsController.isInitialized &&
+                    ttsController.state.value == ReaderTtsState.PLAYING
+                if (!isTtsSpeaking) {
+                    val isNextKey = if (!settings.invertVolumeKeys) {
+                        keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
+                    } else {
+                        keyCode == KeyEvent.KEYCODE_VOLUME_UP
                     }
-                    return true
-                }
-                KeyEvent.KEYCODE_VOLUME_UP -> {
-                    val handled = navigator?.goBackward(tapZoneHandler.pageTurnAnimated(settings)) ?: false
-                    if (handled && settings.hapticFeedback) {
-                        tapZoneHandler.performHapticFeedback()
+                    val isPrevKey = if (!settings.invertVolumeKeys) {
+                        keyCode == KeyEvent.KEYCODE_VOLUME_UP
+                    } else {
+                        keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
                     }
-                    return true
+
+                    if (isNextKey) {
+                        val handled = navigator?.goForward(tapZoneHandler.pageTurnAnimated(settings)) ?: false
+                        if (handled && settings.hapticFeedback) {
+                            tapZoneHandler.performHapticFeedback()
+                        }
+                        return true
+                    } else if (isPrevKey) {
+                        val handled = navigator?.goBackward(tapZoneHandler.pageTurnAnimated(settings)) ?: false
+                        if (handled && settings.hapticFeedback) {
+                            tapZoneHandler.performHapticFeedback()
+                        }
+                        return true
+                    }
                 }
             }
         }

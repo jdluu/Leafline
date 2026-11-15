@@ -6,17 +6,18 @@ import com.jdluu.leafline.reader.theme.ReaderTheme
 import org.readium.r2.navigator.epub.EpubPreferences
 
 /**
- * Persists reader display and interaction settings in app-private
- * SharedPreferences so they survive activity recreation and app restarts. Only
- * the fields managed by the reader settings sheet are stored; every other
- * EpubPreferences field stays unset so Readium applies its own defaults. The
- * reading theme is stored as a [ReaderTheme] name on [ReaderSettings] itself,
- * not inside EpubPreferences, keeping Readium types out of the domain model.
- * Values loaded from storage are validated against the reader domain rules:
- * unknown font names fall back to the original font, page margins snap back
- * into range, and a stored publisher-mode selection clears stale custom
- * typography overrides.
- * Tap zones are stored per zone with per-zone fallbacks for unknown names.
+ * SharedPreferences-backed persistence for [ReaderSettings].
+ *
+ * Font family choices are stored as strings using the stable name of Readium's
+ * [org.readium.r2.navigator.preferences.FontFamily] instances; unrecognized
+ * values fall back to null (original publisher font) via
+ * [fontFamilyFromStoredName].
+ * Line height and page margins are stored as double bits; page margins are
+ * clamped and snapped to [PAGE_MARGINS_STEP] on load and save.
+ * Storing publisher styles as true drops the custom font, line height, and
+ * margins on load via [withStyleMode] so an active publisher-mode choice
+ * cannot reintroduce stale overrides after a restart.
+ * Per-zone tap actions are stored under separate keys for left, center, right.
  * The superseded single-key tap zone preset ([KEY_TAP_ZONES]) migrates on
  * load until the first save replaces it with per-zone keys.
  * The sepia quick control's restore target ([ReaderSettings.preSepiaTheme])
@@ -43,7 +44,9 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
             orientation = enumFromName(KEY_ORIENTATION, ReaderOrientation.AUTO),
             showMinimalHud = preferences.getBoolean(KEY_SHOW_MINIMAL_HUD, true),
             minimalHudMode = enumFromName(KEY_MINIMAL_HUD_MODE, MinimalHudMode.CHAPTER_AND_PERCENT),
-            hapticFeedback = preferences.getBoolean(KEY_HAPTIC_FEEDBACK, false)
+            hapticFeedback = preferences.getBoolean(KEY_HAPTIC_FEEDBACK, false),
+            volumeKeyNavigation = preferences.getBoolean(KEY_VOLUME_KEY_NAVIGATION, true),
+            invertVolumeKeys = preferences.getBoolean(KEY_INVERT_VOLUME_KEYS, false)
         )
     }
 
@@ -59,6 +62,7 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
             .putString(KEY_TAP_ZONE_LEFT, settings.tapZoneConfig.leftZone.name)
             .putString(KEY_TAP_ZONE_CENTER, settings.tapZoneConfig.centerZone.name)
             .putString(KEY_TAP_ZONE_RIGHT, settings.tapZoneConfig.rightZone.name)
+            .putString(KEY_TAP_ZONE_LAYOUT, settings.tapZoneConfig.layout.name)
             .remove(KEY_TAP_ZONES)
             .putString(KEY_PAGE_TURN_ANIMATION, settings.pageTurnAnimation.name)
             .putNullableFloat(KEY_BRIGHTNESS, settings.brightness)
@@ -70,6 +74,8 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
             .putBoolean(KEY_SHOW_MINIMAL_HUD, settings.showMinimalHud)
             .putString(KEY_MINIMAL_HUD_MODE, settings.minimalHudMode.name)
             .putBoolean(KEY_HAPTIC_FEEDBACK, settings.hapticFeedback)
+            .putBoolean(KEY_VOLUME_KEY_NAVIGATION, settings.volumeKeyNavigation)
+            .putBoolean(KEY_INVERT_VOLUME_KEYS, settings.invertVolumeKeys)
             .apply()
     }
 
@@ -103,26 +109,29 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
     }
 
     /**
-     * Restores the per-zone tap actions. Unknown stored names fall back to
-     * that zone's default. Until per-zone keys exist, the superseded
+     * Restores the per-zone tap actions and layout. Unknown stored names fall back to
+     * default. Until per-zone keys exist, the superseded
      * [KEY_TAP_ZONES] preset migrates: a stored REVERSED preset becomes the
      * swapped side zones, anything else keeps the conventional defaults.
      */
     private fun loadTapZoneConfig(): TapZoneConfig {
+        val layout = enumFromName(KEY_TAP_ZONE_LAYOUT, TapZoneLayout.SYMMETRIC)
         val hasPerZoneKeys = preferences.contains(KEY_TAP_ZONE_LEFT) ||
             preferences.contains(KEY_TAP_ZONE_CENTER) ||
             preferences.contains(KEY_TAP_ZONE_RIGHT)
         if (!hasPerZoneKeys) {
-            return if (preferences.getString(KEY_TAP_ZONES, null) == LEGACY_TAP_ZONES_REVERSED) {
+            val base = if (preferences.getString(KEY_TAP_ZONES, null) == LEGACY_TAP_ZONES_REVERSED) {
                 TapZoneConfig.REVERSED
             } else {
                 TapZoneConfig.DEFAULT
             }
+            return base.copy(layout = layout)
         }
         return TapZoneConfig(
             leftZone = enumFromName(KEY_TAP_ZONE_LEFT, TapZoneConfig.DEFAULT.leftZone),
             centerZone = enumFromName(KEY_TAP_ZONE_CENTER, TapZoneConfig.DEFAULT.centerZone),
-            rightZone = enumFromName(KEY_TAP_ZONE_RIGHT, TapZoneConfig.DEFAULT.rightZone)
+            rightZone = enumFromName(KEY_TAP_ZONE_RIGHT, TapZoneConfig.DEFAULT.rightZone),
+            layout = layout
         )
     }
 
@@ -212,6 +221,7 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
         private const val KEY_TAP_ZONE_LEFT = "reader_tap_zone_left"
         private const val KEY_TAP_ZONE_CENTER = "reader_tap_zone_center"
         private const val KEY_TAP_ZONE_RIGHT = "reader_tap_zone_right"
+        private const val KEY_TAP_ZONE_LAYOUT = "reader_tap_zone_layout"
 
         /** Superseded single-key tap zone preset, migrated on load. */
         private const val KEY_TAP_ZONES = "reader_tap_zones"
@@ -225,7 +235,9 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
         private const val KEY_ORIENTATION = "reader_orientation"
         private const val KEY_SHOW_MINIMAL_HUD = "reader_show_minimal_hud"
         private const val KEY_MINIMAL_HUD_MODE = "reader_minimal_hud_mode"
-    private const val KEY_HAPTIC_FEEDBACK = "reader_haptic_feedback"
+        private const val KEY_HAPTIC_FEEDBACK = "reader_haptic_feedback"
+        private const val KEY_VOLUME_KEY_NAVIGATION = "reader_volume_key_navigation"
+        private const val KEY_INVERT_VOLUME_KEYS = "reader_invert_volume_keys"
         internal const val PREFS_NAME = "leafline_reader_prefs"
 
         fun fromContext(context: Context): ReaderPreferencesStore {
