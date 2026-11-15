@@ -1,8 +1,13 @@
 package com.jdluu.leafline.reader.tts
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 /**
  * High-level playback state for text-to-speech reading mode.
@@ -45,32 +50,50 @@ interface TtsPlayerAdapter {
      * Adjust playback rate (e.g. 0.75x to 2.0x).
      */
     fun setRate(rate: Float) {}
+
+    /**
+     * Skip to the previous sentence or utterance.
+     */
+    fun skipPrevious() {}
+
+    /**
+     * Skip to the next sentence or utterance.
+     */
+    fun skipNext() {}
 }
 
 /**
- * Owns TTS playback state and lifecycle transitions (idle, playing, paused, unavailable, error).
+ * Owns TTS playback state, audio navigation, sleep timers, and lifecycle transitions
+ * (idle, playing, paused, unavailable, error).
  *
  * The Readium navigator and Android-specific implementations are kept behind
  * injected callbacks so this controller is fully testable on a plain JVM.
  */
 class ReaderTtsController(
     initialState: ReaderTtsState = ReaderTtsState.IDLE,
+    private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default),
     private val onPlay: () -> Boolean,
     private val onPause: () -> Unit = {},
     private val onStop: () -> Unit = {},
     private val onSetRate: (Float) -> Unit = {},
+    private val onSkipPrevious: () -> Unit = {},
+    private val onSkipNext: () -> Unit = {},
     private val onError: (String?) -> Unit = {}
 ) {
     constructor(
         adapter: TtsPlayerAdapter,
         initialState: ReaderTtsState = ReaderTtsState.IDLE,
+        scope: CoroutineScope = CoroutineScope(Dispatchers.Default),
         onError: (String?) -> Unit = {}
     ) : this(
         initialState = initialState,
+        scope = scope,
         onPlay = { adapter.play() },
         onPause = { adapter.pause() },
         onStop = { adapter.stop() },
         onSetRate = { adapter.setRate(it) },
+        onSkipPrevious = { adapter.skipPrevious() },
+        onSkipNext = { adapter.skipNext() },
         onError = onError
     )
 
@@ -82,6 +105,11 @@ class ReaderTtsController(
 
     private val _rate = MutableStateFlow(1.0f)
     val rate: StateFlow<Float> = _rate.asStateFlow()
+
+    private val _sleepState = MutableStateFlow(TtsSleepState())
+    val sleepState: StateFlow<TtsSleepState> = _sleepState.asStateFlow()
+
+    private var timerJob: Job? = null
 
     fun setRate(newRate: Float) {
         val clamped = newRate.coerceIn(0.5f, 3.0f)
@@ -134,12 +162,96 @@ class ReaderTtsController(
     }
 
     /**
-     * Requests playback to stop and return to idle.
+     * Requests playback to stop, resets any active sleep timer, and returns to idle.
      */
     fun stop() {
         if (_state.value != ReaderTtsState.UNAVAILABLE) {
+            timerJob?.cancel()
+            timerJob = null
+            _sleepState.value = TtsSleepState(option = TtsSleepOption.OFF)
             onStop()
             _state.value = ReaderTtsState.IDLE
+        }
+    }
+
+    /**
+     * Skips backward to the previous sentence or utterance.
+     */
+    fun skipPrevious() {
+        if (_state.value.isActive) {
+            onSkipPrevious()
+        }
+    }
+
+    /**
+     * Skips forward to the next sentence or utterance.
+     */
+    fun skipNext() {
+        if (_state.value.isActive) {
+            onSkipNext()
+        }
+    }
+
+    /**
+     * Configures the sleep timer with an option and optional current chapter href.
+     */
+    fun setSleepTimer(option: TtsSleepOption, currentChapterHref: String? = null) {
+        timerJob?.cancel()
+        timerJob = null
+
+        if (option == TtsSleepOption.OFF) {
+            _sleepState.value = TtsSleepState(option = TtsSleepOption.OFF)
+            return
+        }
+
+        if (option == TtsSleepOption.END_OF_CHAPTER) {
+            _sleepState.value = TtsSleepState(
+                option = TtsSleepOption.END_OF_CHAPTER,
+                targetChapterHref = normalizeChapterHref(currentChapterHref)
+            )
+            return
+        }
+
+        val minutes = option.minutes ?: return
+        val totalSeconds = minutes * 60L
+        _sleepState.value = TtsSleepState(
+            option = option,
+            remainingSeconds = totalSeconds
+        )
+
+        timerJob = scope.launch {
+            var remaining = totalSeconds
+            while (remaining > 0) {
+                delay(1000)
+                remaining--
+                _sleepState.value = _sleepState.value.copy(remainingSeconds = remaining)
+            }
+            _sleepState.value = TtsSleepState(option = TtsSleepOption.OFF)
+            pause()
+        }
+    }
+
+    /**
+     * Cancels any active sleep timer.
+     */
+    fun cancelSleepTimer() {
+        setSleepTimer(TtsSleepOption.OFF)
+    }
+
+    /**
+     * Notifies the controller of the current locator/chapter href so the
+     * [TtsSleepOption.END_OF_CHAPTER] timer can detect chapter boundaries.
+     */
+    fun onLocatorChanged(chapterHref: String?) {
+        val current = _sleepState.value
+        if (current.option != TtsSleepOption.END_OF_CHAPTER) return
+
+        val normalized = normalizeChapterHref(chapterHref) ?: return
+        if (current.targetChapterHref == null) {
+            _sleepState.value = current.copy(targetChapterHref = normalized)
+        } else if (normalized != current.targetChapterHref) {
+            _sleepState.value = TtsSleepState(option = TtsSleepOption.OFF)
+            pause()
         }
     }
 
@@ -148,6 +260,9 @@ class ReaderTtsController(
      */
     fun onEngineError(message: String? = null) {
         if (_state.value != ReaderTtsState.UNAVAILABLE) {
+            timerJob?.cancel()
+            timerJob = null
+            _sleepState.value = TtsSleepState(option = TtsSleepOption.OFF)
             onStop()
             _lastErrorMessage.value = message
             _state.value = ReaderTtsState.ERROR
@@ -160,6 +275,9 @@ class ReaderTtsController(
      */
     fun onPlaybackEnded() {
         if (_state.value != ReaderTtsState.UNAVAILABLE) {
+            timerJob?.cancel()
+            timerJob = null
+            _sleepState.value = TtsSleepState(option = TtsSleepOption.OFF)
             onStop()
             _state.value = ReaderTtsState.IDLE
         }

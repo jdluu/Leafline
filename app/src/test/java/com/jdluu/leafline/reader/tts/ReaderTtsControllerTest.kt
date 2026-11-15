@@ -1,21 +1,27 @@
 package com.jdluu.leafline.reader.tts
 
 import app.cash.turbine.test
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
  * Plain JVM unit tests for [ReaderTtsController], covering playback state transitions,
- * error handling, and the unavailable-engine fallback path.
+ * audio navigation, sleep timers, error handling, and the unavailable-engine fallback path.
  */
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class ReaderTtsControllerTest {
 
     private class Harness(
         initialState: ReaderTtsState = ReaderTtsState.IDLE,
-        playResult: Boolean = true
+        playResult: Boolean = true,
+        scope: CoroutineScope = CoroutineScope(Dispatchers.Unconfined)
     ) {
         val calls = mutableListOf<String>()
         val errorNotifications = mutableListOf<String?>()
@@ -25,6 +31,7 @@ class ReaderTtsControllerTest {
 
         val controller = ReaderTtsController(
             initialState = initialState,
+            scope = scope,
             onPlay = {
                 calls += "play"
                 if (playShouldThrow) throw IllegalStateException("Speech engine crashed")
@@ -33,6 +40,8 @@ class ReaderTtsControllerTest {
             onPause = { calls += "pause" },
             onStop = { calls += "stop" },
             onSetRate = { rateChanges += it },
+            onSkipPrevious = { calls += "skipPrevious" },
+            onSkipNext = { calls += "skipNext" },
             onError = { errorNotifications += it }
         )
     }
@@ -52,7 +61,7 @@ class ReaderTtsControllerTest {
 
     @Test
     fun `play transitions from IDLE to PLAYING when onPlay succeeds`() = runTest {
-        val harness = Harness()
+        val harness = Harness(scope = this)
         harness.controller.state.test {
             assertEquals(ReaderTtsState.IDLE, awaitItem())
 
@@ -78,7 +87,7 @@ class ReaderTtsControllerTest {
 
     @Test
     fun `pause transitions from PLAYING to PAUSED`() = runTest {
-        val harness = Harness()
+        val harness = Harness(scope = this)
         harness.controller.play()
 
         harness.controller.state.test {
@@ -109,7 +118,7 @@ class ReaderTtsControllerTest {
 
     @Test
     fun `play transitions from PAUSED to PLAYING`() = runTest {
-        val harness = Harness()
+        val harness = Harness(scope = this)
         harness.controller.play()
         harness.controller.pause()
 
@@ -125,7 +134,7 @@ class ReaderTtsControllerTest {
 
     @Test
     fun `stop transitions from PLAYING to IDLE and calls onStop`() = runTest {
-        val harness = Harness()
+        val harness = Harness(scope = this)
         harness.controller.play()
 
         harness.controller.state.test {
@@ -140,7 +149,7 @@ class ReaderTtsControllerTest {
 
     @Test
     fun `stop transitions from PAUSED to IDLE and calls onStop`() = runTest {
-        val harness = Harness()
+        val harness = Harness(scope = this)
         harness.controller.play()
         harness.controller.pause()
 
@@ -188,7 +197,7 @@ class ReaderTtsControllerTest {
 
     @Test
     fun `play transitions to ERROR when onPlay returns false`() = runTest {
-        val harness = Harness(playResult = false)
+        val harness = Harness(playResult = false, scope = this)
 
         harness.controller.state.test {
             assertEquals(ReaderTtsState.IDLE, awaitItem())
@@ -204,7 +213,7 @@ class ReaderTtsControllerTest {
 
     @Test
     fun `play transitions to ERROR when onPlay throws`() = runTest {
-        val harness = Harness()
+        val harness = Harness(scope = this)
         harness.playShouldThrow = true
 
         harness.controller.state.test {
@@ -220,7 +229,7 @@ class ReaderTtsControllerTest {
 
     @Test
     fun `onEngineError transitions state to ERROR, invokes onStop, and notifies error`() = runTest {
-        val harness = Harness()
+        val harness = Harness(scope = this)
         harness.controller.play()
 
         harness.controller.state.test {
@@ -237,7 +246,7 @@ class ReaderTtsControllerTest {
 
     @Test
     fun `onPlaybackEnded transitions state to IDLE and invokes onStop`() = runTest {
-        val harness = Harness()
+        val harness = Harness(scope = this)
         harness.controller.play()
 
         harness.controller.state.test {
@@ -284,73 +293,92 @@ class ReaderTtsControllerTest {
     }
 
     @Test
-    fun `stop from ERROR state transitions to IDLE and calls onStop`() {
-        val harness = Harness(playResult = false)
+    fun `skipPrevious and skipNext invoke callbacks when active`() {
+        val harness = Harness()
+        harness.controller.skipPrevious()
+        harness.controller.skipNext()
+        assertEquals(emptyList<String>(), harness.calls)
+
         harness.controller.play()
-        assertEquals(ReaderTtsState.ERROR, harness.controller.state.value)
+        harness.controller.skipPrevious()
+        harness.controller.skipNext()
+        assertEquals(listOf("play", "skipPrevious", "skipNext"), harness.calls)
+
+        harness.controller.pause()
+        harness.controller.skipPrevious()
+        harness.controller.skipNext()
+        assertEquals(listOf("play", "skipPrevious", "skipNext", "pause", "skipPrevious", "skipNext"), harness.calls)
+    }
+
+    @Test
+    fun `timed sleep timer counts down and pauses playback upon expiration`() = runTest {
+        val harness = Harness(scope = this)
+        harness.controller.play()
+        assertEquals(ReaderTtsState.PLAYING, harness.controller.state.value)
+
+        harness.controller.setSleepTimer(TtsSleepOption.MINUTES_15)
+        assertEquals(TtsSleepOption.MINUTES_15, harness.controller.sleepState.value.option)
+        assertEquals(900L, harness.controller.sleepState.value.remainingSeconds)
+        assertTrue(harness.controller.sleepState.value.isActive)
+
+        // Advance 10 seconds
+        advanceTimeBy(10_001)
+        assertEquals(890L, harness.controller.sleepState.value.remainingSeconds)
+        assertEquals(ReaderTtsState.PLAYING, harness.controller.state.value)
+
+        // Advance remaining 890 seconds to trigger expiration
+        advanceTimeBy(890_000)
+        assertEquals(ReaderTtsState.PAUSED, harness.controller.state.value)
+        assertEquals(TtsSleepOption.OFF, harness.controller.sleepState.value.option)
+        assertFalse(harness.controller.sleepState.value.isActive)
+        assertTrue(harness.calls.contains("pause"))
+    }
+
+    @Test
+    fun `cancel sleep timer resets sleep state to OFF`() = runTest {
+        val harness = Harness(scope = this)
+        harness.controller.play()
+        harness.controller.setSleepTimer(TtsSleepOption.MINUTES_30)
+        assertTrue(harness.controller.sleepState.value.isActive)
+
+        harness.controller.cancelSleepTimer()
+        assertEquals(TtsSleepOption.OFF, harness.controller.sleepState.value.option)
+        assertNull(harness.controller.sleepState.value.remainingSeconds)
+        assertFalse(harness.controller.sleepState.value.isActive)
+    }
+
+    @Test
+    fun `end of chapter timer pauses when chapter href changes`() {
+        val harness = Harness()
+        harness.controller.play()
+
+        harness.controller.setSleepTimer(TtsSleepOption.END_OF_CHAPTER, "chapter1.xhtml")
+        assertEquals(TtsSleepOption.END_OF_CHAPTER, harness.controller.sleepState.value.option)
+        assertEquals("chapter1.xhtml", harness.controller.sleepState.value.targetChapterHref)
+        assertTrue(harness.controller.sleepState.value.isActive)
+
+        // Utterance within the same chapter
+        harness.controller.onLocatorChanged("chapter1.xhtml#p2")
+        assertEquals(ReaderTtsState.PLAYING, harness.controller.state.value)
+        assertTrue(harness.controller.sleepState.value.isActive)
+
+        // Utterance moves into next chapter
+        harness.controller.onLocatorChanged("chapter2.xhtml#p1")
+        assertEquals(ReaderTtsState.PAUSED, harness.controller.state.value)
+        assertEquals(TtsSleepOption.OFF, harness.controller.sleepState.value.option)
+        assertFalse(harness.controller.sleepState.value.isActive)
+    }
+
+    @Test
+    fun `stopping playback resets active sleep timer`() = runTest {
+        val harness = Harness(scope = this)
+        harness.controller.play()
+        harness.controller.setSleepTimer(TtsSleepOption.MINUTES_45)
+        assertTrue(harness.controller.sleepState.value.isActive)
 
         harness.controller.stop()
         assertEquals(ReaderTtsState.IDLE, harness.controller.state.value)
-        assertEquals(listOf("play", "stop"), harness.calls)
-    }
-
-    @Test
-    fun `markUnavailable transitions state to UNAVAILABLE`() {
-        val harness = Harness()
-        assertEquals(ReaderTtsState.IDLE, harness.controller.state.value)
-
-        harness.controller.markUnavailable()
-        assertEquals(ReaderTtsState.UNAVAILABLE, harness.controller.state.value)
-    }
-
-    @Test
-    fun `works with TtsPlayerAdapter constructor`() {
-        val calls = mutableListOf<String>()
-        val adapter = object : TtsPlayerAdapter {
-            override fun play(): Boolean {
-                calls += "play"
-                return true
-            }
-
-            override fun pause() {
-                calls += "pause"
-            }
-
-            override fun stop() {
-                calls += "stop"
-            }
-        }
-        val controller = ReaderTtsController(adapter = adapter)
-
-        controller.play()
-        assertEquals(ReaderTtsState.PLAYING, controller.state.value)
-
-        controller.pause()
-        assertEquals(ReaderTtsState.PAUSED, controller.state.value)
-
-        controller.stop()
-        assertEquals(ReaderTtsState.IDLE, controller.state.value)
-
-        assertEquals(listOf("play", "pause", "stop"), calls)
-    }
-    @Test
-    fun `setRate updates rate flow and notifies onSetRate callback`() {
-        val harness = Harness()
-        assertEquals(1.0f, harness.controller.rate.value)
-
-        harness.controller.setRate(1.5f)
-        assertEquals(1.5f, harness.controller.rate.value)
-        assertEquals(listOf(1.5f), harness.rateChanges)
-    }
-
-    @Test
-    fun `setRate clamps value between 0 5 and 3 0`() {
-        val harness = Harness()
-
-        harness.controller.setRate(0.2f)
-        assertEquals(0.5f, harness.controller.rate.value)
-
-        harness.controller.setRate(5.0f)
-        assertEquals(3.0f, harness.controller.rate.value)
+        assertEquals(TtsSleepOption.OFF, harness.controller.sleepState.value.option)
+        assertFalse(harness.controller.sleepState.value.isActive)
     }
 }

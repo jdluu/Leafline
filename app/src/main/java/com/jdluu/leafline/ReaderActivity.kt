@@ -195,6 +195,8 @@ import org.readium.r2.navigator.DecorableNavigator
 import org.readium.r2.navigator.VisualNavigator
 import com.jdluu.leafline.reader.tts.ReaderTtsController
 import com.jdluu.leafline.reader.tts.ReaderTtsState
+import com.jdluu.leafline.reader.tts.TtsSleepOption
+import com.jdluu.leafline.reader.tts.TtsSleepState
 import com.jdluu.leafline.reader.tts.throttleLatest
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
@@ -513,9 +515,13 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             this@ReaderActivity.ttsFactory = ttsFactory
             ttsController = ReaderTtsController(
                 initialState = if (ttsFactory != null) ReaderTtsState.IDLE else ReaderTtsState.UNAVAILABLE,
+                scope = lifecycleScope,
                 onPlay = { handleTtsPlay() },
                 onPause = { handleTtsPause() },
                 onStop = { handleTtsStop() },
+                onSetRate = { rate -> handleTtsRateChange(rate) },
+                onSkipPrevious = { ttsNavigator?.skipToPreviousUtterance() },
+                onSkipNext = { ttsNavigator?.skipToNextUtterance() },
                 onError = { message ->
                     if (message != null) {
                         Toast.makeText(this@ReaderActivity, message, Toast.LENGTH_SHORT).show()
@@ -882,6 +888,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                 val syncConflict by syncConflictState.collectAsState()
                 val currentSettings by settingsController.settings.collectAsState()
                 val ttsState by ttsController.state.collectAsState()
+                val ttsSleepState by ttsController.sleepState.collectAsStateWithLifecycle()
                 val canNavigateHistoryBack by navigationHistory.canGoBack.collectAsState()
                 val canNavigateHistoryForward by navigationHistory.canGoForward.collectAsState()
                 val jumpNotice by navigationHistory.jumpNotice.collectAsState()
@@ -963,10 +970,19 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     },
                     ttsState = ttsState,
                     ttsRate = ttsController.rate.collectAsStateWithLifecycle().value,
+                    ttsSleepState = ttsSleepState,
                     onTtsPlay = { ttsController.play() },
                     onTtsPause = { ttsController.pause() },
                     onTtsStop = { ttsController.stop() },
+                    onTtsSkipPrevious = { ttsController.skipPrevious() },
+                    onTtsSkipNext = { ttsController.skipNext() },
                     onTtsRateChange = { rate -> handleTtsRateChange(rate) },
+                    onSetTtsSleepTimer = { option ->
+                        ttsController.setSleepTimer(
+                            option = option,
+                            currentChapterHref = navigator?.currentLocator?.value?.href?.toString()
+                        )
+                    },
                     bookActiveDurationMillis = lifetimeActiveDurationMillis + (if (::sessionRecorder.isInitialized) sessionRecorder.currentActiveDurationMillis() else 0L)
                 )
             }
@@ -1163,6 +1179,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     } catch (e: Exception) {
                         Log.w(TAG, "Could not apply TTS utterance decoration", e)
                     }
+                    ttsController.onLocatorChanged(utteranceLocator.href.toString())
                 }
         }
 

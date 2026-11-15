@@ -77,6 +77,13 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.WbSunny
 import com.jdluu.leafline.reader.tts.ReaderTtsState
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material3.RadioButton
+import com.jdluu.leafline.reader.tts.TtsSleepOption
+import com.jdluu.leafline.reader.tts.TtsSleepState
+import com.jdluu.leafline.reader.tts.formatSleepTimerLabel
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.DropdownMenu
@@ -280,10 +287,14 @@ internal fun ReaderOverlay(
     onHighlightTintSelected: (HighlightTint) -> Unit,
     ttsState: ReaderTtsState = ReaderTtsState.UNAVAILABLE,
     ttsRate: Float = 1.0f,
+    ttsSleepState: TtsSleepState = TtsSleepState(),
     onTtsPlay: () -> Unit = {},
     onTtsPause: () -> Unit = {},
     onTtsStop: () -> Unit = {},
+    onTtsSkipPrevious: () -> Unit = {},
+    onTtsSkipNext: () -> Unit = {},
     onTtsRateChange: (Float) -> Unit = {},
+    onSetTtsSleepTimer: (TtsSleepOption) -> Unit = {},
     bookActiveDurationMillis: Long = 0L,
     canNavigateHistoryBack: Boolean = false,
     canNavigateHistoryForward: Boolean = false,
@@ -298,6 +309,8 @@ internal fun ReaderOverlay(
     BackHandler(enabled = toolbarVisible) {
         onDismissToolbar()
     }
+
+    var sleepTimerSheetVisible by remember { mutableStateOf(false) }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -375,10 +388,14 @@ internal fun ReaderOverlay(
                         onToggleSepia = onToggleSepia,
                         ttsState = ttsState,
                         ttsRate = ttsRate,
+                        ttsSleepState = ttsSleepState,
                         onTtsPlay = onTtsPlay,
                         onTtsPause = onTtsPause,
                         onTtsStop = onTtsStop,
-                        onTtsRateChange = onTtsRateChange
+                        onTtsSkipPrevious = onTtsSkipPrevious,
+                        onTtsSkipNext = onTtsSkipNext,
+                        onTtsRateChange = onTtsRateChange,
+                        onOpenSleepTimer = { sleepTimerSheetVisible = true }
                     )
                 }
             }
@@ -432,6 +449,14 @@ internal fun ReaderOverlay(
                 HighlightTintPickerSheet(
                     onDismiss = { onHighlightTintSelected(DEFAULT_HIGHLIGHT_TINT) },
                     onTintSelected = onHighlightTintSelected
+                )
+            }
+
+            if (sleepTimerSheetVisible) {
+                TtsSleepTimerSheet(
+                    currentState = ttsSleepState,
+                    onSelectOption = onSetTtsSleepTimer,
+                    onDismiss = { sleepTimerSheetVisible = false }
                 )
             }
 
@@ -612,10 +637,14 @@ internal fun QuickControls(
     onToggleSepia: () -> Unit,
     ttsState: ReaderTtsState = ReaderTtsState.UNAVAILABLE,
     ttsRate: Float = 1.0f,
+    ttsSleepState: TtsSleepState = TtsSleepState(),
     onTtsPlay: () -> Unit = {},
     onTtsPause: () -> Unit = {},
     onTtsStop: () -> Unit = {},
-    onTtsRateChange: (Float) -> Unit = {}
+    onTtsSkipPrevious: () -> Unit = {},
+    onTtsSkipNext: () -> Unit = {},
+    onTtsRateChange: (Float) -> Unit = {},
+    onOpenSleepTimer: () -> Unit = {}
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -640,6 +669,18 @@ internal fun QuickControls(
             when (ttsState) {
                 ReaderTtsState.PLAYING -> {
                     FilterChip(
+                        selected = false,
+                        onClick = onTtsSkipPrevious,
+                        label = { Text("Prev") },
+                        leadingIcon = {
+                            Icon(Icons.Default.SkipPrevious, contentDescription = null)
+                        },
+                        modifier = Modifier.semantics {
+                            role = Role.Button
+                            contentDescription = "Previous sentence"
+                        }
+                    )
+                    FilterChip(
                         selected = true,
                         onClick = onTtsPause,
                         label = { Text("Pause") },
@@ -649,6 +690,18 @@ internal fun QuickControls(
                         modifier = Modifier.semantics {
                             role = Role.Button
                             contentDescription = "Pause text-to-speech"
+                        }
+                    )
+                    FilterChip(
+                        selected = false,
+                        onClick = onTtsSkipNext,
+                        label = { Text("Next") },
+                        leadingIcon = {
+                            Icon(Icons.Default.SkipNext, contentDescription = null)
+                        },
+                        modifier = Modifier.semantics {
+                            role = Role.Button
+                            contentDescription = "Next sentence"
                         }
                     )
                     FilterChip(
@@ -677,8 +730,37 @@ internal fun QuickControls(
                             contentDescription = "Text-to-speech speed ${ttsRate}x"
                         }
                     )
+                    val timerLabel = formatSleepTimerLabel(ttsSleepState)
+                    FilterChip(
+                        selected = ttsSleepState.isActive,
+                        onClick = onOpenSleepTimer,
+                        label = { Text(timerLabel) },
+                        leadingIcon = {
+                            Icon(Icons.Default.Timer, contentDescription = null)
+                        },
+                        modifier = Modifier.semantics {
+                            role = Role.Button
+                            contentDescription = if (ttsSleepState.isActive) {
+                                "Sleep timer active: $timerLabel. Tap to adjust"
+                            } else {
+                                "Set sleep timer"
+                            }
+                        }
+                    )
                 }
                 ReaderTtsState.PAUSED -> {
+                    FilterChip(
+                        selected = false,
+                        onClick = onTtsSkipPrevious,
+                        label = { Text("Prev") },
+                        leadingIcon = {
+                            Icon(Icons.Default.SkipPrevious, contentDescription = null)
+                        },
+                        modifier = Modifier.semantics {
+                            role = Role.Button
+                            contentDescription = "Previous sentence"
+                        }
+                    )
                     FilterChip(
                         selected = false,
                         onClick = onTtsPlay,
@@ -693,6 +775,18 @@ internal fun QuickControls(
                     )
                     FilterChip(
                         selected = false,
+                        onClick = onTtsSkipNext,
+                        label = { Text("Next") },
+                        leadingIcon = {
+                            Icon(Icons.Default.SkipNext, contentDescription = null)
+                        },
+                        modifier = Modifier.semantics {
+                            role = Role.Button
+                            contentDescription = "Next sentence"
+                        }
+                    )
+                    FilterChip(
+                        selected = false,
                         onClick = onTtsStop,
                         label = { Text("Stop") },
                         leadingIcon = {
@@ -701,6 +795,37 @@ internal fun QuickControls(
                         modifier = Modifier.semantics {
                             role = Role.Button
                             contentDescription = "Stop text-to-speech"
+                        }
+                    )
+                    val speedOptions = listOf(0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
+                    FilterChip(
+                        selected = false,
+                        onClick = {
+                            val idx = speedOptions.indexOf(ttsRate).let { if (it == -1) 1 else it }
+                            val next = speedOptions[(idx + 1) % speedOptions.size]
+                            onTtsRateChange(next)
+                        },
+                        label = { Text("${ttsRate}x") },
+                        modifier = Modifier.semantics {
+                            role = Role.Button
+                            contentDescription = "Text-to-speech speed ${ttsRate}x"
+                        }
+                    )
+                    val timerLabel = formatSleepTimerLabel(ttsSleepState)
+                    FilterChip(
+                        selected = ttsSleepState.isActive,
+                        onClick = onOpenSleepTimer,
+                        label = { Text(timerLabel) },
+                        leadingIcon = {
+                            Icon(Icons.Default.Timer, contentDescription = null)
+                        },
+                        modifier = Modifier.semantics {
+                            role = Role.Button
+                            contentDescription = if (ttsSleepState.isActive) {
+                                "Sleep timer active: $timerLabel. Tap to adjust"
+                            } else {
+                                "Set sleep timer"
+                            }
                         }
                     )
                 }
@@ -741,6 +866,23 @@ internal fun QuickControls(
                         modifier = Modifier.semantics {
                             role = Role.Button
                             contentDescription = "Read aloud with text-to-speech"
+                        }
+                    )
+                    val timerLabel = formatSleepTimerLabel(ttsSleepState)
+                    FilterChip(
+                        selected = ttsSleepState.isActive,
+                        onClick = onOpenSleepTimer,
+                        label = { Text(timerLabel) },
+                        leadingIcon = {
+                            Icon(Icons.Default.Timer, contentDescription = null)
+                        },
+                        modifier = Modifier.semantics {
+                            role = Role.Button
+                            contentDescription = if (ttsSleepState.isActive) {
+                                "Sleep timer active: $timerLabel. Tap to adjust"
+                            } else {
+                                "Set sleep timer"
+                            }
                         }
                     )
                 }
@@ -2090,6 +2232,123 @@ internal fun JumpNoticeBanner(
                     contentDescription = "Dismiss jump notice"
                 )
             }
+        }
+    }
+}
+
+
+/**
+ * Bottom sheet for configuring text-to-speech sleep timers (off, timed durations, or end of chapter).
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun TtsSleepTimerSheet(
+    currentState: TtsSleepState,
+    onSelectOption: (TtsSleepOption) -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Padding.screen)
+                .navigationBarsPadding()
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Sleep timer",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, contentDescription = "Close sleep timer")
+                }
+            }
+
+            Text(
+                text = "Automatically pause reading aloud",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            if (currentState.isActive) {
+                Spacer(modifier = Modifier.height(Spacing.xs))
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(Spacing.sm),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+                    ) {
+                        Icon(
+                            Icons.Default.Timer,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Text(
+                            text = if (currentState.option == TtsSleepOption.END_OF_CHAPTER) {
+                                "Pausing at the end of the chapter"
+                            } else {
+                                "Time remaining: ${formatSleepTimerLabel(currentState)}"
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(Spacing.xs))
+
+            val options = listOf(
+                TtsSleepOption.OFF to ("Off" to "Do not pause automatically"),
+                TtsSleepOption.MINUTES_15 to ("15 minutes" to "Pause after 15 minutes of reading"),
+                TtsSleepOption.MINUTES_30 to ("30 minutes" to "Pause after 30 minutes of reading"),
+                TtsSleepOption.MINUTES_45 to ("45 minutes" to "Pause after 45 minutes of reading"),
+                TtsSleepOption.MINUTES_60 to ("60 minutes" to "Pause after 60 minutes of reading"),
+                TtsSleepOption.END_OF_CHAPTER to ("End of chapter" to "Pause when current chapter ends")
+            )
+
+            options.forEach { (option, labels) ->
+                val (title, subtitle) = labels
+                val isSelected = currentState.option == option
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .clickable {
+                            onSelectOption(option)
+                            onDismiss()
+                        }
+                        .padding(vertical = Spacing.xs),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = isSelected,
+                        onClick = null,
+                        modifier = Modifier.padding(end = Spacing.sm)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(Spacing.md))
         }
     }
 }

@@ -41,8 +41,8 @@ and paragraph indents, with reading chrome out of the way:
 - **Customizable reading** — Adjustable fonts, themes (including sepia),
   margins, line height, tap zones, volume key page turning, reading progress HUD
   with estimated time left, page-turn animation, and per-book brightness
-- **Text-to-speech** — Optional on-device reading aloud with configurable playback
-  speed, synchronized page turning, and spoken utterance highlighting
+- **Text-to-speech & sleep timer** — Optional on-device reading aloud with configurable playback
+  speed, sentence-by-sentence skip navigation, countdown sleep timer (15/30/45/60 min or End of Chapter) with auto-pause, synchronized page turning, and spoken utterance highlighting
 - **Library management** — Multi-selection batch actions (mark status, assign
   collections, delete), collections, reading status filters, and search
 - **Offline-first** — Works fully offline once books are on the device
