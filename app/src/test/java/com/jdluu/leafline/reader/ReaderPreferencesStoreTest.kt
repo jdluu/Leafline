@@ -49,6 +49,7 @@ class ReaderPreferencesStoreTest {
         assertEquals(true, loaded.previewFootnotes)
         assertEquals(true, loaded.keepScreenOn)
         assertEquals(ReaderOrientation.AUTO, loaded.orientation)
+        assertEquals(true, loaded.showMinimalHud)
     }
 
     @Test
@@ -75,7 +76,8 @@ class ReaderPreferencesStoreTest {
                 preSepiaTheme = ReaderTheme.LIGHT,
                 previewFootnotes = false,
                 keepScreenOn = false,
-                orientation = ReaderOrientation.PORTRAIT
+                orientation = ReaderOrientation.PORTRAIT,
+                showMinimalHud = false
             )
         )
 
@@ -96,6 +98,7 @@ class ReaderPreferencesStoreTest {
         assertEquals(false, loaded.previewFootnotes)
         assertEquals(false, loaded.keepScreenOn)
         assertEquals(ReaderOrientation.PORTRAIT, loaded.orientation)
+        assertEquals(false, loaded.showMinimalHud)
     }
 
     @Test

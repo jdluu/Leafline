@@ -107,7 +107,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TextButton
+import kotlin.math.roundToInt
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -153,6 +158,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -540,6 +546,21 @@ internal fun ReaderOverlay(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .semantics { liveRegion = LiveRegionMode.Polite }
+                )
+            }
+
+            AnimatedVisibility(
+                visible = !toolbarVisible && currentSettings.showMinimalHud,
+                enter = fadeIn(animationSpec = tween(durationMillis = 200)),
+                exit = fadeOut(animationSpec = tween(durationMillis = 150)),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+            ) {
+                MinimalReadingFooter(
+                    currentChapterTitle = currentChapterTitle,
+                    currentLocatorJson = currentLocatorJson,
+                    modifier = Modifier.padding(bottom = 6.dp, start = Spacing.md, end = Spacing.md)
                 )
             }
 
@@ -2155,6 +2176,36 @@ internal fun ReaderSettingsSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
+            Spacer(modifier = Modifier.height(Spacing.sm))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .defaultMinSize(minHeight = 48.dp)
+                    .toggleable(
+                        value = settings.showMinimalHud,
+                        role = Role.Switch,
+                        onValueChange = { showHud ->
+                            onSettingsChange(settings.copy(showMinimalHud = showHud))
+                        }
+                    ),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Minimal reading HUD",
+                    style = MaterialTheme.typography.labelLarge
+                )
+                Switch(
+                    checked = settings.showMinimalHud,
+                    onCheckedChange = null
+                )
+            }
+            Text(
+                "Show chapter and progress subtly when menus are hidden",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
             Spacer(modifier = Modifier.height(Spacing.lg))
         }
     }
@@ -2643,6 +2694,113 @@ internal fun FootnotePreviewSheet(
                 }
             }
             Spacer(modifier = Modifier.height(Spacing.sm))
+        }
+    }
+}
+
+/**
+ * An unobtrusive single-line footer rendered at the bottom edge while menus
+ * are hidden. Displays the active chapter title and overall reading progress.
+ */
+internal fun formatMinimalFooterText(chapterTitle: String?, percent: Int?): String? {
+    val chapter = chapterTitle?.trim()?.takeIf { it.isNotBlank() }
+    val progressText = percent?.let { "$it%" }
+    return when {
+        chapter != null && progressText != null -> "$chapter • $progressText"
+        chapter != null -> chapter
+        progressText != null -> progressText
+        else -> null
+    }
+}
+
+@Composable
+internal fun MinimalReadingFooter(
+    currentChapterTitle: String?,
+    currentLocatorJson: String?,
+    modifier: Modifier = Modifier
+) {
+    val percent = remember(currentLocatorJson) {
+        ReadingProgressMath.percentageFromLocator(currentLocatorJson)?.let {
+            it.roundToInt()
+        }
+    }
+    val displayText = remember(currentChapterTitle, percent) {
+        formatMinimalFooterText(currentChapterTitle, percent)
+    }
+
+    if (displayText != null) {
+        Text(
+            text = displayText,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+            modifier = modifier
+        )
+    }
+}
+
+/**
+ * Displayed while an EPUB archive is opened asynchronously in the background.
+ * Provides a clean back button to allow exiting if the file is large.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun ReaderLoadingScreen(
+    title: String?,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    if (!title.isNullOrBlank()) {
+                        Text(
+                            text = title,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back"
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                )
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.background,
+        modifier = modifier.fillMaxSize()
+    ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(Spacing.md)
+            ) {
+                CircularProgressIndicator(
+                    color = MaterialTheme.colorScheme.primary,
+                    strokeWidth = 3.dp,
+                    modifier = Modifier.size(36.dp) // touch-target-ok: non-interactive progress indicator
+                )
+                Text(
+                    text = "Opening book…",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }

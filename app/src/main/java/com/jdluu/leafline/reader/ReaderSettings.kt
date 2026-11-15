@@ -223,7 +223,12 @@ data class ReaderSettings(
     /**
      * Screen orientation policy inside the reading view.
      */
-    val orientation: ReaderOrientation = ReaderOrientation.AUTO
+    val orientation: ReaderOrientation = ReaderOrientation.AUTO,
+    /**
+     * When true, displays an unobtrusive minimal footer with current chapter and
+     * progress at the bottom of the reading view when menus are hidden.
+     */
+    val showMinimalHud: Boolean = true
 )
 
 /** Screen orientation policy inside the reading view. */
