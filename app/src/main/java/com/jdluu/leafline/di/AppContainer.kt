@@ -4,6 +4,7 @@ import android.content.Context
 import com.jdluu.leafline.EpubImporter
 import com.jdluu.leafline.LeaflineApplication
 import com.jdluu.leafline.ReadiumEpubImporter
+import com.jdluu.leafline.export.NotesExporter
 import com.jdluu.leafline.library.data.AnnotationRepository
 import com.jdluu.leafline.library.data.AnnotationRepositoryImpl
 import com.jdluu.leafline.library.data.BookmarkRepository
@@ -63,6 +64,13 @@ class AppContainer(context: Context) {
     val opdsFeedStore: OpdsFeedStore by lazy { OpdsFeedStore.fromContext(context) }
 
     val opdsClient: OpdsClient by lazy { OpdsClient() }
+
+    val notesExporter: NotesExporter by lazy {
+        NotesExporter(
+            libraryRepository = libraryRepository,
+            annotationRepository = annotationRepository
+        )
+    }
 }
 
 val Context.appContainer: AppContainer

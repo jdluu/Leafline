@@ -58,6 +58,15 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.lifecycleScope
 import com.jdluu.leafline.di.appContainer
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.filled.Download
+import com.jdluu.leafline.export.BookExportData
+import com.jdluu.leafline.export.NotesExporter
+import com.jdluu.leafline.export.ui.NotesExportSheet
 import com.jdluu.leafline.library.LibraryBook
 import com.jdluu.leafline.library.LibraryFolderStore
 import com.jdluu.leafline.library.LibraryFolderViewModel
@@ -389,6 +398,7 @@ fun LeaflineApp(activity: MainActivity) {
                         foldersViewModel = libraryFolderViewModel,
                         folderRescanViewModel = folderRescanViewModel,
                         backupManager = activity.appContainer.backupManager,
+                        notesExporter = activity.appContainer.notesExporter,
                         onImportEpub = { importEpubLauncher.launch(arrayOf(MainActivity.EPUB_MIME_TYPE)) },
                         onAddLibraryFolder = { addLibraryFolderLauncher.launch(null) },
                         onReselectFolder = { uri ->
@@ -422,7 +432,8 @@ fun LeaflineApp(activity: MainActivity) {
                         onAppearanceChange = { selected ->
                             appearance = selected
                             appearanceStore.save(selected)
-                        }
+                        },
+                        notesExporter = activity.appContainer.notesExporter
                     )
                     null -> {}
                 }
@@ -435,7 +446,8 @@ fun LeaflineApp(activity: MainActivity) {
 @Composable
 fun SettingsTab(
     appearance: ThemeMode,
-    onAppearanceChange: (ThemeMode) -> Unit
+    onAppearanceChange: (ThemeMode) -> Unit,
+    notesExporter: NotesExporter? = null
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
@@ -452,8 +464,73 @@ fun SettingsTab(
                 modifier = Modifier.fillMaxWidth()
             )
             HorizontalDivider(modifier = Modifier.padding(vertical = Spacing.md))
+            NotesExportSection(
+                notesExporter = notesExporter,
+                modifier = Modifier.fillMaxWidth()
+            )
+            HorizontalDivider(modifier = Modifier.padding(vertical = Spacing.md))
             KoreaderSyncSection(modifier = Modifier.fillMaxWidth())
         }
+    }
+}
+
+@Composable
+private fun NotesExportSection(
+    notesExporter: NotesExporter?,
+    modifier: Modifier = Modifier
+) {
+    if (notesExporter == null) return
+    val scope = rememberCoroutineScope()
+    var batchData by remember { mutableStateOf<List<BookExportData>?>(null) }
+    var isLoading by remember { mutableStateOf(false) }
+    var showExportSheet by remember { mutableStateOf(false) }
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        Text(
+            "Notes & Data Portability",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(bottom = Spacing.xs)
+        )
+        Text(
+            "Export highlights, notes, and reading metadata to Obsidian Markdown, structured JSON, or an Obsidian Vault archive (.zip).",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = Spacing.sm)
+        )
+        Button(
+            onClick = {
+                isLoading = true
+                scope.launch {
+                    try {
+                        batchData = notesExporter.getAllExportData(includeEmptyBooks = false)
+                        showExportSheet = true
+                    } finally {
+                        isLoading = false
+                    }
+                }
+            },
+            enabled = !isLoading,
+            modifier = Modifier.heightIn(min = 48.dp)
+        ) {
+            Icon(
+                Icons.Default.Download,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp) // touch-target-ok: button decorative icon
+            )
+            Spacer(Modifier.width(Spacing.xs))
+            Text(if (isLoading) "Loading notes…" else "Export all notes & highlights")
+        }
+    }
+
+    if (showExportSheet && batchData != null) {
+        NotesExportSheet(
+            notesExporter = notesExporter,
+            batchBooksData = batchData,
+            onDismiss = {
+                showExportSheet = false
+                batchData = null
+            }
+        )
     }
 }
 

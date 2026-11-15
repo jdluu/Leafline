@@ -132,6 +132,11 @@ import com.jdluu.leafline.library.rescan.RescanSummary
 import com.jdluu.leafline.sync.ReadingProgressMath
 import com.jdluu.leafline.theme.IconSize
 import androidx.compose.material.icons.filled.SaveAlt
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Download
+import com.jdluu.leafline.export.BookExportData
+import com.jdluu.leafline.export.NotesExporter
+import com.jdluu.leafline.export.ui.NotesExportSheet
 import com.jdluu.leafline.library.backup.BackupRestoreSheet
 import com.jdluu.leafline.library.backup.LibraryBackupManager
 import com.jdluu.leafline.theme.Padding
@@ -147,6 +152,7 @@ fun LibraryScreen(
     foldersViewModel: LibraryFolderViewModel? = null,
     folderRescanViewModel: FolderRescanViewModel? = null,
     backupManager: LibraryBackupManager? = null,
+    notesExporter: NotesExporter? = null,
     onImportEpub: () -> Unit,
     onAddLibraryFolder: () -> Unit = {},
     onReselectFolder: (String) -> Unit = {},
@@ -185,6 +191,19 @@ fun LibraryScreen(
     var showBatchCollectionDialog by remember { mutableStateOf(false) }
     var showBatchTagDialog by remember { mutableStateOf(false) }
     val tagCounts by viewModel.tagCounts.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+    var exportBookTarget by remember { mutableStateOf<LibraryBook?>(null) }
+    var exportBookData by remember { mutableStateOf<BookExportData?>(null) }
+    var exportBatchTarget by remember { mutableStateOf<List<BookExportData>?>(null) }
+
+    LaunchedEffect(exportBookTarget) {
+        val target = exportBookTarget
+        if (target != null && notesExporter != null) {
+            exportBookData = notesExporter.getExportDataForBook(target)
+        } else {
+            exportBookData = null
+        }
+    }
 
     BackHandler(enabled = selectionMode) {
         selectionMode = false
@@ -243,6 +262,19 @@ fun LibraryScreen(
                             if (collections.isNotEmpty()) {
                                 IconButton(onClick = { showBatchCollectionDialog = true }) {
                                     Icon(Icons.Default.CollectionsBookmark, contentDescription = "Add selected to collection")
+                                }
+                            }
+                            if (notesExporter != null) {
+                                IconButton(onClick = {
+                                    scope.launch {
+                                        val selectedBooks = books.filter { it.stableId in selectedBookIds }
+                                        val batchData = selectedBooks.map { book ->
+                                            notesExporter.getExportDataForBook(book)
+                                        }
+                                        exportBatchTarget = batchData
+                                    }
+                                }) {
+                                    Icon(Icons.Default.Download, contentDescription = "Export notes for selected books")
                                 }
                             }
                             IconButton(onClick = { showBatchDeleteConfirm = true }) {
@@ -701,7 +733,31 @@ fun LibraryScreen(
                 detailSheetBook = null
                 onOpenBook(book)
             },
+            onExportNotes = if (notesExporter != null) {
+                { exportBookTarget = currentBook }
+            } else null,
             onGetReadingStats = { viewModel.getReadingAggregateForBook(book.stableId) }
+        )
+    }
+
+    if (exportBookData != null && notesExporter != null) {
+        NotesExportSheet(
+            notesExporter = notesExporter,
+            singleBookData = exportBookData,
+            onDismiss = {
+                exportBookTarget = null
+                exportBookData = null
+            }
+        )
+    }
+
+    if (exportBatchTarget != null && notesExporter != null) {
+        NotesExportSheet(
+            notesExporter = notesExporter,
+            batchBooksData = exportBatchTarget,
+            onDismiss = {
+                exportBatchTarget = null
+            }
         )
     }
 
@@ -1636,6 +1692,7 @@ private fun BookDetailSheet(
     onAddToCollection: (Long) -> Unit,
     onRemoveFromCollection: (Long) -> Unit,
     onOpen: () -> Unit,
+    onExportNotes: (() -> Unit)? = null,
     onGetReadingStats: suspend () -> ReadingAggregate = { ReadingAggregate.EMPTY }
 ) {
     var optimisticStatus by remember(book.readingStatus) { mutableStateOf(book.readingStatus) }
@@ -2000,6 +2057,24 @@ private fun BookDetailSheet(
                         label = { Text(collection.name) },
                         modifier = Modifier.padding(vertical = 2.dp)
                     )
+                }
+            }
+
+            if (onExportNotes != null) {
+                Spacer(Modifier.height(Spacing.sm))
+                OutlinedButton(
+                    onClick = onExportNotes,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Description,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp) // touch-target-ok: button decorative icon
+                    )
+                    Spacer(Modifier.width(Spacing.xs))
+                    Text("Export notes & highlights")
                 }
             }
 

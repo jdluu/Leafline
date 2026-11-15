@@ -124,6 +124,9 @@ import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.commitNow
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.jdluu.leafline.export.BookExportData
+import com.jdluu.leafline.library.LibraryBook
+import com.jdluu.leafline.export.ui.NotesExportSheet
 import com.jdluu.leafline.di.appContainer
 import com.jdluu.leafline.library.ReadingStatus
 import com.jdluu.leafline.library.data.Annotation
@@ -322,6 +325,8 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     private var highlightTintSheetVisible = mutableStateOf(false)
     private var bookmarkSheetVisible = mutableStateOf(false)
     private var highlightsSheetVisible = mutableStateOf(false)
+    private var exportSheetVisible = mutableStateOf(false)
+    private var exportSheetData = mutableStateOf<BookExportData?>(null)
     private var searchSheetVisible = mutableStateOf(false)
     private var bookTitle = mutableStateOf("")
 
@@ -936,14 +941,17 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     }
 
     private fun exportAnnotations(selected: List<Annotation>, title: String) {
-        val content = com.jdluu.leafline.reader.annotations.AnnotationExportFormatter
-            .markdown(selected, ::annotationExcerpt)
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/markdown"
-            putExtra(Intent.EXTRA_SUBJECT, "$title annotations")
-            putExtra(Intent.EXTRA_TEXT, content)
-        }
-        startActivity(Intent.createChooser(intent, "Export highlights"))
+        val book = currentBook ?: LibraryBook(
+            stableId = bookStableId ?: "",
+            title = title,
+            authors = publication?.metadata?.authors?.mapNotNull { it.name } ?: emptyList()
+        )
+        exportSheetData.value = BookExportData(
+            book = book,
+            annotations = selected,
+            collections = emptyList()
+        )
+        exportSheetVisible.value = true
     }
 
     private class ReaderOverlayTouchContainer(
@@ -966,6 +974,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             settingsSheetVisible.value ||
             bookmarkSheetVisible.value ||
             highlightsSheetVisible.value ||
+            exportSheetVisible.value ||
             searchSheetVisible.value ||
             highlightTintSheetVisible.value ||
             syncConflictState.value != null ||
@@ -1148,6 +1157,16 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                         } catch (_: Exception) {}
                     }
                 )
+                if (exportSheetVisible.value && exportSheetData.value != null) {
+                    NotesExportSheet(
+                        notesExporter = appContainer.notesExporter,
+                        singleBookData = exportSheetData.value,
+                        onDismiss = {
+                            exportSheetVisible.value = false
+                            exportSheetData.value = null
+                        }
+                    )
+                }
                     }
                 }
             }

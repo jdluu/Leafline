@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.Flow
 interface AnnotationRepository {
     fun observeAnnotations(bookId: String): Flow<List<Annotation>>
     suspend fun getAnnotations(bookId: String): List<Annotation>
+    suspend fun getAllAnnotations(): List<Annotation>
     suspend fun addAnnotation(
         bookId: String,
         locatorJson: String,
