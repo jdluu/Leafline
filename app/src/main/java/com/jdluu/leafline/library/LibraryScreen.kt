@@ -4,6 +4,8 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import com.jdluu.leafline.library.cover.BitmapMemoryCache
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -1383,15 +1385,21 @@ fun BookGridTile(
                     .aspectRatio(COVER_ASPECT_RATIO)
                     .clip(MaterialTheme.shapes.medium)
             ) {
-                if (bitmap != null) {
-                    Image(
-                        bitmap = bitmap.asImageBitmap(),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    CoverPlaceholder(title = book.title)
+                Crossfade(
+                    targetState = bitmap,
+                    animationSpec = tween(durationMillis = 200),
+                    label = "gridCoverCrossfade"
+                ) { bmp ->
+                    if (bmp != null) {
+                        Image(
+                            bitmap = bmp.asImageBitmap(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        CoverPlaceholder(title = book.title)
+                    }
                 }
 
                 if (selectionMode) {
@@ -1596,15 +1604,21 @@ private fun ContinueReadingTile(book: LibraryBook, onClick: () -> Unit) {
                     .aspectRatio(COVER_ASPECT_RATIO)
                     .clip(MaterialTheme.shapes.medium)
             ) {
-                if (bitmap != null) {
-                    Image(
-                        bitmap = bitmap.asImageBitmap(),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    CoverPlaceholder(title = book.title)
+                Crossfade(
+                    targetState = bitmap,
+                    animationSpec = tween(durationMillis = 200),
+                    label = "continueReadingCoverCrossfade"
+                ) { bmp ->
+                    if (bmp != null) {
+                        Image(
+                            bitmap = bmp.asImageBitmap(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        CoverPlaceholder(title = book.title)
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(4.dp))
@@ -1677,23 +1691,29 @@ private fun BookDetailSheet(
                         .clip(MaterialTheme.shapes.medium)
                         .background(MaterialTheme.colorScheme.surfaceVariant)
                 ) {
-                    if (bitmap != null) {
-                        Image(
-                            bitmap = bitmap.asImageBitmap(),
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    } else {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.MenuBook,
+                    Crossfade(
+                        targetState = bitmap,
+                        animationSpec = tween(durationMillis = 200),
+                        label = "detailCoverCrossfade"
+                    ) { bmp ->
+                        if (bmp != null) {
+                            Image(
+                                bitmap = bmp.asImageBitmap(),
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
                             )
+                        } else {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.MenuBook,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }

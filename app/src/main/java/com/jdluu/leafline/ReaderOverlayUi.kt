@@ -29,6 +29,16 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import com.jdluu.leafline.theme.HIGHLIGHT_TINTS
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -321,6 +331,17 @@ internal fun ReaderOverlay(
     }
 
     var sleepTimerSheetVisible by remember { mutableStateOf(false) }
+    val tocListState = rememberLazyListState()
+    val activeTocIndex = remember(tocLinks, currentChapterHref) {
+        tocLinks.indexOfFirst { (link, _) ->
+            matchesChapter(link.href.toString(), currentChapterHref)
+        }
+    }
+    LaunchedEffect(drawerState.isOpen) {
+        if (drawerState.isOpen && activeTocIndex >= 0) {
+            tocListState.animateScrollToItem(activeTocIndex)
+        }
+    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -333,16 +354,26 @@ internal fun ReaderOverlay(
                     modifier = Modifier.padding(Padding.screen)
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                LazyColumn {
-                    items(tocLinks) { (link, depth) ->
-                        TocItem(link = link, depth = depth, onClick = { onTocClick(link) })
+                LazyColumn(state = tocListState) {
+                    itemsIndexed(tocLinks) { index, (link, depth) ->
+                        val isCurrent = index == activeTocIndex
+                        TocItem(
+                            link = link,
+                            depth = depth,
+                            isCurrent = isCurrent,
+                            onClick = { onTocClick(link) }
+                        )
                     }
                 }
             }
         }
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            if (toolbarVisible) {
+            AnimatedVisibility(
+                visible = toolbarVisible,
+                enter = fadeIn(animationSpec = tween(durationMillis = 150)),
+                exit = fadeOut(animationSpec = tween(durationMillis = 150))
+            ) {
                 // Tapping outside the toolbar dismisses it
                 Box(
                     modifier = Modifier
@@ -354,12 +385,26 @@ internal fun ReaderOverlay(
                             onDismissToolbar()
                         }
                 )
+            }
 
+            AnimatedVisibility(
+                visible = toolbarVisible,
+                enter = slideInVertically(
+                    initialOffsetY = { -it },
+                    animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing)
+                ) + fadeIn(animationSpec = tween(durationMillis = 200)),
+                exit = slideOutVertically(
+                    targetOffsetY = { -it },
+                    animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing)
+                ) + fadeOut(animationSpec = tween(durationMillis = 150)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+            ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .align(Alignment.TopCenter)
-                        .statusBarsPadding()
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
@@ -497,13 +542,24 @@ internal fun ReaderOverlay(
                 )
             }
 
-            if (toolbarVisible) {
+            AnimatedVisibility(
+                visible = toolbarVisible,
+                enter = slideInVertically(
+                    initialOffsetY = { it },
+                    animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing)
+                ) + fadeIn(animationSpec = tween(durationMillis = 200)),
+                exit = slideOutVertically(
+                    targetOffsetY = { it },
+                    animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing)
+                ) + fadeOut(animationSpec = tween(durationMillis = 150)),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+            ) {
                 ReaderBottomBar(
                     currentLocatorJson = currentLocatorJson,
                     activeDurationMillis = bookActiveDurationMillis,
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .navigationBarsPadding()
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
@@ -2087,22 +2143,62 @@ internal fun TapZoneActionRow(
     }
 }
 
+internal fun matchesChapter(linkHref: String, currentHref: String?): Boolean {
+    if (currentHref == null) return false
+    val cleanLink = linkHref.substringBefore("#").trimStart('/')
+    val cleanCurrent = currentHref.substringBefore("#").trimStart('/')
+    if (cleanLink.isEmpty() || cleanCurrent.isEmpty()) return false
+    return cleanLink == cleanCurrent || cleanCurrent.endsWith(cleanLink) || cleanLink.endsWith(cleanCurrent)
+}
+
 @Composable
-internal fun TocItem(link: Link, depth: Int, onClick: () -> Unit) {
+internal fun TocItem(
+    link: Link,
+    depth: Int,
+    isCurrent: Boolean = false,
+    onClick: () -> Unit
+) {
     val indent = (depth * 16).dp
     Surface(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 2.dp)
             .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-            .clickable(onClickLabel = "Open section", onClick = onClick)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(
+                onClickLabel = if (isCurrent) "Current section" else "Open section",
+                onClick = onClick
+            ),
+        shape = RoundedCornerShape(8.dp),
+        color = if (isCurrent) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                else androidx.compose.ui.graphics.Color.Transparent
     ) {
-        Text(
-            text = link.title ?: link.href.toString(),
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(start = indent + 16.dp, top = 12.dp, bottom = 12.dp, end = 16.dp),
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = indent + 12.dp, top = 12.dp, bottom = 12.dp, end = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            if (isCurrent) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.MenuBook,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp) // touch-target-ok: decorative icon in 48dp Surface
+                )
+            }
+            Text(
+                text = link.title ?: link.href.toString(),
+                style = if (isCurrent) MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+                        else MaterialTheme.typography.bodyMedium,
+                color = if (isCurrent) MaterialTheme.colorScheme.onPrimaryContainer
+                        else MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+        }
     }
 }
 
