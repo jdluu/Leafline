@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-15
+
 ### Added
 - **Reader Footnote & Note Popup Preview Dialog**:
   - Non-disruptive bottom sheet preview for footnotes, endnotes, and internal note citations without losing reading position.
