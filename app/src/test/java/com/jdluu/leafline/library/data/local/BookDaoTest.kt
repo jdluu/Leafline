@@ -118,4 +118,21 @@ class BookDaoTest {
 
         assertTrue(results.isEmpty())
     }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun setRating_and_setTags_persist_correctly() = runTest {
+        bookDao.insert(entity(stableId = "book-1", title = "Dune", authors = listOf("Frank Herbert")))
+
+        bookDao.setRating("book-1", 5)
+        bookDao.setTags("book-1", listOf("sci-fi", "masterpiece"))
+
+        val book = bookDao.getBookByStableId("book-1")
+        assertEquals(5, book?.rating)
+        assertEquals(listOf("sci-fi", "masterpiece"), book?.tags)
+
+        bookDao.setRating("book-1", null)
+        val cleared = bookDao.getBookByStableId("book-1")
+        assertEquals(null, cleared?.rating)
+    }
 }

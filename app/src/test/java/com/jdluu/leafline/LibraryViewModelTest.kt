@@ -193,6 +193,101 @@ class LibraryViewModelTest {
             assertEquals(setOf("b1", "b2"), repository.deletedBooks.toSet())
             assertEquals(setOf(42L to "b1", 42L to "b2"), repository.addedToCollection.toSet())
         }
+
+    @Test
+    fun `setRating invokes repository setRating`() = runTest(dispatcher) {
+        val repository = FakeLibraryRepository(books = flowOf(emptyList()))
+        val viewModel = LibraryViewModel(repository)
+
+        viewModel.setRating("book-1", 5)
+        advanceUntilIdle()
+
+        assertEquals(listOf("book-1" to 5), repository.updatedRatings)
+    }
+
+    @Test
+    fun `setTags invokes repository setTags`() = runTest(dispatcher) {
+        val repository = FakeLibraryRepository(books = flowOf(emptyList()))
+        val viewModel = LibraryViewModel(repository)
+
+        viewModel.setTags("book-1", listOf("sci-fi", "favorite"))
+        advanceUntilIdle()
+
+        assertEquals(listOf("book-1" to listOf("sci-fi", "favorite")), repository.updatedTags)
+    }
+
+    @Test
+    fun `addTag appends new tag to existing book tags`() = runTest(dispatcher) {
+        val book = testBook("book-1", "/p1", "h1", tags = listOf("sci-fi"))
+        val repository = FakeLibraryRepository(
+            books = flowOf(listOf(book)),
+            booksById = mapOf("book-1" to book)
+        )
+        val viewModel = LibraryViewModel(repository)
+
+        viewModel.addTag("book-1", "dystopian")
+        advanceUntilIdle()
+
+        assertEquals(listOf("book-1" to listOf("sci-fi", "dystopian")), repository.updatedTags)
+    }
+
+    @Test
+    fun `removeTag removes matching tag case-insensitively`() = runTest(dispatcher) {
+        val book = testBook("book-1", "/p1", "h1", tags = listOf("Sci-Fi", "Classic"))
+        val repository = FakeLibraryRepository(
+            books = flowOf(listOf(book)),
+            booksById = mapOf("book-1" to book)
+        )
+        val viewModel = LibraryViewModel(repository)
+
+        viewModel.removeTag("book-1", "sci-fi")
+        advanceUntilIdle()
+
+        assertEquals(listOf("book-1" to listOf("Classic")), repository.updatedTags)
+    }
+
+    @Test
+    fun `allTags emits sorted distinct tags from books`() = runTest(dispatcher) {
+        val book1 = testBook("book-1", "/p1", "h1", tags = listOf("Sci-Fi", "Novel"))
+        val book2 = testBook("book-2", "/p2", "h2", tags = listOf("Fantasy", "Novel", "  "))
+        val repository = FakeLibraryRepository(books = flowOf(listOf(book1, book2)))
+        val viewModel = LibraryViewModel(repository)
+
+        val emissions = mutableListOf<List<String>>()
+        val job = launch {
+            viewModel.allTags.collect { emissions += it }
+        }
+        advanceUntilIdle()
+
+        assertEquals(listOf("Fantasy", "Novel", "Sci-Fi"), emissions.last())
+        job.cancel()
+    }
+
+    @Test
+    fun `tag filter restricts sortedBooks`() = runTest(dispatcher) {
+        val book1 = testBook("b1", "/p1", "h1", tags = listOf("history"))
+        val book2 = testBook("b2", "/p2", "h2", tags = listOf("science"))
+        val repository = FakeLibraryRepository(books = flowOf(listOf(book1, book2)))
+        val viewModel = LibraryViewModel(repository)
+
+        val emissions = mutableListOf<List<LibraryBook>>()
+        val job = launch {
+            viewModel.sortedBooks.collect { emissions += it }
+        }
+        advanceUntilIdle()
+        assertEquals(2, emissions.last().size)
+
+        viewModel.selectTag("history")
+        advanceUntilIdle()
+        assertEquals(1, emissions.last().size)
+        assertEquals("b1", emissions.last().first().stableId)
+
+        viewModel.selectTag(null)
+        advanceUntilIdle()
+        assertEquals(2, emissions.last().size)
+
+        job.cancel()
+    }
 }
 
 private fun testBook(
@@ -200,7 +295,9 @@ private fun testBook(
     filePath: String,
     fileHash: String,
     lastLocatorJson: String? = null,
-    readingStatus: ReadingStatus = ReadingStatus.UNREAD
+    readingStatus: ReadingStatus = ReadingStatus.UNREAD,
+    rating: Int? = null,
+    tags: List<String> = emptyList()
 ) = LibraryBook(
     stableId = stableId,
     title = "Book",
@@ -214,14 +311,17 @@ private fun testBook(
     addedAtEpochMillis = 1L,
     pageCount = null,
     lastLocatorJson = lastLocatorJson,
-    readingStatus = readingStatus
+    readingStatus = readingStatus,
+    rating = rating,
+    tags = tags
 )
 
 /** Minimal [LibraryRepository] for ViewModel tests; only reads used here. */
 private class FakeLibraryRepository(
     private val books: Flow<List<LibraryBook>>,
     private val existingByHash: LibraryBook? = null,
-    private val collectionsForBook: Map<String, Flow<List<Collection>>> = emptyMap()
+    private val collectionsForBook: Map<String, Flow<List<Collection>>> = emptyMap(),
+    private val booksById: Map<String, LibraryBook> = emptyMap()
 ) : LibraryRepository {
     val addedBooks = mutableListOf<LibraryBook>()
     val updatedBooks = mutableListOf<LibraryBook>()
@@ -230,6 +330,8 @@ private class FakeLibraryRepository(
     val removedFromCollection = mutableListOf<Pair<Long, String>>()
     val deletedBooks = mutableListOf<String>()
     val updatedReadingStatuses = mutableListOf<Pair<String, ReadingStatus>>()
+    val updatedRatings = mutableListOf<Pair<String, Int?>>()
+    val updatedTags = mutableListOf<Pair<String, List<String>>>()
     override fun getAllBooks(): Flow<List<LibraryBook>> = books
 
     override fun searchBooks(query: String): Flow<List<LibraryBook>> = books
@@ -244,7 +346,7 @@ private class FakeLibraryRepository(
     override fun getCollectionsForBook(bookStableId: String): Flow<List<Collection>> =
         collectionsForBook[bookStableId] ?: flowOf(emptyList())
 
-    override suspend fun getBookByStableId(stableId: String): LibraryBook? = error("not used")
+    override suspend fun getBookByStableId(stableId: String): LibraryBook? = booksById[stableId]
 
     override suspend fun getBookByFileHash(fileHash: String): LibraryBook? {
         lookupHashes += fileHash
@@ -296,5 +398,13 @@ private class FakeLibraryRepository(
 
     override suspend fun setReadingStatus(stableId: String, status: ReadingStatus) {
         updatedReadingStatuses += stableId to status
+    }
+
+    override suspend fun setRating(stableId: String, rating: Int?) {
+        updatedRatings += stableId to rating
+    }
+
+    override suspend fun setTags(stableId: String, tags: List<String>) {
+        updatedTags += stableId to tags
     }
 }

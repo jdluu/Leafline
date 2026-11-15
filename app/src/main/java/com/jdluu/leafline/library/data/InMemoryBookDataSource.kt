@@ -104,6 +104,24 @@ class InMemoryBookDataSource : BookDataSource {
         }
     }
 
+    override suspend fun setRating(stableId: String, rating: Int?) {
+        mutex.withLock {
+            books[stableId]?.let { current ->
+                books[stableId] = current.copy(rating = rating)
+                refreshFlow()
+            }
+        }
+    }
+
+    override suspend fun setTags(stableId: String, tags: List<String>) {
+        mutex.withLock {
+            books[stableId]?.let { current ->
+                books[stableId] = current.copy(tags = tags)
+                refreshFlow()
+            }
+        }
+    }
+
     override fun getBooksByReadingStatus(status: ReadingStatus): Flow<List<LibraryBook>> {
         return _booksFlow.asStateFlow().map { all ->
             all.filter { it.readingStatus == status }

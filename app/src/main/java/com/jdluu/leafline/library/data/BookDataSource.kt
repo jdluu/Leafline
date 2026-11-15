@@ -17,6 +17,8 @@ interface BookDataSource {
     suspend fun update(book: LibraryBook)
     suspend fun delete(stableId: String)
     suspend fun setReadingStatus(stableId: String, status: ReadingStatus)
+    suspend fun setRating(stableId: String, rating: Int?)
+    suspend fun setTags(stableId: String, tags: List<String>)
     fun getBooksByReadingStatus(status: ReadingStatus): Flow<List<LibraryBook>>
     fun getRecentlyReadBooks(limit: Int = 10): Flow<List<LibraryBook>>
 }

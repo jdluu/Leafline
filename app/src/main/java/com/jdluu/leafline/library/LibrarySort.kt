@@ -6,7 +6,8 @@ package com.jdluu.leafline.library
 enum class LibrarySort(val label: String) {
     RECENT("Recent"),
     TITLE("Title"),
-    AUTHOR("Author");
+    AUTHOR("Author"),
+    RATING("Rating");
 
     fun sorted(books: List<LibraryBook>): List<LibraryBook> = when (this) {
         RECENT -> books.sortedByDescending { it.addedAtEpochMillis ?: Long.MIN_VALUE }
@@ -14,6 +15,10 @@ enum class LibrarySort(val label: String) {
         AUTHOR -> books.sortedWith(
             compareBy<LibraryBook> { it.authors.firstOrNull()?.lowercase() }
                 .thenBy { it.title.lowercase() }
+        )
+        RATING -> books.sortedWith(
+            compareByDescending<LibraryBook> { it.rating ?: 0 }
+                .thenByDescending { it.addedAtEpochMillis ?: Long.MIN_VALUE }
         )
     }
 

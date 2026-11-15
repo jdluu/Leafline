@@ -91,10 +91,25 @@ class LibrarySortTest {
     }
 
     @Test
+    fun `RATING sorts by rating descending then addedAt descending`() {
+        val books = listOf(
+            book("1", "A", addedAt = 100).copy(rating = 3),
+            book("2", "B", addedAt = 200).copy(rating = 5),
+            book("3", "C", addedAt = 300).copy(rating = null),
+            book("4", "D", addedAt = 400).copy(rating = 3)
+        )
+
+        val sorted = LibrarySort.RATING.sorted(books)
+
+        assertEquals(listOf("2", "4", "1", "3"), sorted.map { it.stableId })
+    }
+
+    @Test
     fun `fromNameOrDefault parses stored names`() {
         assertEquals(LibrarySort.TITLE, LibrarySort.fromNameOrDefault("TITLE"))
         assertEquals(LibrarySort.AUTHOR, LibrarySort.fromNameOrDefault("AUTHOR"))
         assertEquals(LibrarySort.RECENT, LibrarySort.fromNameOrDefault("RECENT"))
+        assertEquals(LibrarySort.RATING, LibrarySort.fromNameOrDefault("RATING"))
     }
 
     @Test

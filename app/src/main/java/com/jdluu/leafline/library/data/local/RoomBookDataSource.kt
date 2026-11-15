@@ -68,6 +68,14 @@ class RoomBookDataSource(
         database.bookDao().setReadingStatus(stableId, status.dbValue)
     }
 
+    override suspend fun setRating(stableId: String, rating: Int?) {
+        database.bookDao().setRating(stableId, rating)
+    }
+
+    override suspend fun setTags(stableId: String, tags: List<String>) {
+        database.bookDao().setTags(stableId, tags)
+    }
+
     override fun getBooksByReadingStatus(status: ReadingStatus): Flow<List<LibraryBook>> {
         return database.bookDao().getBooksByReadingStatus(status.dbValue).map { entities ->
             entities.map { BookEntity.toLibraryBook(it) }

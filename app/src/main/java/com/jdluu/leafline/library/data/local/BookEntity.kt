@@ -22,7 +22,9 @@ data class BookEntity(
     val coverPath: String? = null,
     val koreaderHash: String? = null,
     val lastReadAtEpochMillis: Long? = null,
-    val readingStatus: String = "unread"
+    val readingStatus: String = "unread",
+    val rating: Int? = null,
+    val tags: List<String> = emptyList()
 ) {
     companion object {
         fun fromLibraryBook(book: LibraryBook): BookEntity {
@@ -42,7 +44,9 @@ data class BookEntity(
                 koreaderHash = book.koreaderHash,
                 lastReadAtEpochMillis = book.lastReadAtEpochMillis,
                 lastLocatorJson = book.lastLocatorJson,
-                readingStatus = book.readingStatus.dbValue
+                readingStatus = book.readingStatus.dbValue,
+                rating = book.rating,
+                tags = book.tags
             )
         }
 
@@ -63,7 +67,9 @@ data class BookEntity(
                 koreaderHash = entity.koreaderHash,
                 lastReadAtEpochMillis = entity.lastReadAtEpochMillis,
                 lastLocatorJson = entity.lastLocatorJson,
-                readingStatus = ReadingStatus.fromDb(entity.readingStatus)
+                readingStatus = ReadingStatus.fromDb(entity.readingStatus),
+                rating = entity.rating,
+                tags = entity.tags
             )
         }
     }

@@ -49,6 +49,12 @@ interface BookDao {
     @Query("UPDATE books SET readingStatus = :readingStatus WHERE stableId = :stableId")
     suspend fun setReadingStatus(stableId: String, readingStatus: String)
 
+    @Query("UPDATE books SET rating = :rating WHERE stableId = :stableId")
+    suspend fun setRating(stableId: String, rating: Int?)
+
+    @Query("UPDATE books SET tags = :tags WHERE stableId = :stableId")
+    suspend fun setTags(stableId: String, tags: List<String>)
+
     @Query("SELECT * FROM books WHERE readingStatus = :readingStatus ORDER BY addedAtEpochMillis DESC")
     fun getBooksByReadingStatus(readingStatus: String): Flow<List<BookEntity>>
 
