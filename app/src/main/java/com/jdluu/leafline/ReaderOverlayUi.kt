@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.InputChip
+import com.jdluu.leafline.reader.ReaderOrientation
 import com.jdluu.leafline.reader.search.SearchOptions
 import androidx.compose.material3.AlertDialog
 import androidx.activity.compose.BackHandler
@@ -2034,6 +2035,23 @@ internal fun ReaderSettingsSheet(
             )
             Spacer(modifier = Modifier.height(Spacing.sm))
 
+            Text("Screen orientation", style = MaterialTheme.typography.labelLarge)
+            Row(modifier = Modifier.padding(top = Spacing.xs, bottom = Spacing.sm)) {
+                listOf(
+                    ReaderOrientation.AUTO to "Auto",
+                    ReaderOrientation.PORTRAIT to "Portrait",
+                    ReaderOrientation.LANDSCAPE to "Landscape"
+                ).forEach { (orient, label) ->
+                    FilterChip(
+                        selected = settings.orientation == orient,
+                        onClick = { onSettingsChange(settings.copy(orientation = orient)) },
+                        label = { Text(label) },
+                        modifier = Modifier.padding(end = Spacing.xs)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(Spacing.xs))
             Text("Page turn animation", style = MaterialTheme.typography.labelLarge)
             Row(modifier = Modifier.padding(top = Spacing.xs, bottom = Spacing.sm)) {
                 listOf(
@@ -2103,6 +2121,36 @@ internal fun ReaderSettingsSheet(
             }
             Text(
                 "Display a popup preview when tapping footnotes instead of jumping to the end of the chapter",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(modifier = Modifier.height(Spacing.sm))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .defaultMinSize(minHeight = 48.dp)
+                    .toggleable(
+                        value = settings.keepScreenOn,
+                        role = Role.Switch,
+                        onValueChange = { keepOn ->
+                            onSettingsChange(settings.copy(keepScreenOn = keepOn))
+                        }
+                    ),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Keep screen on",
+                    style = MaterialTheme.typography.labelLarge
+                )
+                Switch(
+                    checked = settings.keepScreenOn,
+                    onCheckedChange = null
+                )
+            }
+            Text(
+                "Prevent screen from timing out while reading",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

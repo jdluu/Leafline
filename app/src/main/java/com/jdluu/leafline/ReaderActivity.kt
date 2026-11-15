@@ -10,7 +10,12 @@ import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.content.pm.ActivityInfo
 import android.util.Log
+import com.jdluu.leafline.reader.ReaderOrientation
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.debounce
 import android.view.ActionMode
 import android.view.KeyEvent
 import android.view.MotionEvent
@@ -558,9 +563,13 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                 initialSettings = savedSettings,
                 submitToNavigator = { navigator?.submitPreferences(it.toNavigatorPreferences()) },
                 applyWindowBrightness = ::applyBrightnessToWindow,
+                applyKeepScreenOn = ::applyKeepScreenOn,
+                applyOrientation = ::applyOrientation,
                 save = readerPreferencesStore::save
             )
             applyBrightnessToWindow(savedSettings.brightness)
+            applyKeepScreenOn(savedSettings.keepScreenOn)
+            applyOrientation(savedSettings.orientation)
 
             val navigatorFactory = EpubNavigatorFactory(publication)
             val fragmentFactory = navigatorFactory.createFragmentFactory(
@@ -626,16 +635,23 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                         val progression = locator.locations.totalProgression
                             ?: locator.locations.progression
                         sessionRecorder.updateLocation(locatorJson, progression)
-                        try {
-                            libraryRepository.saveLastLocator(
-                                stableId,
-                                locatorJson,
-                                System.currentTimeMillis()
-                            )
-                        } catch (e: Exception) {
-                            Log.w(TAG, "Could not save reading position", e)
-                        }
                     }
+                }
+                lifecycleScope.launch {
+                    @OptIn(FlowPreview::class)
+                    navigator?.currentLocator
+                        ?.debounce(500L)
+                        ?.collect { locator ->
+                            try {
+                                libraryRepository.saveLastLocator(
+                                    stableId,
+                                    locator.toJSON().toString(),
+                                    System.currentTimeMillis()
+                                )
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Could not save reading position", e)
+                            }
+                        }
                 }
                 lifecycleScope.launch {
                     run { lifecycleScope.launch { syncManager.pullRemoteProgress() } }
@@ -738,6 +754,41 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         window.attributes = attributes
     }
 
+    override fun onPause() {
+        super.onPause()
+        val stableId = bookStableId
+        val loc = currentLocation.value
+        if (stableId != null && loc != null) {
+            lifecycleScope.launch(Dispatchers.IO) {
+                try {
+                    libraryRepository.saveLastLocator(
+                        stableId,
+                        loc.toJSON().toString(),
+                        System.currentTimeMillis()
+                    )
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not flush reading position on pause", e)
+                }
+            }
+        }
+    }
+
+    private fun applyKeepScreenOn(keepOn: Boolean) {
+        if (keepOn) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
+
+    private fun applyOrientation(orientation: ReaderOrientation) {
+        requestedOrientation = when (orientation) {
+            ReaderOrientation.AUTO -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            ReaderOrientation.PORTRAIT -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            ReaderOrientation.LANDSCAPE -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        }
+    }
+
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         if (this::sessionRecorder.isInitialized) {
@@ -759,6 +810,13 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         ttsNavigator = null
         navigationHistory.clear()
         jumpNoticeDismissJob?.cancel()
+        if (isFinishing) {
+            try {
+                publication?.close()
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not close publication", e)
+            }
+        }
         super.onDestroy()
     }
 

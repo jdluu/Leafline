@@ -47,6 +47,8 @@ class ReaderPreferencesStoreTest {
         assertNull(loaded.brightness)
         assertNull(loaded.preSepiaTheme)
         assertEquals(true, loaded.previewFootnotes)
+        assertEquals(true, loaded.keepScreenOn)
+        assertEquals(ReaderOrientation.AUTO, loaded.orientation)
     }
 
     @Test
@@ -71,7 +73,9 @@ class ReaderPreferencesStoreTest {
                 pageTurnAnimation = PageTurnAnimation.NONE,
                 brightness = 0.42f,
                 preSepiaTheme = ReaderTheme.LIGHT,
-                previewFootnotes = false
+                previewFootnotes = false,
+                keepScreenOn = false,
+                orientation = ReaderOrientation.PORTRAIT
             )
         )
 
@@ -90,6 +94,8 @@ class ReaderPreferencesStoreTest {
         assertEquals(0.42f, loaded.brightness!!)
         assertEquals(ReaderTheme.LIGHT, loaded.preSepiaTheme)
         assertEquals(false, loaded.previewFootnotes)
+        assertEquals(false, loaded.keepScreenOn)
+        assertEquals(ReaderOrientation.PORTRAIT, loaded.orientation)
     }
 
     @Test
