@@ -199,6 +199,10 @@ import com.jdluu.leafline.reader.tts.TtsSleepOption
 import com.jdluu.leafline.reader.tts.TtsSleepState
 import com.jdluu.leafline.reader.tts.throttleLatest
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
+import org.readium.r2.navigator.HyperlinkNavigator
+import com.jdluu.leafline.reader.footnotes.FootnoteContent
+import com.jdluu.leafline.reader.footnotes.FootnoteDetector
+import com.jdluu.leafline.reader.footnotes.FootnoteResolver
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.navigator.epub.EpubPreferences
 import org.readium.r2.navigator.input.InputListener
@@ -303,6 +307,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     private var toolbarVisible = mutableStateOf(false)
     private var isDrawerOpen = mutableStateOf(false)
     private var settingsSheetVisible = mutableStateOf(false)
+    private val activeFootnote = mutableStateOf<FootnoteContent?>(null)
     private var highlightTintSheetVisible = mutableStateOf(false)
     private var bookmarkSheetVisible = mutableStateOf(false)
     private var highlightsSheetVisible = mutableStateOf(false)
@@ -983,7 +988,18 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                             currentChapterHref = navigator?.currentLocator?.value?.href?.toString()
                         )
                     },
-                    bookActiveDurationMillis = lifetimeActiveDurationMillis + (if (::sessionRecorder.isInitialized) sessionRecorder.currentActiveDurationMillis() else 0L)
+                    bookActiveDurationMillis = lifetimeActiveDurationMillis + (if (::sessionRecorder.isInitialized) sessionRecorder.currentActiveDurationMillis() else 0L),
+                    activeFootnote = activeFootnote.value,
+                    onDismissFootnote = { activeFootnote.value = null },
+                    onJumpToFootnote = { locatorJson ->
+                        try {
+                            val locator = Locator.fromJSON(org.json.JSONObject(locatorJson))
+                            if (locator != null) {
+                                onJumpToLocator(locator)
+                                navigator?.go(locator, animated = false)
+                            }
+                        } catch (_: Exception) {}
+                    }
                 )
             }
         }
@@ -1029,6 +1045,44 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             to = locator,
             description = "Footnote / Link"
         )
+    }
+
+    override fun shouldFollowInternalLink(
+        link: Link,
+        context: HyperlinkNavigator.LinkContext?
+    ): Boolean {
+        if (!settingsController.settings.value.previewFootnotes) {
+            return true
+        }
+
+        val targetUrl = link.url()
+        val fragment = targetUrl.fragment
+        if (!FootnoteDetector.isLikelyFootnoteLink(
+                urlPath = targetUrl.path,
+                fragment = fragment,
+                rels = link.rels
+            )
+        ) {
+            return true
+        }
+
+        val pub = publication ?: return true
+        val targetLocator = pub.locatorFromLink(link)
+        val targetLocatorJson = targetLocator?.toJSON()?.toString()
+
+        lifecycleScope.launch {
+            val footnote = FootnoteResolver(pub).resolve(link, targetLocatorJson)
+            if (footnote != null && footnote.text.isNotBlank()) {
+                activeFootnote.value = footnote
+            } else {
+                if (targetLocator != null) {
+                    onJumpToLocator(targetLocator)
+                    navigator?.go(targetLocator, animated = false)
+                }
+            }
+        }
+
+        return false
     }
 
     private fun navigateHistoryBack() {
