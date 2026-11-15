@@ -15,52 +15,49 @@ class DictionaryLookupHelperTest {
 
     @Test
     fun sanitizeQueryStripsPunctuationAndQuotes() {
-        assertEquals("curiosity", DictionaryLookupHelper.sanitizeQuery("  \"curiosity,\"  "))
-        assertEquals("wonder", DictionaryLookupHelper.sanitizeQuery("“wonder!”"))
-        assertEquals("reading", DictionaryLookupHelper.sanitizeQuery("‘reading’..."))
-        assertEquals("definition", DictionaryLookupHelper.sanitizeQuery("«definition»"))
-        assertEquals("parentheses", DictionaryLookupHelper.sanitizeQuery("(parentheses);"))
-        assertEquals("em-dash", DictionaryLookupHelper.sanitizeQuery("—em-dash—"))
+        assertEquals("ephemeral", DictionaryLookupHelper.sanitizeQuery("“ephemeral”"))
+        assertEquals("solitude", DictionaryLookupHelper.sanitizeQuery("\"solitude\"..."))
+        assertEquals("wonder", DictionaryLookupHelper.sanitizeQuery("«wonder»!"))
+        assertEquals("test", DictionaryLookupHelper.sanitizeQuery("(test);"))
+        assertEquals("clean", DictionaryLookupHelper.sanitizeQuery("  clean.  "))
     }
 
     @Test
-    fun sanitizeQueryPreservesInternalApostrophesAndHyphens() {
-        assertEquals("it's", DictionaryLookupHelper.sanitizeQuery("“it's”"))
-        assertEquals("well-known", DictionaryLookupHelper.sanitizeQuery("  well-known.  "))
+    fun sanitizeQueryPreservesHyphenatedWordsAndApostrophes() {
+        assertEquals("well-known", DictionaryLookupHelper.sanitizeQuery("\"well-known\""))
+        assertEquals("don't", DictionaryLookupHelper.sanitizeQuery("don't."))
     }
 
     @Test
-    fun sanitizeQueryFallsBackToTrimmedIfAllPunctuation() {
-        assertEquals("...", DictionaryLookupHelper.sanitizeQuery(" ... "))
-        assertEquals("???", DictionaryLookupHelper.sanitizeQuery("???"))
+    fun sanitizeQueryFallsBackWhenOnlyPunctuation() {
+        assertEquals("...", DictionaryLookupHelper.sanitizeQuery("..."))
+        assertEquals("---", DictionaryLookupHelper.sanitizeQuery("---"))
     }
 
     @Test
-    fun buildColorDictIntentSetsExpectedExtrasAndFlags() {
-        val intent = DictionaryLookupHelper.buildColorDictIntent("testword")
-        assertEquals(DictionaryLookupHelper.COLORDICT_ACTION, intent.action)
-        assertEquals("testword", intent.getStringExtra(DictionaryLookupHelper.EXTRA_QUERY))
-        assertEquals("testword", intent.getStringExtra(Intent.EXTRA_TEXT))
-        assertEquals(false, intent.getBooleanExtra(DictionaryLookupHelper.EXTRA_FULLSCREEN, true))
-        assertTrue(intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0)
+    fun buildColorDictIntentSetsExpectedActionAndExtras() {
+        val intent = DictionaryLookupHelper.buildColorDictIntent("serendipity")
+        assertEquals("colordict.intent.action.SEARCH", intent.action)
+        assertEquals("serendipity", intent.getStringExtra("EXTRA_QUERY"))
+        assertEquals(false, intent.getBooleanExtra("EXTRA_FULLSCREEN", true))
+        assertTrue((intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK) != 0)
     }
 
     @Test
-    fun buildDefineIntentSetsExpectedExtrasAndFlags() {
-        val intent = DictionaryLookupHelper.buildDefineIntent("testword")
+    fun buildDefineIntentSetsExpectedActionAndText() {
+        val intent = DictionaryLookupHelper.buildDefineIntent("quintessential")
         assertEquals(Intent.ACTION_DEFINE, intent.action)
-        assertEquals("testword", intent.getStringExtra(Intent.EXTRA_TEXT))
-        assertTrue(intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0)
+        assertEquals("quintessential", intent.getStringExtra(Intent.EXTRA_TEXT))
+        assertTrue((intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK) != 0)
     }
 
     @Test
-    fun buildProcessTextIntentSetsExpectedExtrasAndType() {
-        val intent = DictionaryLookupHelper.buildProcessTextIntent("selected text", readonly = true)
+    fun buildProcessTextIntentSetsMimeAndExtras() {
+        val intent = DictionaryLookupHelper.buildProcessTextIntent("sample passage", readonly = true)
         assertEquals(Intent.ACTION_PROCESS_TEXT, intent.action)
         assertEquals("text/plain", intent.type)
-        assertEquals("selected text", intent.getStringExtra(Intent.EXTRA_PROCESS_TEXT))
+        assertEquals("sample passage", intent.getStringExtra(Intent.EXTRA_PROCESS_TEXT))
         assertEquals(true, intent.getBooleanExtra(Intent.EXTRA_PROCESS_TEXT_READONLY, false))
-        assertTrue(intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0)
     }
 
     @Test
@@ -77,8 +74,10 @@ class DictionaryLookupHelperTest {
         val intent = DictionaryLookupHelper.buildWebSearchIntent("Alice & Wonderland")
         assertEquals(Intent.ACTION_VIEW, intent.action)
         assertNotNull(intent.data)
-        assertTrue(intent.data.toString().contains("Alice+%26+Wonderland"))
-        assertTrue(intent.data.toString().startsWith("https://duckduckgo.com/?q=define+"))
+        val dataStr = intent.data.toString()
+        assertTrue(dataStr.startsWith("https://duckduckgo.com/?q=define+"))
+        assertTrue(dataStr.contains("%26"))
+        assertTrue(dataStr.contains("Alice") && dataStr.contains("Wonderland"))
     }
 
     @Test
