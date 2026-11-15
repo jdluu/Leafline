@@ -61,4 +61,12 @@ class ReaderSettingsController(
     fun toggleSepia() {
         submit(toggleSepia(_settings.value))
     }
+
+    /** Cycles through the available minimal HUD display modes and routes through [submit]. */
+    fun cycleMinimalHudMode() {
+        val current = _settings.value.minimalHudMode
+        val modes = MinimalHudMode.entries
+        val next = modes[(current.ordinal + 1) % modes.size]
+        submit(_settings.value.copy(minimalHudMode = next))
+    }
 }

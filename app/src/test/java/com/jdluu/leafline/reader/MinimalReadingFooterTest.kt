@@ -10,7 +10,7 @@ class MinimalReadingFooterTest {
     @Test
     fun `both chapter and percentage formats combined string`() {
         val result = formatMinimalFooterText("Chapter 1: Down the Rabbit-Hole", 42)
-        assertEquals("Chapter 1: Down the Rabbit-Hole • 42%", result)
+        assertEquals("Chapter 1: Down the Rabbit-Hole \u2022 42%", result)
     }
 
     @Test
@@ -41,6 +41,41 @@ class MinimalReadingFooterTest {
     @Test
     fun `trims surrounding whitespace from chapter title`() {
         val result = formatMinimalFooterText("  Epilogue  ", 99)
-        assertEquals("Epilogue • 99%", result)
+        assertEquals("Epilogue \u2022 99%", result)
+    }
+
+    @Test
+    fun `respects minimal hud mode selection`() {
+        val chapter = "Chapter 4"
+        val percent = 50
+        val remaining = "~20 min left"
+
+        // Percent only mode
+        assertEquals(
+            "50%",
+            formatMinimalFooterText(chapter, percent, remaining, MinimalHudMode.PERCENT_ONLY)
+        )
+
+        // Time remaining mode
+        assertEquals(
+            "~20 min left",
+            formatMinimalFooterText(chapter, percent, remaining, MinimalHudMode.TIME_REMAINING)
+        )
+        // Time remaining fallback when remaining is null
+        assertEquals(
+            "50%",
+            formatMinimalFooterText(chapter, percent, null, MinimalHudMode.TIME_REMAINING)
+        )
+
+        // Chapter only mode
+        assertEquals(
+            "Chapter 4",
+            formatMinimalFooterText(chapter, percent, remaining, MinimalHudMode.CHAPTER_ONLY)
+        )
+        // Chapter only fallback when chapter is null
+        assertEquals(
+            "50%",
+            formatMinimalFooterText(null, percent, remaining, MinimalHudMode.CHAPTER_ONLY)
+        )
     }
 }

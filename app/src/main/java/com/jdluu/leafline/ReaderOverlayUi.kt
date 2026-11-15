@@ -95,6 +95,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import com.jdluu.leafline.reader.navigation.filterVisibleTocLinks
 import com.jdluu.leafline.reader.navigation.findAncestorKeysForIndex
+import com.jdluu.leafline.reader.MinimalHudMode
+import com.jdluu.leafline.reader.navigation.ReaderScrubberHelper
 import com.jdluu.leafline.reader.navigation.tocLinkKey
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
@@ -333,7 +335,14 @@ internal fun ReaderOverlay(
     onDismissJumpNotice: () -> Unit = {},
     activeFootnote: FootnoteContent? = null,
     onDismissFootnote: () -> Unit = {},
-    onJumpToFootnote: (String) -> Unit = {}
+    onJumpToFootnote: (String) -> Unit = {},
+    chapterTitles: List<String> = emptyList(),
+    canSkipPreviousChapter: Boolean = false,
+    canSkipNextChapter: Boolean = false,
+    onPreviousChapter: () -> Unit = {},
+    onNextChapter: () -> Unit = {},
+    onSeekToPercentage: ((Double) -> Unit)? = null,
+    onCycleMinimalHudMode: () -> Unit = {}
 ) {
     BackHandler(enabled = !toolbarVisible && jumpNotice != null) {
         onNavigateHistoryBack()
@@ -639,6 +648,9 @@ internal fun ReaderOverlay(
                 MinimalReadingFooter(
                     currentChapterTitle = currentChapterTitle,
                     currentLocatorJson = currentLocatorJson,
+                    activeDurationMillis = bookActiveDurationMillis,
+                    mode = currentSettings.minimalHudMode,
+                    onCycleMode = onCycleMinimalHudMode,
                     modifier = Modifier.padding(bottom = 6.dp, start = Spacing.md, end = Spacing.md)
                 )
             }
@@ -660,6 +672,13 @@ internal fun ReaderOverlay(
                 ReaderBottomBar(
                     currentLocatorJson = currentLocatorJson,
                     activeDurationMillis = bookActiveDurationMillis,
+                    currentChapterTitle = currentChapterTitle,
+                    chapterTitles = chapterTitles,
+                    canSkipPreviousChapter = canSkipPreviousChapter,
+                    canSkipNextChapter = canSkipNextChapter,
+                    onPreviousChapter = onPreviousChapter,
+                    onNextChapter = onNextChapter,
+                    onSeekToPercentage = onSeekToPercentage,
                     modifier = Modifier
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
@@ -2548,6 +2567,13 @@ internal fun MetadataRow(label: String, value: String) {
 internal fun ReaderBottomBar(
     currentLocatorJson: String?,
     activeDurationMillis: Long = 0L,
+    currentChapterTitle: String? = null,
+    chapterTitles: List<String> = emptyList(),
+    canSkipPreviousChapter: Boolean = false,
+    canSkipNextChapter: Boolean = false,
+    onPreviousChapter: () -> Unit = {},
+    onNextChapter: () -> Unit = {},
+    onSeekToPercentage: ((Double) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val percent = remember(currentLocatorJson) {
@@ -2559,12 +2585,22 @@ internal fun ReaderBottomBar(
     val remaining = remember(percent, activeDurationMillis) {
         ReadingProgressMath.estimatedRemainingTimeLabel(percent, activeDurationMillis)
     }
-    val displayText = remember(label, remaining) {
-        if (label == null) null
+    val displayText = remember(label, remaining, currentChapterTitle) {
+        val chapter = currentChapterTitle?.trim()?.takeIf { it.isNotBlank() }
+        val progressInfo = if (label == null) null
         else if (remaining != null) "$label • $remaining"
         else label
+        when {
+            chapter != null && progressInfo != null -> "$chapter • $progressInfo"
+            progressInfo != null -> progressInfo
+            else -> chapter
+        }
     }
-    if (displayText != null && percent != null) {
+
+    var draggingPercent by remember { mutableStateOf<Double?>(null) }
+    val activePercent = draggingPercent ?: percent ?: 0.0
+
+    if (displayText != null || percent != null) {
         Surface(
             modifier = modifier.fillMaxWidth(),
             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
@@ -2573,23 +2609,79 @@ internal fun ReaderBottomBar(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+                    .padding(horizontal = Spacing.md, vertical = Spacing.xs),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                LinearProgressIndicator(
-                    progress = { (percent / 100.0).toFloat().coerceIn(0f, 1f) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(4.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant
-                )
-                Spacer(modifier = Modifier.height(Spacing.xs))
-                Text(
-                    text = displayText,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                if (draggingPercent != null) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    ) {
+                        Text(
+                            text = ReaderScrubberHelper.resolveScrubberPreview(activePercent, chapterTitles),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = 2.dp)
+                        )
+                    }
+                } else if (displayText != null) {
+                    Text(
+                        text = displayText,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = onPreviousChapter,
+                        enabled = canSkipPreviousChapter,
+                        modifier = Modifier.semantics {
+                            contentDescription = "Previous chapter"
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.SkipPrevious,
+                            contentDescription = null
+                        )
+                    }
+
+                    Slider(
+                        value = activePercent.toFloat().coerceIn(0f, 100f),
+                        onValueChange = { draggingPercent = it.toDouble() },
+                        onValueChangeFinished = {
+                            draggingPercent?.let { onSeekToPercentage?.invoke(it) }
+                            draggingPercent = null
+                        },
+                        valueRange = 0f..100f,
+                        modifier = Modifier
+                            .weight(1f)
+                            .semantics {
+                                contentDescription = "Reading progress: ${activePercent.toInt()}%"
+                            }
+                    )
+
+                    IconButton(
+                        onClick = onNextChapter,
+                        enabled = canSkipNextChapter,
+                        modifier = Modifier.semantics {
+                            contentDescription = "Next chapter"
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.SkipNext,
+                            contentDescription = null
+                        )
+                    }
+                }
             }
         }
     }
@@ -2881,16 +2973,28 @@ internal fun FootnotePreviewSheet(
 
 /**
  * An unobtrusive single-line footer rendered at the bottom edge while menus
- * are hidden. Displays the active chapter title and overall reading progress.
+ * are hidden. Displays reading progress according to the selected [MinimalHudMode].
  */
-internal fun formatMinimalFooterText(chapterTitle: String?, percent: Int?): String? {
+internal fun formatMinimalFooterText(
+    chapterTitle: String?,
+    percent: Int?,
+    remainingTime: String? = null,
+    mode: MinimalHudMode = MinimalHudMode.CHAPTER_AND_PERCENT
+): String? {
     val chapter = chapterTitle?.trim()?.takeIf { it.isNotBlank() }
     val progressText = percent?.let { "$it%" }
-    return when {
-        chapter != null && progressText != null -> "$chapter • $progressText"
-        chapter != null -> chapter
-        progressText != null -> progressText
-        else -> null
+    val remaining = remainingTime?.trim()?.takeIf { it.isNotBlank() }
+
+    return when (mode) {
+        MinimalHudMode.CHAPTER_AND_PERCENT -> when {
+            chapter != null && progressText != null -> "$chapter • $progressText"
+            chapter != null -> chapter
+            progressText != null -> progressText
+            else -> null
+        }
+        MinimalHudMode.PERCENT_ONLY -> progressText ?: chapter
+        MinimalHudMode.TIME_REMAINING -> remaining ?: progressText ?: chapter
+        MinimalHudMode.CHAPTER_ONLY -> chapter ?: progressText
     }
 }
 
@@ -2898,6 +3002,9 @@ internal fun formatMinimalFooterText(chapterTitle: String?, percent: Int?): Stri
 internal fun MinimalReadingFooter(
     currentChapterTitle: String?,
     currentLocatorJson: String?,
+    activeDurationMillis: Long = 0L,
+    mode: MinimalHudMode = MinimalHudMode.CHAPTER_AND_PERCENT,
+    onCycleMode: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val percent = remember(currentLocatorJson) {
@@ -2905,20 +3012,36 @@ internal fun MinimalReadingFooter(
             it.roundToInt()
         }
     }
-    val displayText = remember(currentChapterTitle, percent) {
-        formatMinimalFooterText(currentChapterTitle, percent)
+    val remainingTime = remember(percent, activeDurationMillis) {
+        percent?.let {
+            ReadingProgressMath.estimatedRemainingTimeLabel(it.toDouble(), activeDurationMillis)
+        }
+    }
+    val displayText = remember(currentChapterTitle, percent, remainingTime, mode) {
+        formatMinimalFooterText(currentChapterTitle, percent, remainingTime, mode)
     }
 
     if (displayText != null) {
-        Text(
-            text = displayText,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
+        Box(
             modifier = modifier
-        )
+                .defaultMinSize(minHeight = 48.dp)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onCycleMode
+                )
+                .semantics { contentDescription = "Reading status: $displayText. Tap to cycle format." },
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = displayText,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
 

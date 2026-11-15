@@ -50,6 +50,7 @@ class ReaderPreferencesStoreTest {
         assertEquals(true, loaded.keepScreenOn)
         assertEquals(ReaderOrientation.AUTO, loaded.orientation)
         assertEquals(true, loaded.showMinimalHud)
+        assertEquals(MinimalHudMode.CHAPTER_AND_PERCENT, loaded.minimalHudMode)
         assertEquals(false, loaded.hapticFeedback)
     }
 
@@ -79,6 +80,7 @@ class ReaderPreferencesStoreTest {
                 keepScreenOn = false,
                 orientation = ReaderOrientation.PORTRAIT,
                 showMinimalHud = false,
+                minimalHudMode = MinimalHudMode.TIME_REMAINING,
                 hapticFeedback = true
             )
         )
@@ -101,6 +103,7 @@ class ReaderPreferencesStoreTest {
         assertEquals(false, loaded.keepScreenOn)
         assertEquals(ReaderOrientation.PORTRAIT, loaded.orientation)
         assertEquals(false, loaded.showMinimalHud)
+        assertEquals(MinimalHudMode.TIME_REMAINING, loaded.minimalHudMode)
         assertEquals(true, loaded.hapticFeedback)
     }
 
