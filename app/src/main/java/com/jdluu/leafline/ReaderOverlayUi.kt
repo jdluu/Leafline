@@ -94,6 +94,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import com.jdluu.leafline.reader.navigation.ReaderNavigationDrawerContent
+import com.jdluu.leafline.reader.ReaderStylePreset
 import com.jdluu.leafline.reader.navigation.ReaderNavigationTab
 import com.jdluu.leafline.reader.navigation.filterVisibleTocLinks
 import com.jdluu.leafline.reader.navigation.findAncestorKeysForIndex
@@ -1967,6 +1968,28 @@ internal fun ReaderSettingsSheet(
                         },
                         label = { Text(label) },
                         modifier = Modifier.padding(end = Spacing.xs)
+                    )
+                }
+            }
+
+            Text("Presets", style = MaterialTheme.typography.labelLarge)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(top = Spacing.xs, bottom = Spacing.sm),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+            ) {
+                val activePreset = ReaderStylePreset.matchingPreset(preferences)
+                ReaderStylePreset.entries.forEach { preset ->
+                    FilterChip(
+                        selected = activePreset == preset,
+                        onClick = {
+                            applyCustomPreference { current ->
+                                preset.applyTo(current)
+                            }
+                        },
+                        label = { Text(preset.label) }
                     )
                 }
             }
