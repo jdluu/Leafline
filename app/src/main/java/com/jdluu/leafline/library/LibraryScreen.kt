@@ -1,5 +1,10 @@
 package com.jdluu.leafline.library
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.border
+import com.jdluu.leafline.library.insights.ReadingStreakHelper
+
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import com.jdluu.leafline.library.cover.BitmapMemoryCache
@@ -1564,8 +1569,65 @@ private fun BookDetailSheet(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                    val progressFraction = ReadingProgressMath.percentageFromLocator(book.lastLocatorJson)
+                        ?.div(ReadingProgressMath.FULL_PERCENT)
+                    val progressLabel = ReadingProgressMath.progressLabel(book.lastLocatorJson)
+                    if (progressFraction != null) {
+                        Spacer(Modifier.height(Spacing.xs))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Progress",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            if (progressLabel != null) {
+                                Text(
+                                    text = progressLabel,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(2.dp))
+                        LinearProgressIndicator(
+                            progress = { progressFraction.toFloat().coerceIn(0f, 1f) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(6.dp)
+                                .clip(MaterialTheme.shapes.extraSmall)
+                        )
+                    }
                     Spacer(Modifier.height(Spacing.xs))
                     Button(onClick = onOpen) { Text("Open book") }
+                }
+            }
+
+            if (!book.description.isNullOrBlank()) {
+                var descriptionExpanded by remember { mutableStateOf(false) }
+                Spacer(Modifier.height(Spacing.sm))
+                HorizontalDivider()
+                Spacer(Modifier.height(Padding.compact))
+                Text("Description", style = MaterialTheme.typography.titleSmall)
+                Spacer(Modifier.height(Spacing.xs))
+                Text(
+                    text = book.description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = if (descriptionExpanded) Int.MAX_VALUE else 4,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (book.description.length > 180) {
+                    TextButton(
+                        onClick = { descriptionExpanded = !descriptionExpanded },
+                        modifier = Modifier.padding(top = 2.dp)
+                    ) {
+                        Text(if (descriptionExpanded) "Show less" else "Read more")
+                    }
                 }
             }
 
@@ -1878,6 +1940,10 @@ private fun ReadingInsightsSheet(
     var todayStats by remember { mutableStateOf(ReadingAggregate.EMPTY) }
     var weeklyStats by remember { mutableStateOf(ReadingAggregate.EMPTY) }
     var recentDailyStats by remember { mutableStateOf<List<Pair<LocalDate, ReadingAggregate>>>(emptyList()) }
+    val currentStreak = remember(recentDailyStats) {
+        ReadingStreakHelper.calculateCurrentStreak(recentDailyStats)
+    }
+    var selectedDayIndex by remember { mutableStateOf<Int?>(null) }
 
     LaunchedEffect(Unit) {
         todayStats = viewModel.getTodayAggregate()
@@ -1954,6 +2020,17 @@ private fun ReadingInsightsSheet(
                                 style = MaterialTheme.typography.labelMedium
                             )
                         }
+                        Column {
+                            Text(
+                                text = if (currentStreak > 0) "$currentStreak d" else "0 d",
+                                style = MaterialTheme.typography.headlineMedium,
+                                color = if (currentStreak > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "Streak",
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                        }
                     }
                 }
             }
@@ -1973,6 +2050,42 @@ private fun ReadingInsightsSheet(
 
             Spacer(Modifier.height(Spacing.md))
 
+            AnimatedVisibility(visible = selectedDayIndex != null) {
+                selectedDayIndex?.let { idx ->
+                    if (idx in recentDailyStats.indices) {
+                        val (selectedDate, selectedAgg) = recentDailyStats[idx]
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = Spacing.xs)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = Spacing.md, vertical = Spacing.xs),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "${selectedDate.dayOfWeek.name.lowercase().replaceFirstChar { it.uppercase() }}, ${selectedDate.month.name.lowercase().replaceFirstChar { it.uppercase() }} ${selectedDate.dayOfMonth}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                                Text(
+                                    text = "${formatReadingDuration(selectedAgg.activeDurationMillis)} • ${selectedAgg.sessionCount} session${if (selectedAgg.sessionCount == 1) "" else "s"}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             val maxMinutes = (recentDailyStats.maxOfOrNull { it.second.activeMinutes } ?: 0L).coerceAtLeast(15L)
             Row(
                 modifier = Modifier
@@ -1984,33 +2097,59 @@ private fun ReadingInsightsSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Bottom
             ) {
-                recentDailyStats.forEach { (date, agg) ->
-                    val ratio = (agg.activeMinutes.toFloat() / maxMinutes.toFloat()).coerceIn(0.06f, 1f)
+                recentDailyStats.forEachIndexed { index, (date, agg) ->
+                    val isSelected = selectedDayIndex == index
+                    val isToday = date == LocalDate.now()
+                    val targetRatio = (agg.activeMinutes.toFloat() / maxMinutes.toFloat()).coerceIn(0.06f, 1f)
+                    val animatedRatio by animateFloatAsState(
+                        targetValue = targetRatio,
+                        animationSpec = tween(durationMillis = 400),
+                        label = "chartBarHeight"
+                    )
                     val dayLabel = date.dayOfWeek.name.take(3)
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(MaterialTheme.shapes.small)
+                            .clickable {
+                                selectedDayIndex = if (selectedDayIndex == index) null else index
+                            }
+                            .padding(vertical = 4.dp)
+                            .semantics {
+                                contentDescription = "$dayLabel: ${agg.activeMinutes} minutes, ${agg.sessionCount} sessions"
+                            }
                     ) {
                         Text(
                             text = if (agg.activeMinutes > 0) "${agg.activeMinutes}m" else "",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal
                         )
                         Spacer(Modifier.height(4.dp))
                         Box(
                             modifier = Modifier
-                                .width(16.dp)
-                                .height((70 * ratio).dp)
+                                .width(if (isSelected) 20.dp else 16.dp)
+                                .height((70 * animatedRatio).dp)
                                 .clip(MaterialTheme.shapes.small)
                                 .background(
-                                    if (agg.activeMinutes > 0) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.outlineVariant
+                                    when {
+                                        isSelected -> MaterialTheme.colorScheme.primary
+                                        agg.activeMinutes > 0 -> MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                                        else -> MaterialTheme.colorScheme.outlineVariant
+                                    }
+                                )
+                                .then(
+                                    if (isToday) Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small)
+                                    else Modifier
                                 )
                         )
                         Spacer(Modifier.height(Spacing.xs))
                         Text(
                             text = dayLabel,
-                            style = MaterialTheme.typography.labelSmall
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
