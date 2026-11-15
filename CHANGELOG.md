@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Reader Footnote & Note Popup Preview Dialog**:
+  - Non-disruptive bottom sheet preview for footnotes, endnotes, and internal note citations without losing reading position.
+  - Robust footnote detection distinguishing note citations from backlinks, navigational links, and chapter headers.
+  - Multi-pattern EPUB footnote content extraction supporting EPUB 3 semantic markups (`<aside epub:type="footnote">`, `role="doc-footnote"`), EPUB 2 anchor patterns (`<p id="...">`, `<a id="..."></a><p>...</p>`, `<li id="...">`), nested formatting, and entity unescaping.
+  - Optional "Jump to note" navigation action for full-context inspection, seamlessly integrated with navigation jump history.
+  - Configurable "Preview footnotes & notes" preference in Reader Settings, persisted across app sessions via `ReaderPreferencesStore`.
 - **Book Ratings & Custom Tags**:
   - Interactive 1–5 star rating control in the Book Detail sheet with unrated/clear options.
   - Custom tag management in the Book Detail sheet with tag creation, deletion chips, and library suggestions.

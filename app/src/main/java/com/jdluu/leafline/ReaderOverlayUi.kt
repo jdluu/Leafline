@@ -31,6 +31,10 @@ import androidx.compose.ui.draw.clip
 import com.jdluu.leafline.theme.HIGHLIGHT_TINTS
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material3.FilledTonalButton
+import com.jdluu.leafline.reader.footnotes.FootnoteContent
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material3.ButtonDefaults
@@ -301,10 +305,16 @@ internal fun ReaderOverlay(
     jumpNotice: JumpNotice? = null,
     onNavigateHistoryBack: () -> Unit = {},
     onNavigateHistoryForward: () -> Unit = {},
-    onDismissJumpNotice: () -> Unit = {}
+    onDismissJumpNotice: () -> Unit = {},
+    activeFootnote: FootnoteContent? = null,
+    onDismissFootnote: () -> Unit = {},
+    onJumpToFootnote: (String) -> Unit = {}
 ) {
     BackHandler(enabled = !toolbarVisible && jumpNotice != null) {
         onNavigateHistoryBack()
+    }
+    BackHandler(enabled = activeFootnote != null) {
+        onDismissFootnote()
     }
     BackHandler(enabled = toolbarVisible) {
         onDismissToolbar()
@@ -465,6 +475,14 @@ internal fun ReaderOverlay(
                     conflict = conflict,
                     onJump = onJumpToRemote,
                     onDismiss = onDismissSyncConflict
+                )
+            }
+
+            if (activeFootnote != null) {
+                FootnotePreviewSheet(
+                    footnote = activeFootnote,
+                    onDismiss = onDismissFootnote,
+                    onJump = onJumpToFootnote
                 )
             }
 
@@ -2004,6 +2022,35 @@ internal fun ReaderSettingsSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
+            Spacer(modifier = Modifier.height(Spacing.sm))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(
+                        value = settings.previewFootnotes,
+                        role = Role.Switch,
+                        onValueChange = { preview ->
+                            onSettingsChange(settings.copy(previewFootnotes = preview))
+                        }
+                    ),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Preview footnotes & notes",
+                    style = MaterialTheme.typography.labelLarge
+                )
+                Switch(
+                    checked = settings.previewFootnotes,
+                    onCheckedChange = null
+                )
+            }
+            Text(
+                "Display a popup preview when tapping footnotes instead of jumping to the end of the chapter",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
             Spacer(modifier = Modifier.height(Spacing.lg))
         }
     }
@@ -2349,6 +2396,109 @@ internal fun TtsSleepTimerSheet(
             }
 
             Spacer(modifier = Modifier.height(Spacing.md))
+        }
+    }
+}
+
+/**
+ * Non-disruptive bottom sheet preview for footnotes and endnotes, allowing
+ * the user to inspect note content without leaving their reading position.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun FootnotePreviewSheet(
+    footnote: FootnoteContent,
+    onDismiss: () -> Unit,
+    onJump: (String) -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Padding.screen)
+                .navigationBarsPadding()
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp) // touch-target-ok: non-interactive decorative icon
+                    )
+                    Text(
+                        text = footnote.title,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Dismiss footnote preview"
+                    )
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(weight = 1f, fill = false)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text = footnote.text,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(vertical = Spacing.sm)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(Spacing.md))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .defaultMinSize(minHeight = 48.dp)
+                        .padding(end = Spacing.xs)
+                ) {
+                    Text("Close")
+                }
+                if (footnote.targetLocatorJson != null) {
+                    FilledTonalButton(
+                        onClick = {
+                            val locJson = footnote.targetLocatorJson
+                            onDismiss()
+                            onJump(locJson)
+                        },
+                        modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(18.dp) // touch-target-ok: non-interactive icon inside button
+                                .padding(end = 4.dp)
+                        )
+                        Text("Jump to note")
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(Spacing.sm))
         }
     }
 }

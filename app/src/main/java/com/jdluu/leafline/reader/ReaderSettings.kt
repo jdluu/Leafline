@@ -210,7 +210,12 @@ data class ReaderSettings(
      * to false; the initial value from a cold start is determined by the
      * system remove-animations accessibility setting.
      */
-    val reduceMotion: Boolean = false
+    val reduceMotion: Boolean = false,
+    /**
+     * When true, tapping an internal footnote/endnote link displays a modal
+     * preview sheet instead of immediately navigating away from the reading position.
+     */
+    val previewFootnotes: Boolean = true
 )
 
 /** Horizontal tap zones spanning the reader screen from left to right. */

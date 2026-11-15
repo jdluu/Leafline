@@ -46,6 +46,7 @@ class ReaderPreferencesStoreTest {
         assertEquals(PageTurnAnimation.SLIDE, loaded.pageTurnAnimation)
         assertNull(loaded.brightness)
         assertNull(loaded.preSepiaTheme)
+        assertEquals(true, loaded.previewFootnotes)
     }
 
     @Test
@@ -69,7 +70,8 @@ class ReaderPreferencesStoreTest {
                 ),
                 pageTurnAnimation = PageTurnAnimation.NONE,
                 brightness = 0.42f,
-                preSepiaTheme = ReaderTheme.LIGHT
+                preSepiaTheme = ReaderTheme.LIGHT,
+                previewFootnotes = false
             )
         )
 
@@ -87,6 +89,7 @@ class ReaderPreferencesStoreTest {
         assertEquals(PageTurnAnimation.NONE, loaded.pageTurnAnimation)
         assertEquals(0.42f, loaded.brightness!!)
         assertEquals(ReaderTheme.LIGHT, loaded.preSepiaTheme)
+        assertEquals(false, loaded.previewFootnotes)
     }
 
     @Test
@@ -122,6 +125,7 @@ class ReaderPreferencesStoreTest {
         assertEquals(PageTurnAnimation.SLIDE, loaded.pageTurnAnimation)
         assertNull(loaded.brightness)
         assertNull(loaded.preSepiaTheme)
+        assertEquals(true, loaded.previewFootnotes)
     }
 
     @Test
