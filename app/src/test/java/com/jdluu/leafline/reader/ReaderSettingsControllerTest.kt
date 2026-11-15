@@ -20,11 +20,15 @@ class ReaderSettingsControllerTest {
         val ordering = mutableListOf<String>()
         val submitted = mutableListOf<ReaderSettings>()
         val windowBrightness = mutableListOf<Float?>()
+        val keepScreenOnValues = mutableListOf<Boolean>()
+        val orientationValues = mutableListOf<ReaderOrientation>()
         val persisted = mutableListOf<ReaderSettings>()
         val controller = ReaderSettingsController(
             initialSettings = initial,
             submitToNavigator = { submitted += it; ordering += "navigator" },
             applyWindowBrightness = { windowBrightness += it; ordering += "window" },
+            applyKeepScreenOn = { keepScreenOnValues += it; ordering += "keepScreenOn" },
+            applyOrientation = { orientationValues += it; ordering += "orientation" },
             save = { persisted += it; ordering += "save" }
         )
     }
@@ -37,15 +41,21 @@ class ReaderSettingsControllerTest {
     }
 
     @Test
-    fun `submit updates state, submits to navigator, then persists the same settings`() {
+    fun `submit updates state, submits to navigator, applies display policies, then persists the same settings`() {
         val harness = Harness()
-        val target = ReaderSettings(theme = ReaderTheme.DARK)
+        val target = ReaderSettings(
+            theme = ReaderTheme.DARK,
+            keepScreenOn = false,
+            orientation = ReaderOrientation.LANDSCAPE
+        )
 
         harness.controller.submit(target)
 
         assertEquals(target, harness.controller.settings.value)
-        assertEquals(listOf("navigator", "save"), harness.ordering)
+        assertEquals(listOf("navigator", "keepScreenOn", "orientation", "save"), harness.ordering)
         assertEquals(listOf(target), harness.submitted)
+        assertEquals(listOf(false), harness.keepScreenOnValues)
+        assertEquals(listOf(ReaderOrientation.LANDSCAPE), harness.orientationValues)
         assertEquals(listOf(target), harness.persisted)
     }
 
@@ -105,7 +115,7 @@ class ReaderSettingsControllerTest {
 
         assertEquals(ReaderTheme.SEPIA, harness.controller.settings.value.theme)
         assertEquals(ReaderTheme.LIGHT, harness.controller.settings.value.preSepiaTheme)
-        assertEquals(listOf("navigator", "save"), harness.ordering)
+        assertEquals(listOf("navigator", "keepScreenOn", "orientation", "save"), harness.ordering)
         assertEquals(ReaderTheme.SEPIA, harness.persisted.single().theme)
     }
 

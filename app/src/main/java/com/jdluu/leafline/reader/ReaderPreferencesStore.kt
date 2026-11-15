@@ -38,7 +38,9 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
             } else {
                 initialReduceMotion
             },
-            previewFootnotes = preferences.getBoolean(KEY_PREVIEW_FOOTNOTES, true)
+            previewFootnotes = preferences.getBoolean(KEY_PREVIEW_FOOTNOTES, true),
+            keepScreenOn = preferences.getBoolean(KEY_KEEP_SCREEN_ON, true),
+            orientation = enumFromName(KEY_ORIENTATION, ReaderOrientation.AUTO)
         )
     }
 
@@ -60,6 +62,8 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
             .putString(KEY_PRE_SEPIA_THEME, settings.preSepiaTheme?.name)
             .putBoolean(KEY_REDUCE_MOTION, settings.reduceMotion)
             .putBoolean(KEY_PREVIEW_FOOTNOTES, settings.previewFootnotes)
+            .putBoolean(KEY_KEEP_SCREEN_ON, settings.keepScreenOn)
+            .putString(KEY_ORIENTATION, settings.orientation.name)
             .apply()
     }
 
@@ -211,6 +215,8 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
         private const val KEY_PRE_SEPIA_THEME = "reader_pre_sepia_theme"
         private const val KEY_REDUCE_MOTION = "reader_reduce_motion"
         const val KEY_PREVIEW_FOOTNOTES = "reader_preview_footnotes"
+        private const val KEY_KEEP_SCREEN_ON = "reader_keep_screen_on"
+        private const val KEY_ORIENTATION = "reader_orientation"
         internal const val PREFS_NAME = "leafline_reader_prefs"
 
         fun fromContext(context: Context): ReaderPreferencesStore {

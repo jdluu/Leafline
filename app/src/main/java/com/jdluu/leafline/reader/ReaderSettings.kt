@@ -215,8 +215,23 @@ data class ReaderSettings(
      * When true, tapping an internal footnote/endnote link displays a modal
      * preview sheet instead of immediately navigating away from the reading position.
      */
-    val previewFootnotes: Boolean = true
+    val previewFootnotes: Boolean = true,
+    /**
+     * When true, keeps the display awake while the reader activity is in foreground.
+     */
+    val keepScreenOn: Boolean = true,
+    /**
+     * Screen orientation policy inside the reading view.
+     */
+    val orientation: ReaderOrientation = ReaderOrientation.AUTO
 )
+
+/** Screen orientation policy inside the reading view. */
+enum class ReaderOrientation {
+    AUTO,
+    PORTRAIT,
+    LANDSCAPE
+}
 
 /** Horizontal tap zones spanning the reader screen from left to right. */
 enum class TapZone {

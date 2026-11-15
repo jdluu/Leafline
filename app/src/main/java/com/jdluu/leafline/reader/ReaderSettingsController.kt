@@ -19,6 +19,8 @@ class ReaderSettingsController(
     initialSettings: ReaderSettings,
     private val submitToNavigator: (ReaderSettings) -> Unit,
     private val applyWindowBrightness: (Float?) -> Unit,
+    private val applyKeepScreenOn: (Boolean) -> Unit = {},
+    private val applyOrientation: (ReaderOrientation) -> Unit = {},
     private val save: (ReaderSettings) -> Unit
 ) {
 
@@ -29,11 +31,13 @@ class ReaderSettingsController(
 
     /**
      * Applies [settings] as the current reader settings: updates state, hands
-     * them to the navigator, then persists them.
+     * them to the navigator, applies display/window policies, then persists them.
      */
     fun submit(settings: ReaderSettings) {
         _settings.value = settings
         submitToNavigator(settings)
+        applyKeepScreenOn(settings.keepScreenOn)
+        applyOrientation(settings.orientation)
         save(settings)
     }
 
