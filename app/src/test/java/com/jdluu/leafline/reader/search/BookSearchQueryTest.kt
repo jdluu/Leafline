@@ -1,6 +1,7 @@
 package com.jdluu.leafline.reader.search
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -25,5 +26,19 @@ class BookSearchQueryTest {
     @Test
     fun `normalize preserves non empty single word`() {
         assertEquals("pride", BookSearchQuery.normalize("pride"))
+    }
+
+    @Test
+    fun `validateRegex returns null for valid regex`() {
+        assertNull(BookSearchQuery.validateRegex("[a-z]+"))
+        assertNull(BookSearchQuery.validateRegex("\\bElizabeth\\b"))
+        assertNull(BookSearchQuery.validateRegex("chapter\\s+\\d+"))
+    }
+
+    @Test
+    fun `validateRegex returns error description for invalid regex`() {
+        assertNotNull(BookSearchQuery.validateRegex("[a-z"))
+        assertNotNull(BookSearchQuery.validateRegex("*invalid"))
+        assertNotNull(BookSearchQuery.validateRegex("(unclosed"))
     }
 }

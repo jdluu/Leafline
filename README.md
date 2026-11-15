@@ -37,7 +37,7 @@ and paragraph indents, with reading chrome out of the way:
 - **Reading statistics & insights** — On-device reading time tracking, daily and
   weekly insights, and estimated time remaining
 - **Bookmarks, annotations & dictionary** — Multi-color highlights, color filtering, notes
-  search, full-text in-book search, offline dictionary lookup (ColorDict/GoldenDict/system Define), text sharing, and system text actions
+  search, advanced full-text in-book search (match case, whole word, regex, chapter filtering, and recent search history), offline dictionary lookup (ColorDict/GoldenDict/system Define), text sharing, and system text actions
 - **Customizable reading** — Adjustable fonts, themes (including sepia),
   margins, line height, tap zones, volume key page turning, reading progress HUD
   with estimated time left, page-turn animation, and per-book brightness

@@ -152,6 +152,9 @@ import com.jdluu.leafline.reader.search.BookSearchResult
 import com.jdluu.leafline.reader.search.BookSearchState
 import com.jdluu.leafline.reader.search.BookSearchStatus
 import com.jdluu.leafline.reader.search.BookSearcher
+import com.jdluu.leafline.reader.search.SearchHistoryStore
+import com.jdluu.leafline.reader.search.SearchOptions
+import org.readium.r2.shared.publication.services.search.SearchService
 import com.jdluu.leafline.reader.search.SearchDecorationPlanner
 import com.jdluu.leafline.reader.session.ReadingSessionRecorder
 import com.jdluu.leafline.reader.tapZoneAt
@@ -264,6 +267,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     private lateinit var libraryRepository: LibraryRepository
     private lateinit var readerPreferencesStore: ReaderPreferencesStore
     private lateinit var bookSearcher: BookSearcher
+    private lateinit var searchHistoryStore: SearchHistoryStore
     private val searchDecorationPlanner = SearchDecorationPlanner()
     private lateinit var syncManager: com.jdluu.leafline.reader.sync.ReaderSyncManager
     private lateinit var annotationManager: com.jdluu.leafline.reader.annotations.AnnotationManager
@@ -518,9 +522,19 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     }
                 }
             )
+            searchHistoryStore = SearchHistoryStore.create(this)
             bookSearcher = BookSearcher(
                 scope = lifecycleScope,
-                searchFactory = { query -> this@ReaderActivity.publication?.search(query) }
+                searchFactory = { query, options ->
+                    this@ReaderActivity.publication?.search(
+                        query = query,
+                        options = SearchService.Options(
+                            caseSensitive = options.caseSensitive,
+                            wholeWord = options.wholeWord,
+                            regularExpression = options.regex
+                        )
+                    )
+                }
             )
 
             val animatorScale = android.provider.Settings.Global.getFloat(
@@ -737,10 +751,10 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         super.onDestroy()
     }
 
-    private fun submitSearch(rawQuery: String) {
+    private fun submitSearch(rawQuery: String, options: SearchOptions = SearchOptions()) {
         activeSearchResultId = null
         clearSearchDecorations()
-        bookSearcher.start(rawQuery)
+        bookSearcher.start(rawQuery, options)
     }
 
     private fun clearSearch() {
@@ -762,6 +776,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                 description = "Search result"
             )
         }
+        bookSearcher.state.value.query?.let { searchHistoryStore.recordQuery(it) }
         activeSearchResultId = result.id
         applySearchDecorations()
         navigator?.go(locator, false)
@@ -859,6 +874,11 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                 }
                 val scope = rememberCoroutineScope()
                 val searchState by bookSearcher.state.collectAsState()
+                val searchHistory by searchHistoryStore.history.collectAsState()
+                val currentLoc = currentLocation.value
+                val currentChapterHref = currentLoc?.href?.toString()
+                val currentChapterTitle = currentLoc?.title
+                    ?: publication?.tableOfContents?.firstOrNull { it.href.toString() == currentChapterHref }?.title
                 val syncConflict by syncConflictState.collectAsState()
                 val currentSettings by settingsController.settings.collectAsState()
                 val ttsState by ttsController.state.collectAsState()
@@ -928,7 +948,12 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     onToggleSepia = { settingsController.toggleSepia() },
                     onOpenSearch = { searchSheetVisible.value = true },
                     onDismissSearch = { searchSheetVisible.value = false },
-                    onSubmitSearch = { query -> submitSearch(query) },
+                    currentChapterTitle = currentChapterTitle,
+                    currentChapterHref = currentChapterHref,
+                    recentSearches = searchHistory,
+                    onSubmitSearch = { query, options -> submitSearch(query, options) },
+                    onRemoveRecentSearch = { searchHistoryStore.removeQuery(it) },
+                    onClearRecentSearches = { searchHistoryStore.clear() },
                     onClearSearch = { clearSearch() },
                     onSearchResultClick = { result -> onSearchResultClicked(result) },
                     highlightTintSheetVisible = highlightTintSheetVisible.value,

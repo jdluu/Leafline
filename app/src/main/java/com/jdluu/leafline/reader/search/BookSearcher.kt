@@ -33,10 +33,21 @@ import org.readium.r2.shared.publication.services.search.search
 class BookSearcher(
     private val scope: CoroutineScope,
     private val backgroundDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    private val searchFactory: suspend (query: String) -> SearchIterator?,
+    private val searchFactory: suspend (query: String, options: SearchOptions) -> SearchIterator?,
     private val mapLocator: (id: Int, locator: Locator) -> BookSearchResult? =
         ::defaultMapLocator,
 ) {
+
+    /** Backwards-compatible constructor accepting a simple query-only factory. */
+    constructor(
+        scope: CoroutineScope,
+        searchFactory: suspend (query: String) -> SearchIterator?
+    ) : this(
+        scope = scope,
+        backgroundDispatcher = Dispatchers.IO,
+        searchFactory = { query, _ -> searchFactory(query) },
+        mapLocator = ::defaultMapLocator
+    )
 
     @Volatile
     private var job: Job? = null
@@ -53,10 +64,10 @@ class BookSearcher(
     fun locatorFor(resultId: Int): Locator? = locatorsById[resultId]
 
     /**
-     * Starts a new search for [rawQuery], replacing any running search.
+     * Starts a new search for [rawQuery] with [options], replacing any running search.
      * Blank queries reset the search instead.
      */
-    fun start(rawQuery: String) {
+    fun start(rawQuery: String, options: SearchOptions = SearchOptions()) {
         scope.launch {
             mutex.withLock {
                 stopCurrentSearch()
@@ -67,8 +78,20 @@ class BookSearcher(
                     return@withLock
                 }
 
+                if (options.regex) {
+                    val regexError = BookSearchQuery.validateRegex(query)
+                    if (regexError != null) {
+                        _state.value = BookSearchState(
+                            query = query,
+                            options = options,
+                            status = BookSearchStatus.Failed("Invalid regular expression: $regexError")
+                        )
+                        return@withLock
+                    }
+                }
+
                 job = scope.launch {
-                    runSearch(query)
+                    runSearch(query, options)
                 }
             }
         }
@@ -84,7 +107,7 @@ class BookSearcher(
         }
     }
 
-    private suspend fun runSearch(query: String) = withContext(backgroundDispatcher) {
+    private suspend fun runSearch(query: String, options: SearchOptions) = withContext(backgroundDispatcher) {
         if (!scope.isActive) return@withContext
         val runLocators = mutableMapOf<Int, Locator>()
         val results = mutableListOf<BookSearchResult>()
@@ -92,27 +115,28 @@ class BookSearcher(
         publish(
             BookSearchState(
                 query = query,
+                options = options,
                 status = BookSearchStatus.Searching,
                 results = emptyList()
             )
         )
 
         val iterator = try {
-            searchFactory(query)
+            searchFactory(query, options)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            publishFailed(query, START_FAILED_MESSAGE)
+            publishFailed(query, options, START_FAILED_MESSAGE)
             return@withContext
         }
 
         if (iterator == null) {
-            publishFailed(query, UNSEARCHABLE_MESSAGE)
+            publishFailed(query, options, UNSEARCHABLE_MESSAGE)
             return@withContext
         }
 
         try {
-            drainResults(query, iterator, runLocators, results)
+            drainResults(query, options, iterator, runLocators, results)
         } finally {
             iterator.close()
         }
@@ -120,6 +144,7 @@ class BookSearcher(
 
     private suspend fun drainResults(
         query: String,
+        options: SearchOptions,
         iterator: SearchIterator,
         runLocators: MutableMap<Int, Locator>,
         results: MutableList<BookSearchResult>,
@@ -132,13 +157,13 @@ class BookSearcher(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                publishFailed(query, ITERATION_FAILED_MESSAGE)
+                publishFailed(query, options, ITERATION_FAILED_MESSAGE)
                 return
             }
 
             val failure = page.failureOrNull()
             if (failure != null) {
-                publishFailed(query, messageFor(failure))
+                publishFailed(query, options, messageFor(failure))
                 return
             }
 
@@ -147,6 +172,17 @@ class BookSearcher(
 
             synchronized(runLocators) {
                 for (locator in collection.locators) {
+                    if (options.chapterHref != null) {
+                        val locHref = locator.href.toString().trimStart('/')
+                        val targetHref = options.chapterHref.trimStart('/')
+                        if (!locHref.equals(targetHref, ignoreCase = true) &&
+                            !locHref.startsWith(targetHref, ignoreCase = true) &&
+                            !targetHref.startsWith(locHref, ignoreCase = true)
+                        ) {
+                            continue
+                        }
+                    }
+
                     val mapped = mapLocator(nextId, locator)
                     if (mapped != null) {
                         runLocators[nextId] = locator
@@ -161,6 +197,7 @@ class BookSearcher(
             publish(
                 BookSearchState(
                     query = query,
+                    options = options,
                     status = BookSearchStatus.Searching,
                     results = results.toList()
                 )
@@ -170,6 +207,7 @@ class BookSearcher(
         publish(
             BookSearchState(
                 query = query,
+                options = options,
                 status = BookSearchStatus.Completed(results.size),
                 results = results.toList()
             )
@@ -186,8 +224,8 @@ class BookSearcher(
         _state.value = update
     }
 
-    private fun publishFailed(query: String, message: String) {
-        publish(BookSearchState(query = query, status = BookSearchStatus.Failed(message)))
+    private fun publishFailed(query: String, options: SearchOptions, message: String) {
+        publish(BookSearchState(query = query, options = options, status = BookSearchStatus.Failed(message)))
     }
 
     private fun stopCurrentSearch() {
