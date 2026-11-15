@@ -3,6 +3,8 @@ package com.jdluu.leafline.library
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -30,12 +32,22 @@ class LibrarySortStoreTest {
     }
 
     @Test
+    fun `loadAscending returns fallback when nothing saved`() {
+        val store = LibrarySortStore.fromContext(context)
+
+        assertTrue(store.loadAscending(defaultForSort = true))
+        assertFalse(store.loadAscending(defaultForSort = false))
+    }
+
+    @Test
     fun `save then load round trips the chosen sort`() {
         val store = LibrarySortStore.fromContext(context)
 
         store.save(LibrarySort.TITLE)
+        store.saveAscending(false)
 
         assertEquals(LibrarySort.TITLE, store.load())
+        assertFalse(store.loadAscending(defaultForSort = true))
     }
 
     @Test

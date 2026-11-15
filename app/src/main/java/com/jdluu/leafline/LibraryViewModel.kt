@@ -9,6 +9,7 @@ import com.jdluu.leafline.library.LibraryLayout
 import com.jdluu.leafline.library.LibraryLayoutStore
 import com.jdluu.leafline.library.LibrarySortStore
 import com.jdluu.leafline.library.ReadingStatus
+import com.jdluu.leafline.library.ProgressFilter
 import com.jdluu.leafline.library.cover.CoverLoader
 import com.jdluu.leafline.library.data.Collection
 import com.jdluu.leafline.library.data.LibraryRepository
@@ -74,6 +75,14 @@ class LibraryViewModel(
     private val _sort = MutableStateFlow(sortStore?.load() ?: LibrarySort.RECENT)
     val sort: StateFlow<LibrarySort> = _sort.asStateFlow()
 
+    private val _sortAscending = MutableStateFlow(
+        sortStore?.loadAscending(_sort.value.defaultAscending) ?: _sort.value.defaultAscending
+    )
+    val sortAscending: StateFlow<Boolean> = _sortAscending.asStateFlow()
+
+    private val _progressFilter = MutableStateFlow(ProgressFilter.ALL)
+    val progressFilter: StateFlow<ProgressFilter> = _progressFilter.asStateFlow()
+
     private val _layout = MutableStateFlow(layoutStore?.load() ?: LibraryLayout.GRID)
     val layout: StateFlow<LibraryLayout> = _layout.asStateFlow()
 
@@ -93,6 +102,26 @@ class LibraryViewModel(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
+        )
+
+    /** Map of collection ID to book count in that collection. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val collectionCounts: StateFlow<Map<Long, Int>> = repository.getAllCollections()
+        .flatMapLatest { list ->
+            if (list.isEmpty()) {
+                flowOf(emptyMap())
+            } else {
+                combine(list.map { col ->
+                    repository.observeBookIdsForCollection(col.id).map { col.id to it.size }
+                }) { pairs ->
+                    pairs.toMap()
+                }
+            }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyMap()
         )
 
     /** Currently selected collection filter (null = show all). */
@@ -161,21 +190,34 @@ class LibraryViewModel(
 
     private data class LibraryFilterCriteria(
         val sort: LibrarySort,
+        val sortAscending: Boolean,
         val collectionId: Long?,
         val bookIds: Set<String>?,
         val statusFilter: ReadingStatus?,
+        val progressFilter: ProgressFilter,
         val tagFilter: String?
     )
 
     private val filterCriteria: Flow<LibraryFilterCriteria> =
         combine(
             _sort,
+            _sortAscending,
             _selectedCollection,
             collectionBookIds,
             _readingStatusFilter,
+            _progressFilter,
             _selectedTag
-        ) { sort, collectionId, bookIds, statusFilter, tagFilter ->
-            LibraryFilterCriteria(sort, collectionId, bookIds, statusFilter, tagFilter)
+        ) { array ->
+            @Suppress("UNCHECKED_CAST")
+            LibraryFilterCriteria(
+                sort = array[0] as LibrarySort,
+                sortAscending = array[1] as Boolean,
+                collectionId = array[2] as Long?,
+                bookIds = array[3] as Set<String>?,
+                statusFilter = array[4] as ReadingStatus?,
+                progressFilter = array[5] as ProgressFilter,
+                tagFilter = array[6] as String?
+            )
         }
 
     val sortedBooks: StateFlow<List<LibraryBook>> =
@@ -190,12 +232,17 @@ class LibraryViewModel(
             } else {
                 byCollection.filter { it.readingStatus == criteria.statusFilter }
             }
-            val byTag = if (criteria.tagFilter == null) {
+            val byProgress = if (criteria.progressFilter == ProgressFilter.ALL) {
                 byStatus
             } else {
-                byStatus.filter { book -> book.tags.any { it.equals(criteria.tagFilter, ignoreCase = true) } }
+                byStatus.filter { criteria.progressFilter.matches(it) }
             }
-            criteria.sort.sorted(byTag)
+            val byTag = if (criteria.tagFilter == null) {
+                byProgress
+            } else {
+                byProgress.filter { book -> book.tags.any { it.equals(criteria.tagFilter, ignoreCase = true) } }
+            }
+            criteria.sort.sorted(byTag, criteria.sortAscending)
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -241,9 +288,30 @@ class LibraryViewModel(
         }
 
     fun setSort(sort: LibrarySort) {
-        if (_sort.value == sort) return
-        _sort.value = sort
-        sortStore?.save(sort)
+        if (_sort.value == sort) {
+            toggleSortDirection()
+        } else {
+            _sort.value = sort
+            _sortAscending.value = sort.defaultAscending
+            sortStore?.save(sort)
+            sortStore?.saveAscending(sort.defaultAscending)
+        }
+    }
+
+    fun toggleSortDirection() {
+        val next = !_sortAscending.value
+        _sortAscending.value = next
+        sortStore?.saveAscending(next)
+    }
+
+    fun setSortDirection(ascending: Boolean) {
+        if (_sortAscending.value == ascending) return
+        _sortAscending.value = ascending
+        sortStore?.saveAscending(ascending)
+    }
+
+    fun setProgressFilter(filter: ProgressFilter) {
+        _progressFilter.value = filter
     }
 
     fun setLayout(layout: LibraryLayout) {
