@@ -199,6 +199,7 @@ import com.jdluu.leafline.reader.ReaderSettings
 import com.jdluu.leafline.reader.StyleMode
 import com.jdluu.leafline.reader.TapZoneAction
 import com.jdluu.leafline.reader.TapZoneConfig
+import com.jdluu.leafline.reader.TapZoneLayout
 import com.jdluu.leafline.reader.clampBrightness
 import com.jdluu.leafline.reader.effectiveTapZoneAction
 import com.jdluu.leafline.reader.snapPageMargins
@@ -2150,6 +2151,36 @@ internal fun ReaderSettingsSheet(
             )
 
             Text("Tap zones", style = MaterialTheme.typography.labelLarge)
+            Text(
+                "Zone layout",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+            FlowRow(modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)) {
+                TapZoneLayout.values().forEach { layout ->
+                    FilterChip(
+                        selected = settings.tapZoneConfig.layout == layout,
+                        onClick = {
+                            onSettingsChange(
+                                settings.copy(
+                                    tapZoneConfig = settings.tapZoneConfig.copy(layout = layout)
+                                )
+                            )
+                        },
+                        label = { Text(layout.label) },
+                        modifier = Modifier
+                            .padding(end = Spacing.xs)
+                            .semantics { contentDescription = "Zone layout: ${layout.description}" }
+                    )
+                }
+            }
+            Text(
+                settings.tapZoneConfig.layout.description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = Spacing.xs)
+            )
+
             TapZoneActionRow(
                 label = "Left zone",
                 selected = settings.tapZoneConfig.leftZone,
@@ -2364,6 +2395,68 @@ internal fun ReaderSettingsSheet(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+
+            Spacer(modifier = Modifier.height(Spacing.sm))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .defaultMinSize(minHeight = 48.dp)
+                    .toggleable(
+                        value = settings.volumeKeyNavigation,
+                        role = Role.Switch,
+                        onValueChange = { enabled ->
+                            onSettingsChange(settings.copy(volumeKeyNavigation = enabled))
+                        }
+                    ),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Volume key navigation",
+                    style = MaterialTheme.typography.labelLarge
+                )
+                Switch(
+                    checked = settings.volumeKeyNavigation,
+                    onCheckedChange = null
+                )
+            }
+            Text(
+                "Turn pages using physical volume buttons when not scrolling",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            if (settings.volumeKeyNavigation) {
+                Spacer(modifier = Modifier.height(Spacing.xs))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .defaultMinSize(minHeight = 48.dp)
+                        .toggleable(
+                            value = settings.invertVolumeKeys,
+                            role = Role.Switch,
+                            onValueChange = { inverted ->
+                                onSettingsChange(settings.copy(invertVolumeKeys = inverted))
+                            }
+                        ),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Invert volume buttons",
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                    Switch(
+                        checked = settings.invertVolumeKeys,
+                        onCheckedChange = null
+                    )
+                }
+                Text(
+                    "Volume Up turns forward, Volume Down turns back",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
             Spacer(modifier = Modifier.height(Spacing.lg))
         }

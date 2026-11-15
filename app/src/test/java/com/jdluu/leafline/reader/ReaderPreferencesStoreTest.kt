@@ -52,6 +52,9 @@ class ReaderPreferencesStoreTest {
         assertEquals(true, loaded.showMinimalHud)
         assertEquals(MinimalHudMode.CHAPTER_AND_PERCENT, loaded.minimalHudMode)
         assertEquals(false, loaded.hapticFeedback)
+        assertEquals(true, loaded.volumeKeyNavigation)
+        assertEquals(false, loaded.invertVolumeKeys)
+        assertEquals(TapZoneLayout.SYMMETRIC, loaded.tapZoneConfig.layout)
     }
 
     @Test
@@ -71,7 +74,8 @@ class ReaderPreferencesStoreTest {
                 tapZoneConfig = TapZoneConfig(
                     leftZone = TapZoneAction.NEXT_PAGE,
                     centerZone = TapZoneAction.NONE,
-                    rightZone = TapZoneAction.TOGGLE_MENU
+                    rightZone = TapZoneAction.TOGGLE_MENU,
+                    layout = TapZoneLayout.NARROW_EDGES
                 ),
                 pageTurnAnimation = PageTurnAnimation.NONE,
                 brightness = 0.42f,
@@ -81,7 +85,9 @@ class ReaderPreferencesStoreTest {
                 orientation = ReaderOrientation.PORTRAIT,
                 showMinimalHud = false,
                 minimalHudMode = MinimalHudMode.TIME_REMAINING,
-                hapticFeedback = true
+                hapticFeedback = true,
+                volumeKeyNavigation = false,
+                invertVolumeKeys = true
             )
         )
 
@@ -105,6 +111,9 @@ class ReaderPreferencesStoreTest {
         assertEquals(false, loaded.showMinimalHud)
         assertEquals(MinimalHudMode.TIME_REMAINING, loaded.minimalHudMode)
         assertEquals(true, loaded.hapticFeedback)
+        assertEquals(TapZoneLayout.NARROW_EDGES, loaded.tapZoneConfig.layout)
+        assertEquals(false, loaded.volumeKeyNavigation)
+        assertEquals(true, loaded.invertVolumeKeys)
     }
 
     @Test

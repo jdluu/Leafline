@@ -16,10 +16,43 @@ class TapZonesTest {
     }
 
     @Test
+    fun `narrow edges layout assigns slim 20 percent edges and wide center`() {
+        assertEquals(TapZone.LEFT, tapZoneAt(0.15f, TapZoneLayout.NARROW_EDGES))
+        assertEquals(TapZone.CENTER, tapZoneAt(0.25f, TapZoneLayout.NARROW_EDGES))
+        assertEquals(TapZone.CENTER, tapZoneAt(0.50f, TapZoneLayout.NARROW_EDGES))
+        assertEquals(TapZone.CENTER, tapZoneAt(0.75f, TapZoneLayout.NARROW_EDGES))
+        assertEquals(TapZone.RIGHT, tapZoneAt(0.85f, TapZoneLayout.NARROW_EDGES))
+    }
+
+    @Test
+    fun `wide edges layout assigns 40 percent edges and compact 20 percent center`() {
+        assertEquals(TapZone.LEFT, tapZoneAt(0.35f, TapZoneLayout.WIDE_EDGES))
+        assertEquals(TapZone.CENTER, tapZoneAt(0.50f, TapZoneLayout.WIDE_EDGES))
+        assertEquals(TapZone.RIGHT, tapZoneAt(0.65f, TapZoneLayout.WIDE_EDGES))
+    }
+
+    @Test
+    fun `right-handed layout provides dominant right advance zone`() {
+        assertEquals(TapZone.LEFT, tapZoneAt(0.10f, TapZoneLayout.RIGHT_HANDED))
+        assertEquals(TapZone.CENTER, tapZoneAt(0.20f, TapZoneLayout.RIGHT_HANDED))
+        assertEquals(TapZone.RIGHT, tapZoneAt(0.35f, TapZoneLayout.RIGHT_HANDED))
+        assertEquals(TapZone.RIGHT, tapZoneAt(0.85f, TapZoneLayout.RIGHT_HANDED))
+    }
+
+    @Test
+    fun `left-handed layout provides dominant left advance zone`() {
+        assertEquals(TapZone.LEFT, tapZoneAt(0.35f, TapZoneLayout.LEFT_HANDED))
+        assertEquals(TapZone.LEFT, tapZoneAt(0.65f, TapZoneLayout.LEFT_HANDED))
+        assertEquals(TapZone.CENTER, tapZoneAt(0.75f, TapZoneLayout.LEFT_HANDED))
+        assertEquals(TapZone.RIGHT, tapZoneAt(0.90f, TapZoneLayout.LEFT_HANDED))
+    }
+
+    @Test
     fun `default config maps left back right forward and center to menu`() {
         assertEquals(TapZoneAction.PREVIOUS_PAGE, tapZoneAction(TapZone.LEFT, TapZoneConfig.DEFAULT))
         assertEquals(TapZoneAction.TOGGLE_MENU, tapZoneAction(TapZone.CENTER, TapZoneConfig.DEFAULT))
         assertEquals(TapZoneAction.NEXT_PAGE, tapZoneAction(TapZone.RIGHT, TapZoneConfig.DEFAULT))
+        assertEquals(TapZoneLayout.SYMMETRIC, TapZoneConfig.DEFAULT.layout)
     }
 
     @Test
@@ -57,5 +90,7 @@ class TapZonesTest {
     @Test
     fun `default reader settings use the conventional tap zone config`() {
         assertEquals(TapZoneConfig.DEFAULT, ReaderSettings().tapZoneConfig)
+        assertTrue(ReaderSettings().volumeKeyNavigation)
+        assertTrue(!ReaderSettings().invertVolumeKeys)
     }
 }

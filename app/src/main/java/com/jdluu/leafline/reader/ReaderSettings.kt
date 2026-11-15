@@ -82,6 +82,23 @@ fun EpubPreferences.withStyleMode(mode: StyleMode): EpubPreferences {
 }
 
 /**
+ * Tap zone layout geometry defining the horizontal distribution of the left,
+ * center, and right zones across the reader screen.
+ */
+enum class TapZoneLayout(val label: String, val description: String) {
+    /** Classic equal thirds: 33% left, 34% center, 33% right. */
+    SYMMETRIC("Symmetric", "Equal thirds (33% / 34% / 33%)"),
+    /** Slim edge zones (20% / 60% / 20%) to avoid accidental page turns. */
+    NARROW_EDGES("Narrow edges", "Narrow edges (20% / 60% / 20%)"),
+    /** Wide edge zones (40% / 20% / 40%) for easy page turning. */
+    WIDE_EDGES("Wide edges", "Wide edges (40% / 20% / 40%)"),
+    /** Dominant right turn zone (15% left, 15% center, 70% right) for one-handed right reading. */
+    RIGHT_HANDED("Right-handed", "Right-handed (15% / 15% / 70%)"),
+    /** Dominant left turn zone (70% left, 15% center, 15% right) for one-handed left reading. */
+    LEFT_HANDED("Left-handed", "Left-handed (70% / 15% / 15%)")
+}
+
+/**
  * Per-zone configuration of what a tap does over the reading surface: each of
  * the three horizontal zones maps to one [TapZoneAction]. DEFAULT mirrors the
  * conventional left-back, right-forward layout; REVERSED swaps the sides for
@@ -90,7 +107,8 @@ fun EpubPreferences.withStyleMode(mode: StyleMode): EpubPreferences {
 data class TapZoneConfig(
     val leftZone: TapZoneAction = TapZoneAction.PREVIOUS_PAGE,
     val centerZone: TapZoneAction = TapZoneAction.TOGGLE_MENU,
-    val rightZone: TapZoneAction = TapZoneAction.NEXT_PAGE
+    val rightZone: TapZoneAction = TapZoneAction.NEXT_PAGE,
+    val layout: TapZoneLayout = TapZoneLayout.SYMMETRIC
 ) {
     companion object {
         /** Conventional mapping: left turns back, right turns forward. */
@@ -248,7 +266,15 @@ data class ReaderSettings(
      * When true, emits subtle haptic feedback when turning pages via edge taps
      * or volume keys.
      */
-    val hapticFeedback: Boolean = false
+    val hapticFeedback: Boolean = false,
+    /**
+     * When true, physical volume buttons can be used to navigate pages.
+     */
+    val volumeKeyNavigation: Boolean = true,
+    /**
+     * When true, inverts volume button navigation (Volume Up advances, Volume Down goes back).
+     */
+    val invertVolumeKeys: Boolean = false
 )
 
 /** Screen orientation policy inside the reading view. */
@@ -273,12 +299,35 @@ enum class TapZoneAction {
     NONE
 }
 
-/** Maps a horizontal position (0..1 across the screen) to its tap zone. */
-fun tapZoneAt(fraction: Float): TapZone {
-    return when {
-        fraction < 1f / 3f -> TapZone.LEFT
-        fraction > 2f / 3f -> TapZone.RIGHT
-        else -> TapZone.CENTER
+/** Maps a horizontal position (0..1 across the screen) to its tap zone based on [layout]. */
+fun tapZoneAt(fraction: Float, layout: TapZoneLayout = TapZoneLayout.SYMMETRIC): TapZone {
+    val clamped = fraction.coerceIn(0f, 1f)
+    return when (layout) {
+        TapZoneLayout.SYMMETRIC -> when {
+            clamped < 1f / 3f -> TapZone.LEFT
+            clamped > 2f / 3f -> TapZone.RIGHT
+            else -> TapZone.CENTER
+        }
+        TapZoneLayout.NARROW_EDGES -> when {
+            clamped < 0.20f -> TapZone.LEFT
+            clamped > 0.80f -> TapZone.RIGHT
+            else -> TapZone.CENTER
+        }
+        TapZoneLayout.WIDE_EDGES -> when {
+            clamped < 0.40f -> TapZone.LEFT
+            clamped > 0.60f -> TapZone.RIGHT
+            else -> TapZone.CENTER
+        }
+        TapZoneLayout.RIGHT_HANDED -> when {
+            clamped < 0.15f -> TapZone.LEFT
+            clamped < 0.30f -> TapZone.CENTER
+            else -> TapZone.RIGHT
+        }
+        TapZoneLayout.LEFT_HANDED -> when {
+            clamped < 0.70f -> TapZone.LEFT
+            clamped < 0.85f -> TapZone.CENTER
+            else -> TapZone.RIGHT
+        }
     }
 }
 

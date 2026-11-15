@@ -61,7 +61,7 @@ class TapZoneHandler(
             val ratio = event.point.x / width
             Log.d("TapZoneHandler", "onTap: point=${event.point}, width=$width, ratio=$ratio")
             val action = effectiveTapZoneAction(
-                tapZoneAt(ratio),
+                tapZoneAt(ratio, settings.tapZoneConfig.layout),
                 settings.tapZoneConfig,
                 settings.epub.scroll == true
             )
