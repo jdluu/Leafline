@@ -39,6 +39,9 @@ object NotesExportFormatter {
 
     private val humanDateFormat = SimpleDateFormat("MMM d, yyyy", Locale.US)
     private val frontmatterDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+    private val readwiseDateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).apply {
+        timeZone = TimeZone.getTimeZone("UTC")
+    }
 
     /**
      * Parses an annotation into normalized highlight content with chapter,
@@ -340,6 +343,113 @@ object NotesExportFormatter {
     }
 
     /**
+     * Formats a single book and its annotations into a Readwise-compatible CSV.
+     * Columns: Highlight,Book Title,Book Author,URL,Note,Location,Date
+     */
+    fun formatSingleBookReadwiseCsv(data: BookExportData): String = buildString {
+        appendLine("Highlight,Book Title,Book Author,URL,Note,Location,Date")
+        val parsed = data.annotations.map(::parseHighlight)
+        parsed.forEach { highlight ->
+            append(escapeCsvField(highlight.excerpt)).append(',')
+            append(escapeCsvField(data.book.title)).append(',')
+            append(escapeCsvField(data.book.authors.joinToString(", "))).append(',')
+            append(',').append(escapeCsvField(highlight.note.orEmpty())).append(',')
+            val location = highlight.chapterTitle ?: highlight.progressFraction?.let { "${Math.round(it * 100)}%" }.orEmpty()
+            append(escapeCsvField(location)).append(',')
+            append(escapeCsvField(readwiseDateFormat.format(Date(highlight.createdAtEpochMillis))))
+            appendLine()
+        }
+    }
+
+    /**
+     * Formats multiple books and their annotations into a combined Readwise-compatible CSV.
+     */
+    fun formatBatchReadwiseCsv(booksData: List<BookExportData>): String = buildString {
+        appendLine("Highlight,Book Title,Book Author,URL,Note,Location,Date")
+        booksData.forEach { data ->
+            val parsed = data.annotations.map(::parseHighlight)
+            parsed.forEach { highlight ->
+                append(escapeCsvField(highlight.excerpt)).append(',')
+                append(escapeCsvField(data.book.title)).append(',')
+                append(escapeCsvField(data.book.authors.joinToString(", "))).append(',')
+                append(',').append(escapeCsvField(highlight.note.orEmpty())).append(',')
+                val location = highlight.chapterTitle ?: highlight.progressFraction?.let { "${Math.round(it * 100)}%" }.orEmpty()
+                append(escapeCsvField(location)).append(',')
+                append(escapeCsvField(readwiseDateFormat.format(Date(highlight.createdAtEpochMillis))))
+                appendLine()
+            }
+        }
+    }
+
+    /**
+     * Formats a single book's annotations into Anki flashcard TSV format with headers:
+     * #separator:tab
+     * #html:true
+     * #tags column:4
+     */
+    fun formatSingleBookAnkiTsv(data: BookExportData): String = buildString {
+        appendLine("#separator:tab")
+        appendLine("#html:true")
+        appendLine("#tags column:4")
+        val parsed = data.annotations.map(::parseHighlight)
+        parsed.forEach { highlight ->
+            appendAnkiCardRow(this, data, highlight)
+        }
+    }
+
+    /**
+     * Formats multiple books and their annotations into a combined Anki flashcard TSV deck.
+     */
+    fun formatBatchAnkiTsv(booksData: List<BookExportData>): String = buildString {
+        appendLine("#separator:tab")
+        appendLine("#html:true")
+        appendLine("#tags column:4")
+        booksData.forEach { data ->
+            val parsed = data.annotations.map(::parseHighlight)
+            parsed.forEach { highlight ->
+                appendAnkiCardRow(this, data, highlight)
+            }
+        }
+    }
+
+    private fun appendAnkiCardRow(builder: StringBuilder, data: BookExportData, highlight: ParsedHighlight) {
+        val titleHtml = escapeHtml(data.book.title)
+        val authorText = if (data.book.authors.isNotEmpty()) " by ${data.book.authors.joinToString(", ")}" else ""
+        val chapterText = highlight.chapterTitle?.let { " ($it)" }.orEmpty()
+
+        val frontHtml = if (!highlight.note.isNullOrBlank()) {
+            "<b>${escapeHtml(highlight.note)}</b><br><br><small style=\"color:gray;\">From <i>$titleHtml</i>$chapterText</small>"
+        } else {
+            "Quote from <i>$titleHtml</i>$chapterText"
+        }
+
+        val backHtml = "<blockquote>${escapeHtml(highlight.excerpt)}</blockquote>"
+        val source = cleanSingleLine("${data.book.title}$authorText$chapterText")
+
+        val tagList = mutableListOf("leafline")
+        val bookTag = slugify(data.book.title).takeIf { it.isNotBlank() }
+        if (bookTag != null) tagList.add("book_$bookTag")
+        if (highlight.colorLabel.isNotBlank()) {
+            tagList.add("color_${slugify(highlight.colorLabel)}")
+        }
+        data.collections.forEach { col ->
+            val s = slugify(col)
+            if (s.isNotBlank()) tagList.add("collection_$s")
+        }
+        data.book.tags.forEach { tag ->
+            val s = slugify(tag)
+            if (s.isNotBlank()) tagList.add(s)
+        }
+        val tags = tagList.distinct().joinToString(" ")
+
+        builder.append(cleanField(frontHtml)).append('\t')
+            .append(cleanField(backHtml)).append('\t')
+            .append(source).append('\t')
+            .append(tags)
+            .append('\n')
+    }
+
+    /**
      * Builds an Obsidian Vault ZIP archive containing individual .md files per book
      * and an Index.md linking all books with Obsidian [[WikiLinks]].
      */
@@ -454,5 +564,33 @@ object NotesExportFormatter {
         return text.lowercase(Locale.US)
             .replace(Regex("[^a-z0-9\\s-]"), "")
             .replace(Regex("\\s+"), "-")
+    }
+
+    fun escapeCsvField(value: String): String {
+        return if (value.contains(',') || value.contains('"') || value.contains('\n') || value.contains('\r')) {
+            "\"" + value.replace("\"", "\"\"") + "\""
+        } else {
+            value
+        }
+    }
+
+    fun escapeHtml(text: String): String {
+        return text
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+            .replace("\t", "    ")
+            .replace("\r\n", "<br>")
+            .replace("\n", "<br>")
+            .replace("\r", "<br>")
+    }
+
+    private fun cleanField(html: String): String {
+        return html.replace("\t", "    ").replace("\r\n", "<br>").replace("\n", "<br>").replace("\r", "<br>")
+    }
+
+    private fun cleanSingleLine(text: String): String {
+        return text.replace('\t', ' ').replace('\r', ' ').replace('\n', ' ').trim()
     }
 }

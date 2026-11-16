@@ -14,6 +14,8 @@ enum class ExportFormat(
     val isBatchOnly: Boolean = false
 ) {
     OBSIDIAN_MARKDOWN("obsidian_md", "Obsidian Markdown", "md", "text/markdown"),
+    READWISE_CSV("readwise_csv", "Readwise CSV", "csv", "text/csv"),
+    ANKI_TSV("anki_tsv", "Anki Flashcards (TSV)", "tsv", "text/tab-separated-values"),
     STRUCTURED_JSON("json", "Structured JSON", "json", "application/json"),
     PLAIN_TEXT("plain_text", "Plain Text", "txt", "text/plain"),
     VAULT_ZIP("vault_zip", "Obsidian Vault (ZIP)", "zip", "application/zip", isBatchOnly = true)

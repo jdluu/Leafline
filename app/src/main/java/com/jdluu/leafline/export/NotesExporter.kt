@@ -48,6 +48,8 @@ class NotesExporter(
         val filename = NotesExportFormatter.defaultSingleFilename(data.book.title, format)
         val content = when (format) {
             ExportFormat.OBSIDIAN_MARKDOWN -> NotesExportFormatter.formatSingleBookMarkdown(data)
+            ExportFormat.READWISE_CSV -> NotesExportFormatter.formatSingleBookReadwiseCsv(data)
+            ExportFormat.ANKI_TSV -> NotesExportFormatter.formatSingleBookAnkiTsv(data)
             ExportFormat.STRUCTURED_JSON -> NotesExportFormatter.formatSingleBookJson(data)
             ExportFormat.PLAIN_TEXT -> NotesExportFormatter.formatSingleBookPlainText(data)
             ExportFormat.VAULT_ZIP -> NotesExportFormatter.formatSingleBookMarkdown(data)
@@ -74,6 +76,28 @@ class NotesExporter(
                     bookCount = booksData.size,
                     highlightCount = totalHighlights,
                     binaryPayload = zipBytes,
+                    mimeType = format.mimeType
+                )
+            }
+            ExportFormat.READWISE_CSV -> {
+                val csv = NotesExportFormatter.formatBatchReadwiseCsv(booksData)
+                BatchExportResult(
+                    format = format,
+                    filename = filename,
+                    bookCount = booksData.size,
+                    highlightCount = totalHighlights,
+                    textPayload = csv,
+                    mimeType = format.mimeType
+                )
+            }
+            ExportFormat.ANKI_TSV -> {
+                val tsv = NotesExportFormatter.formatBatchAnkiTsv(booksData)
+                BatchExportResult(
+                    format = format,
+                    filename = filename,
+                    bookCount = booksData.size,
+                    highlightCount = totalHighlights,
+                    textPayload = tsv,
                     mimeType = format.mimeType
                 )
             }
