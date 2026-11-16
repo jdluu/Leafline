@@ -50,6 +50,14 @@ object BookMetadataMapper {
 
         val pageCount = metadata.numberOfPages
 
+        val seriesInfo = metadata.belongsToSeries.firstOrNull()
+        val series = seriesInfo?.name?.trim()?.takeIf { it.isNotBlank() }
+            ?: (metadata.get("calibre:series") as? String)?.trim()?.takeIf { it.isNotBlank() }
+
+        val seriesIndex = seriesInfo?.position?.toFloat()
+            ?: (metadata.get("calibre:series_index") as? Number)?.toFloat()
+            ?: (metadata.get("calibre:series_index") as? String)?.toFloatOrNull()
+
         return LibraryBook(
             stableId = stableId,
             title = title,
@@ -62,7 +70,9 @@ object BookMetadataMapper {
             fileHash = fileHash,
             addedAtEpochMillis = addedAt.toEpochMilli(),
             pageCount = pageCount,
-            koreaderHash = koreaderHash
+            koreaderHash = koreaderHash,
+            series = series,
+            seriesIndex = seriesIndex
         )
     }
 }

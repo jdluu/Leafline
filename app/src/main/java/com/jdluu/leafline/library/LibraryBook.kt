@@ -21,5 +21,15 @@ data class LibraryBook(
     val lastLocatorJson: String? = null,
     val readingStatus: ReadingStatus = UNREAD,
     val rating: Int? = null,
-    val tags: List<String> = emptyList()
-)
+    val tags: List<String> = emptyList(),
+    val series: String? = null,
+    val seriesIndex: Float? = null
+) {
+    fun formattedSeries(): String? {
+        val s = series?.trim() ?: return null
+        if (s.isEmpty()) return null
+        val idx = seriesIndex ?: return s
+        val formattedIndex = if (idx % 1f == 0f) idx.toInt().toString() else idx.toString()
+        return "$s #$formattedIndex"
+    }
+}

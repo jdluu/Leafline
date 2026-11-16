@@ -323,7 +323,36 @@ class LeaflineDatabaseMigrationTest {
     }
 
     @Test
-    fun fullMigrationChain1To10_preservesDataAndPassesRoomSchemaValidation() = runTest {
+    fun migration10To11_addsSeriesAndSeriesIndexColumns() {
+        val db = createRawDatabase(10) { db ->
+            db.execSQL(
+                "CREATE TABLE books (" +
+                    "stableId TEXT NOT NULL PRIMARY KEY, " +
+                    "title TEXT NOT NULL)"
+            )
+            db.execSQL("INSERT INTO books (stableId, title) VALUES ('book-1', 'Title')")
+        }
+
+        LeaflineDatabase.MIGRATION_10_11.migrate(db)
+
+        val cursor = db.query("SELECT stableId, series, seriesIndex FROM books WHERE stableId = 'book-1'")
+        assertTrue(cursor.moveToFirst())
+        assertEquals("book-1", cursor.getString(0))
+        assertNull(cursor.getString(1))
+        assertTrue(cursor.isNull(2))
+        cursor.close()
+
+        db.execSQL("UPDATE books SET series = 'Dune Chronicles', seriesIndex = 1.0 WHERE stableId = 'book-1'")
+        val updated = db.query("SELECT series, seriesIndex FROM books WHERE stableId = 'book-1'")
+        assertTrue(updated.moveToFirst())
+        assertEquals("Dune Chronicles", updated.getString(0))
+        assertEquals(1.0f, updated.getFloat(1), 0.001f)
+        updated.close()
+        db.close()
+    }
+
+    @Test
+    fun fullMigrationChain1To11_preservesDataAndPassesRoomSchemaValidation() = runTest {
         val db = createRawDatabase(1) { db ->
             db.execSQL(
                 "CREATE TABLE books (" +
@@ -350,11 +379,11 @@ class LeaflineDatabaseMigrationTest {
             )
         }
 
-        // Apply every migration in sequence from 1 up to 10
+        // Apply every migration in sequence from 1 up to 11
         LeaflineDatabase.ALL_MIGRATIONS.forEach { migration ->
             migration.migrate(db)
         }
-        db.version = 10
+        db.version = 11
         db.close()
 
         // Open with Room to verify that Room's internal schema validator accepts the migrated database!
@@ -375,6 +404,15 @@ class LeaflineDatabaseMigrationTest {
         assertNull(book.rating)
         assertNull(book.coverPath)
         assertNull(book.lastLocatorJson)
+        assertNull(book.series)
+        assertNull(book.seriesIndex)
+
+        // Verify setSeries updates the book
+        roomDb.bookDao().setSeries("book-legacy", "The Foundation", 2.0f)
+        val updatedBook = roomDb.bookDao().getBookByStableId("book-legacy")
+        assertNotNull(updatedBook)
+        assertEquals("The Foundation", updatedBook!!.series)
+        assertEquals(2.0f, updatedBook.seriesIndex)
 
         // Verify bookmarkDao works on migrated DB
         val bookmarkId = roomDb.bookmarkDao().insert(

@@ -136,6 +136,17 @@ fun BookListRow(
                     )
                 }
 
+                book.formattedSeries()?.let { seriesText ->
+                    Text(
+                        text = seriesText,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(Spacing.xs))
 
                 Row(

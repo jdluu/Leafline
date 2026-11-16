@@ -14,7 +14,8 @@ enum class LibrarySort(
     TITLE("Title", defaultAscending = true),
     AUTHOR("Author", defaultAscending = true),
     PROGRESS("Progress", defaultAscending = false),
-    RATING("Rating", defaultAscending = false);
+    RATING("Rating", defaultAscending = false),
+    SERIES("Series", defaultAscending = true);
 
     fun sorted(books: List<LibraryBook>, ascending: Boolean = defaultAscending): List<LibraryBook> {
         return when (this) {
@@ -85,6 +86,19 @@ enum class LibrarySort(
                 books.sortedWith(
                     compareByDescending<LibraryBook> { it.rating ?: 0 }
                         .thenByDescending { it.addedAtEpochMillis ?: Long.MIN_VALUE }
+                        .thenBy { it.title.lowercase() }
+                )
+            }
+            SERIES -> if (ascending) {
+                books.sortedWith(
+                    compareBy<LibraryBook, String?>(nullsLast(String.CASE_INSENSITIVE_ORDER)) { it.series }
+                        .thenBy { it.seriesIndex ?: Float.MAX_VALUE }
+                        .thenBy { it.title.lowercase() }
+                )
+            } else {
+                books.sortedWith(
+                    compareByDescending<LibraryBook, String?>(nullsFirst(String.CASE_INSENSITIVE_ORDER)) { it.series }
+                        .thenByDescending { it.seriesIndex ?: Float.MIN_VALUE }
                         .thenBy { it.title.lowercase() }
                 )
             }
