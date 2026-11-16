@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **TTS Audio Focus & Noisy Audio Management**:
+  - Integrated `TtsAudioFocusManager` to handle system audio focus during text-to-speech reading.
+  - Automatically ducks speech volume to 20% on transient notifications or navigation alerts (`AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK`) and restores volume when focus returns.
+  - Automatically pauses speech on transient audio focus loss (e.g., incoming phone calls or alarms) and resumes seamlessly on focus gain.
+  - Added `AudioBecomingNoisyReceiver` to auto-pause speech playback when wired headphones or Bluetooth devices are disconnected, preventing unintended speaker audio.
 - **Local-First Reading Goals**:
   - Added configurable daily reading duration targets (e.g., 20 mins/day) and book reading targets, stored privately on-device via `ReadingGoalStore`.
   - Added reading goal progress bars with percentage indicators, goal completion celebration badges, and an in-app goal editor (`EditReadingGoalsDialog`) directly inside the Reading Insights sheet.
