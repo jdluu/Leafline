@@ -14,13 +14,14 @@ import org.readium.r2.navigator.preferences.Theme
 enum class ReaderTheme {
     LIGHT,
     DARK,
-    SEPIA
+    SEPIA,
+    EINK
 }
 
 /** Maps this theme onto the matching Readium preference value. */
 fun ReaderTheme.toReadiumTheme(): Theme {
     return when (this) {
-        ReaderTheme.LIGHT -> Theme.LIGHT
+        ReaderTheme.LIGHT, ReaderTheme.EINK -> Theme.LIGHT
         ReaderTheme.DARK -> Theme.DARK
         ReaderTheme.SEPIA -> Theme.SEPIA
     }
@@ -41,7 +42,7 @@ fun Theme.toReaderTheme(): ReaderTheme {
  */
 fun ReaderTheme?.backgroundColor(isDark: Boolean = false): Int {
     return when (this) {
-        ReaderTheme.LIGHT -> 0xFFFFFFFF.toInt()
+        ReaderTheme.LIGHT, ReaderTheme.EINK -> 0xFFFFFFFF.toInt()
         ReaderTheme.DARK -> 0xFF121212.toInt()
         ReaderTheme.SEPIA -> 0xFFFAF4E8.toInt()
         null -> if (isDark) 0xFF121212.toInt() else 0xFFFFFFFF.toInt()

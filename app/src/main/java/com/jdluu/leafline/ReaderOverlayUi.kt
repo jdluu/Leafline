@@ -1961,7 +1961,8 @@ internal fun ReaderSettingsSheet(
                 listOf(
                     ReaderTheme.LIGHT to "Light",
                     ReaderTheme.SEPIA to "Sepia",
-                    ReaderTheme.DARK to "Dark"
+                    ReaderTheme.DARK to "Dark",
+                    ReaderTheme.EINK to "E-Ink"
                 ).forEach { (theme, label) ->
                     FilterChip(
                         selected = settings.theme == theme,

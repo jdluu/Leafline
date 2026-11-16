@@ -83,6 +83,7 @@ class ReaderSettingsTest {
         assertEquals("LIGHT", ReaderTheme.LIGHT.name)
         assertEquals("DARK", ReaderTheme.DARK.name)
         assertEquals("SEPIA", ReaderTheme.SEPIA.name)
+        assertEquals("EINK", ReaderTheme.EINK.name)
     }
 
     @Test

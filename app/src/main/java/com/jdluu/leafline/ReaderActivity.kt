@@ -742,7 +742,16 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
      * theme at this Android boundary.
      */
     private fun ReaderSettings.toNavigatorPreferences(): EpubPreferences {
-        return epub.copy(theme = theme?.toReadiumTheme())
+        val baseTheme = theme?.toReadiumTheme()
+        return if (theme == com.jdluu.leafline.reader.theme.ReaderTheme.EINK) {
+            epub.copy(
+                theme = baseTheme,
+                backgroundColor = org.readium.r2.navigator.preferences.Color(0xFFFFFFFF.toInt()),
+                textColor = org.readium.r2.navigator.preferences.Color(0xFF000000.toInt())
+            )
+        } else {
+            epub.copy(theme = baseTheme)
+        }
     }
 
     /**
@@ -1187,36 +1196,30 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             settingsController.settings.value.epub.scroll != true
         ) {
             val settings = settingsController.settings.value
-            if (settings.volumeKeyNavigation) {
-                // If TTS is currently playing, let volume keys adjust audio output level
-                val isTtsSpeaking = this::ttsController.isInitialized &&
-                    ttsController.state.value == ReaderTtsState.PLAYING
-                if (!isTtsSpeaking) {
-                    val isNextKey = if (!settings.invertVolumeKeys) {
-                        keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
-                    } else {
-                        keyCode == KeyEvent.KEYCODE_VOLUME_UP
-                    }
-                    val isPrevKey = if (!settings.invertVolumeKeys) {
-                        keyCode == KeyEvent.KEYCODE_VOLUME_UP
-                    } else {
-                        keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
-                    }
+            val isTtsSpeaking = this::ttsController.isInitialized &&
+                ttsController.state.value == ReaderTtsState.PLAYING
 
-                    if (isNextKey) {
-                        val handled = navigator?.goForward(tapZoneHandler.pageTurnAnimated(settings)) ?: false
-                        if (handled && settings.hapticFeedback) {
-                            tapZoneHandler.performHapticFeedback()
-                        }
-                        return true
-                    } else if (isPrevKey) {
-                        val handled = navigator?.goBackward(tapZoneHandler.pageTurnAnimated(settings)) ?: false
-                        if (handled && settings.hapticFeedback) {
-                            tapZoneHandler.performHapticFeedback()
-                        }
-                        return true
+            val direction = com.jdluu.leafline.reader.navigation.HardwareKeyNavigator.resolveDirection(
+                keyCode = keyCode,
+                volumeKeyNavigation = settings.volumeKeyNavigation,
+                invertVolumeKeys = settings.invertVolumeKeys,
+                isTtsSpeaking = isTtsSpeaking
+            )
+
+            if (direction != null) {
+                val animated = tapZoneHandler.pageTurnAnimated(settings)
+                val handled = when (direction) {
+                    com.jdluu.leafline.reader.navigation.PageNavigationDirection.FORWARD -> {
+                        navigator?.goForward(animated) ?: false
+                    }
+                    com.jdluu.leafline.reader.navigation.PageNavigationDirection.BACKWARD -> {
+                        navigator?.goBackward(animated) ?: false
                     }
                 }
+                if (handled && settings.hapticFeedback) {
+                    tapZoneHandler.performHapticFeedback()
+                }
+                return true
             }
         }
         return super.onKeyDown(keyCode, event)
