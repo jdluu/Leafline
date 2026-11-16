@@ -121,13 +121,13 @@ DESIGN.md                visual design contract: tokens, type, shape, motion, co
 Add a schema change as an incremental migration, and register it:
 
 ```kotlin
-val MIGRATION_9_10 = object : Migration(9, 10) {
+val MIGRATION_10_11 = object : Migration(10, 11) {
     override fun migrate(db: SupportSQLiteDatabase) {
-        db.execSQL("ALTER TABLE books ADD COLUMN rating INTEGER NOT NULL DEFAULT 0")
-        db.execSQL("ALTER TABLE books ADD COLUMN tags TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE books ADD COLUMN series TEXT")
+        db.execSQL("ALTER TABLE books ADD COLUMN seriesIndex REAL")
     }
 }
-// ...then bump @Database(version = 10) and add MIGRATION_9_10 to .addMigrations(...)
+// ...then bump @Database(version = 11) and add MIGRATION_10_11 to .addMigrations(...)
 ```
 
 ## Testing and mocking
@@ -145,5 +145,5 @@ val MIGRATION_9_10 = object : Migration(9, 10) {
 
 - Branch from `main`: `feat/...`, `fix/...`, `docs/...`, `refactor/...`, `chore/...`, `test/...`.
 - Conventional commits, imperative, no emoji and no emdash: `feat: add readium tts (#153)`.
-- Work is tracked on the `Leafline Development` board (user project 7). Every change gets an issue with acceptance criteria; move it Todo, then In Progress, then Done when the PR merges.
-- Open a PR against `main` with `Closes #N` in the body. Squash-merge once the three checks pass, then delete the branch.
+- Work is tracked on the `Leafline Development` board (user project 7); move issues to Done on merge.
+- Open a PR for work. Once all CI/CD checks pass, squash-merge into `main` and delete the branch.
