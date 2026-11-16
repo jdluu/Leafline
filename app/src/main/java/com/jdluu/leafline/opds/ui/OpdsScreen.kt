@@ -37,8 +37,11 @@ import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -77,6 +80,9 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -270,8 +276,8 @@ fun OpdsScreen(
     if (showAddFeedDialog) {
         AddOpdsFeedDialog(
             onDismiss = { showAddFeedDialog = false },
-            onAdd = { title, url ->
-                viewModel.addCustomFeed(title, url)
+            onAdd = { title, url, username, password, authToken ->
+                viewModel.addCustomFeed(title, url, username, password, authToken)
                 showAddFeedDialog = false
             }
         )
@@ -339,13 +345,24 @@ private fun OpdsTopBar(
                             .padding(horizontal = Spacing.xs, vertical = 4.dp)
                     ) {
                         Column {
-                            Text(
-                                text = selectedSource.title,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = selectedSource.title,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                if (selectedSource.hasAuth) {
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Icon(
+                                        imageVector = Icons.Default.Lock,
+                                        contentDescription = "Authenticated catalog",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(14.dp) // touch-target-ok
+                                    )
+                                }
+                            }
                             Text(
                                 text = "Tap to switch catalog",
                                 style = MaterialTheme.typography.labelSmall,
@@ -362,10 +379,21 @@ private fun OpdsTopBar(
                             DropdownMenuItem(
                                 text = {
                                     Column {
-                                        Text(
-                                            text = source.title,
-                                            fontWeight = if (source.id == selectedSource.id) FontWeight.Bold else FontWeight.Normal
-                                        )
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = source.title,
+                                                fontWeight = if (source.id == selectedSource.id) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                            if (source.hasAuth) {
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Icon(
+                                                    imageVector = Icons.Default.Lock,
+                                                    contentDescription = "Authenticated catalog",
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(14.dp) // touch-target-ok
+                                                )
+                                            }
+                                        }
                                         if (source.description != null) {
                                             Text(
                                                 text = source.description,
@@ -538,6 +566,7 @@ private fun FeedContentView(
                     book = book,
                     downloadStatus = status,
                     isInLibrary = isInLibrary,
+                    authHeader = viewModel.currentAuthHeader,
                     onClick = { onBookClick(book) },
                     onDownloadClick = { onDownloadClick(book) }
                 )
@@ -565,6 +594,7 @@ private fun FeedContentView(
                         book = book,
                         downloadStatus = status,
                         isInLibrary = isInLibrary,
+                        authHeader = viewModel.currentAuthHeader,
                         onClick = { onBookClick(book) },
                         onDownloadClick = { onDownloadClick(book) }
                     )
@@ -608,6 +638,7 @@ private fun OpdsBookTile(
     book: OpdsBook,
     downloadStatus: DownloadStatus,
     isInLibrary: Boolean,
+    authHeader: String? = null,
     onClick: () -> Unit,
     onDownloadClick: () -> Unit
 ) {
@@ -617,7 +648,7 @@ private fun OpdsBookTile(
             .clickable(onClick = onClick)
     ) {
         Column(modifier = Modifier.padding(Spacing.xs)) {
-            val coverBitmap = rememberOpdsCoverBitmap(book.coverUrl)
+            val coverBitmap = rememberOpdsCoverBitmap(book.coverUrl, authHeader)
 
             Box(
                 modifier = Modifier
@@ -897,13 +928,24 @@ private fun OpdsBookDetailDialog(
     )
 }
 
+private enum class OpdsAuthType(val label: String) {
+    NONE("None"),
+    BASIC("Basic Auth"),
+    BEARER("API Token")
+}
+
 @Composable
 private fun AddOpdsFeedDialog(
     onDismiss: () -> Unit,
-    onAdd: (String, String) -> Unit
+    onAdd: (String, String, String?, String?, String?) -> Unit
 ) {
     var title by remember { mutableStateOf("") }
     var url by remember { mutableStateOf("") }
+    var authType by remember { mutableStateOf(OpdsAuthType.NONE) }
+    var username by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
+    var token by remember { mutableStateOf("") }
     var isError by remember { mutableStateOf(false) }
 
     AlertDialog(
@@ -911,7 +953,9 @@ private fun AddOpdsFeedDialog(
         title = { Text("Add Catalog Feed") },
         text = {
             Column(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(Spacing.sm)
             ) {
                 Text(
@@ -942,6 +986,68 @@ private fun AddOpdsFeedDialog(
                     } else null,
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                Text(
+                    text = "Authentication",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = Spacing.xs)
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+                ) {
+                    OpdsAuthType.entries.forEach { type ->
+                        FilterChip(
+                            selected = authType == type,
+                            onClick = { authType = type },
+                            label = { Text(type.label) }
+                        )
+                    }
+                }
+
+                when (authType) {
+                    OpdsAuthType.NONE -> { /* No additional fields */ }
+                    OpdsAuthType.BASIC -> {
+                        OutlinedTextField(
+                            value = username,
+                            onValueChange = { username = it },
+                            label = { Text("Username") },
+                            placeholder = { Text("admin") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = password,
+                            onValueChange = { password = it },
+                            label = { Text("Password") },
+                            singleLine = true,
+                            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                            trailingIcon = {
+                                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                    Icon(
+                                        imageVector = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                        contentDescription = if (passwordVisible) "Hide password" else "Show password"
+                                    )
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    OpdsAuthType.BEARER -> {
+                        OutlinedTextField(
+                            value = token,
+                            onValueChange = { token = it },
+                            label = { Text("API / Bearer Token") },
+                            placeholder = { Text("kavita-api-key") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
             }
         },
         confirmButton = {
@@ -949,7 +1055,16 @@ private fun AddOpdsFeedDialog(
                 onClick = {
                     val trimmed = url.trim()
                     if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-                        onAdd(title.trim().ifEmpty { "Custom Catalog" }, trimmed)
+                        val finalUsername = if (authType == OpdsAuthType.BASIC) username.trim().ifBlank { null } else null
+                        val finalPassword = if (authType == OpdsAuthType.BASIC) password.ifBlank { null } else null
+                        val finalToken = if (authType == OpdsAuthType.BEARER) token.trim().ifBlank { null } else null
+                        onAdd(
+                            title.trim().ifEmpty { "Custom Catalog" },
+                            trimmed,
+                            finalUsername,
+                            finalPassword,
+                            finalToken
+                        )
                     } else {
                         isError = true
                     }

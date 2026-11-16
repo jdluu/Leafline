@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **OPDS Catalog Authentication & Search**:
+  - Added HTTP Basic Auth and Bearer Token credential support for custom OPDS feeds (enabling integration with protected Calibre-Web, Kavita, and Audiobookshelf servers).
+  - OpenSearch XML description document template resolution and search term substitution.
+  - Authentication header propagation to feed requests, OpenSearch queries, cover image fetching, and direct EPUB downloads.
+  - Visual lock badge in the catalog dropdown indicating authenticated feeds.
+  - Expanded `AddOpdsFeedDialog` with authentication type selector and secure credentials input.
 - **TTS Sleep Timer Fade-Out & Preset Expansion**:
   - Added 5-minute and 10-minute quick presets to the TTS sleep timer selection sheet.
   - Implemented gradual audio volume fade-out over the final 30 seconds before auto-pausing playback, providing a gentle audio transition into silence.

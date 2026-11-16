@@ -10,8 +10,31 @@ data class OpdsFeedSource(
     val title: String,
     val url: String,
     val isBuiltIn: Boolean = false,
-    val description: String? = null
-)
+    val description: String? = null,
+    val username: String? = null,
+    val password: String? = null,
+    val authToken: String? = null
+) {
+    /**
+     * Computes the Authorization header string (HTTP Basic or Bearer) if credentials are present.
+     */
+    fun authHeader(): String? {
+        if (!authToken.isNullOrBlank()) {
+            return "Bearer ${authToken.trim()}"
+        }
+        if (!username.isNullOrBlank() || !password.isNullOrBlank()) {
+            val user = username.orEmpty()
+            val pass = password.orEmpty()
+            val credentials = "$user:$pass"
+            val encoded = java.util.Base64.getEncoder().encodeToString(credentials.toByteArray(Charsets.UTF_8))
+            return "Basic $encoded"
+        }
+        return null
+    }
+
+    val hasAuth: Boolean
+        get() = !authToken.isNullOrBlank() || !username.isNullOrBlank() || !password.isNullOrBlank()
+}
 
 /**
  * An individual publication item available for download in an OPDS catalog.

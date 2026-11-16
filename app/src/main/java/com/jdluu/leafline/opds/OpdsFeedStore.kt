@@ -66,7 +66,13 @@ class OpdsFeedStore(
     /**
      * Adds a custom OPDS feed. Returns the newly created [OpdsFeedSource].
      */
-    fun addCustomFeed(title: String, url: String): OpdsFeedSource {
+    fun addCustomFeed(
+        title: String,
+        url: String,
+        username: String? = null,
+        password: String? = null,
+        authToken: String? = null
+    ): OpdsFeedSource {
         val trimmedTitle = title.trim().ifEmpty { "Custom Catalog" }
         val trimmedUrl = url.trim()
         val newSource = OpdsFeedSource(
@@ -74,13 +80,43 @@ class OpdsFeedStore(
             title = trimmedTitle,
             url = trimmedUrl,
             isBuiltIn = false,
-            description = "Custom OPDS feed"
+            description = "Custom OPDS feed",
+            username = username?.trim()?.ifBlank { null },
+            password = password?.ifBlank { null },
+            authToken = authToken?.trim()?.ifBlank { null }
         )
 
         val currentCustom = loadCustomFeedsOnly().toMutableList()
         currentCustom.add(newSource)
         saveCustomFeeds(currentCustom)
         return newSource
+    }
+
+    /**
+     * Updates an existing custom OPDS feed. Returns the updated [OpdsFeedSource], or null if not found.
+     */
+    fun updateCustomFeed(
+        id: String,
+        title: String,
+        url: String,
+        username: String? = null,
+        password: String? = null,
+        authToken: String? = null
+    ): OpdsFeedSource? {
+        val currentCustom = loadCustomFeedsOnly().toMutableList()
+        val index = currentCustom.indexOfFirst { it.id == id }
+        if (index < 0) return null
+        val existing = currentCustom[index]
+        val updated = existing.copy(
+            title = title.trim().ifEmpty { existing.title },
+            url = url.trim().ifEmpty { existing.url },
+            username = username?.trim()?.ifBlank { null },
+            password = password?.ifBlank { null },
+            authToken = authToken?.trim()?.ifBlank { null }
+        )
+        currentCustom[index] = updated
+        saveCustomFeeds(currentCustom)
+        return updated
     }
 
     /**

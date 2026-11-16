@@ -98,6 +98,9 @@ class OpdsViewModel(
         loadFeedUrl(targetUrl)
     }
 
+    val currentAuthHeader: String?
+        get() = _selectedSource.value.authHeader()
+
     fun search(query: String) {
         _searchQuery.value = query
         val template = activeSearchTemplate
@@ -108,7 +111,7 @@ class OpdsViewModel(
 
         viewModelScope.launch {
             _uiState.value = OpdsUiState.Loading("Searching...")
-            val result = opdsClient.searchFeed(template, query.trim())
+            val result = opdsClient.searchFeed(template, query.trim(), currentAuthHeader)
             result.fold(
                 onSuccess = { feed ->
                     _uiState.value = OpdsUiState.Success(feed)
@@ -135,7 +138,7 @@ class OpdsViewModel(
     private fun loadFeedUrl(url: String) {
         viewModelScope.launch {
             _uiState.value = OpdsUiState.Loading()
-            val result = opdsClient.fetchFeed(url)
+            val result = opdsClient.fetchFeed(url, currentAuthHeader)
             result.fold(
                 onSuccess = { feed ->
                     if (!feed.searchTemplateUrl.isNullOrBlank()) {
@@ -157,13 +160,35 @@ class OpdsViewModel(
         onSuccess: (LibraryBook) -> Unit = {},
         onError: (String) -> Unit = {}
     ) {
-        downloadManager.downloadAndImport(book, onSuccess, onError)
+        downloadManager.downloadAndImport(book, currentAuthHeader, onSuccess, onError)
     }
 
-    fun addCustomFeed(title: String, url: String) {
-        val newSource = feedStore.addCustomFeed(title, url)
+    fun addCustomFeed(
+        title: String,
+        url: String,
+        username: String? = null,
+        password: String? = null,
+        authToken: String? = null
+    ) {
+        val newSource = feedStore.addCustomFeed(title, url, username, password, authToken)
         _feedSources.value = feedStore.loadFeeds()
         selectSource(newSource)
+    }
+
+    fun updateCustomFeed(
+        id: String,
+        title: String,
+        url: String,
+        username: String? = null,
+        password: String? = null,
+        authToken: String? = null
+    ) {
+        val updated = feedStore.updateCustomFeed(id, title, url, username, password, authToken)
+        _feedSources.value = feedStore.loadFeeds()
+        if (updated != null && _selectedSource.value.id == id) {
+            _selectedSource.value = updated
+            refresh()
+        }
     }
 
     fun deleteCustomFeed(id: String) {

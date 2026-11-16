@@ -32,6 +32,7 @@ class OpdsDownloadManager(
 
     fun downloadAndImport(
         book: OpdsBook,
+        authHeader: String? = null,
         onSuccess: (LibraryBook) -> Unit = {},
         onError: (String) -> Unit = {}
     ) {
@@ -52,7 +53,7 @@ class OpdsDownloadManager(
             val fileName = "${sanitizedTitle}_${System.currentTimeMillis()}.epub"
             val targetFile = File(context.filesDir, fileName)
 
-            val downloadResult = opdsClient.downloadEpubFile(downloadUrl, targetFile) { fraction ->
+            val downloadResult = opdsClient.downloadEpubFile(downloadUrl, targetFile, authHeader) { fraction ->
                 _downloadStatuses.value = _downloadStatuses.value + (book.id to DownloadStatus.Downloading(fraction))
             }
 

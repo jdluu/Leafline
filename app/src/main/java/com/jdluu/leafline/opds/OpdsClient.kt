@@ -3,6 +3,7 @@ package com.jdluu.leafline.opds
 import com.jdluu.leafline.opds.model.OpdsFeedResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
@@ -24,14 +25,21 @@ open class OpdsClient(
     /**
      * Fetches and parses an OPDS catalog feed from the given [url].
      */
-    open suspend fun fetchFeed(url: String): Result<OpdsFeedResult> = withContext(Dispatchers.IO) {
+    open suspend fun fetchFeed(
+        url: String,
+        authHeader: String? = null
+    ): Result<OpdsFeedResult> = withContext(Dispatchers.IO) {
         runCatching {
-            val request = Request.Builder()
+            val builder = Request.Builder()
                 .url(url)
                 .header("User-Agent", "Leafline-Reader/0.3.0 (Android; OPDS Client)")
                 .header("Accept", "application/atom+xml, application/opds+json, application/json, text/xml, */*")
-                .build()
 
+            if (!authHeader.isNullOrBlank()) {
+                builder.header("Authorization", authHeader)
+            }
+
+            val request = builder.build()
             okHttpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     throw IllegalStateException("HTTP ${response.code}: ${response.message}")
@@ -51,21 +59,70 @@ open class OpdsClient(
     }
 
     /**
+     * Resolves an OpenSearch description XML URL into a concrete search template URL containing {searchTerms}.
+     */
+    open suspend fun resolveSearchTemplate(
+        searchUrl: String,
+        authHeader: String? = null
+    ): String = withContext(Dispatchers.IO) {
+        if (searchUrl.contains("{searchTerms}")) {
+            return@withContext searchUrl
+        }
+        try {
+            val builder = Request.Builder().url(searchUrl)
+            if (!authHeader.isNullOrBlank()) {
+                builder.header("Authorization", authHeader)
+            }
+            okHttpClient.newCall(builder.build()).execute().use { response ->
+                if (response.isSuccessful) {
+                    val xml = response.body?.string().orEmpty()
+                    val templateRegex = Regex("""template=["']([^"']+)["']""", RegexOption.IGNORE_CASE)
+                    val match = templateRegex.find(xml)
+                    if (match != null) {
+                        val rawTemplate = match.groupValues[1]
+                        return@withContext try {
+                            val base = searchUrl.toHttpUrl()
+                            base.resolve(rawTemplate)?.toString() ?: rawTemplate
+                        } catch (_: Exception) {
+                            rawTemplate
+                        }
+                    }
+                }
+            }
+        } catch (_: Exception) {
+            // Fallback to original url
+        }
+        searchUrl
+    }
+
+    /**
      * Searches a catalog feed using its OpenSearch URL template.
      * Replaces `{searchTerms}` with URL-encoded query.
      */
-    open suspend fun searchFeed(searchTemplateUrl: String, query: String): Result<OpdsFeedResult> {
+    open suspend fun searchFeed(
+        searchTemplateUrl: String,
+        query: String,
+        authHeader: String? = null
+    ): Result<OpdsFeedResult> {
+        val resolvedTemplate = if (!searchTemplateUrl.contains("{searchTerms}") &&
+            (searchTemplateUrl.contains("opensearch", ignoreCase = true) || searchTemplateUrl.endsWith(".xml", ignoreCase = true))
+        ) {
+            resolveSearchTemplate(searchTemplateUrl, authHeader)
+        } else {
+            searchTemplateUrl
+        }
+
         val encodedQuery = withContext(Dispatchers.IO) {
             URLEncoder.encode(query, "UTF-8")
         }
-        val targetUrl = if (searchTemplateUrl.contains("{searchTerms}")) {
-            searchTemplateUrl.replace("{searchTerms}", encodedQuery)
-        } else if (searchTemplateUrl.contains("?")) {
-            "$searchTemplateUrl&q=$encodedQuery"
+        val targetUrl = if (resolvedTemplate.contains("{searchTerms}")) {
+            resolvedTemplate.replace("{searchTerms}", encodedQuery)
+        } else if (resolvedTemplate.contains("?")) {
+            "$resolvedTemplate&q=$encodedQuery"
         } else {
-            "$searchTemplateUrl?q=$encodedQuery"
+            "$resolvedTemplate?q=$encodedQuery"
         }
-        return fetchFeed(targetUrl)
+        return fetchFeed(targetUrl, authHeader)
     }
 
     /**
@@ -75,13 +132,19 @@ open class OpdsClient(
     open suspend fun downloadEpubFile(
         downloadUrl: String,
         destinationFile: File,
+        authHeader: String? = null,
         onProgress: (Float) -> Unit = {}
     ): Result<File> = withContext(Dispatchers.IO) {
         runCatching {
-            val request = Request.Builder()
+            val builder = Request.Builder()
                 .url(downloadUrl)
                 .header("User-Agent", "Leafline-Reader/0.3.0 (Android; OPDS Client)")
-                .build()
+
+            if (!authHeader.isNullOrBlank()) {
+                builder.header("Authorization", authHeader)
+            }
+
+            val request = builder.build()
 
             okHttpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {

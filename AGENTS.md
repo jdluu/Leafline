@@ -76,7 +76,6 @@ Never do:
 
 - Commit to `main`. Open a pull request. Branch protection requires the `Build and unit test`, `Android lint`, and `Quality guards` checks and blocks force-push.
 - Commit credentials, tokens, signing keys, `local.properties`, `.env*`, APKs, or build output.
-- Implement OPDS catalog browsing or downloading, host a server, or act as a Calibre replacement. Leafline opens EPUB files already on the device.
 - Write a new EPUB parser or renderer. Use the Readium Kotlin Toolkit.
 - Edit anything under `app/build/`, `build/`, or `.gradle/`.
 - Let a test reach the live network.
@@ -93,12 +92,14 @@ you did not execute.
 ```text
 app/src/main/java/com/jdluu/leafline/
   ReaderActivity.kt      reader host: Readium navigator, overlays, bookmarks, highlights, search, TTS
-  MainActivity.kt        library and settings shell
+  MainActivity.kt        library, explore (OPDS), and settings shell
   reader/                reader orchestration: settings, tap zones, bookmarks, annotations, search, tts, sync
-  library/               library screen, view models, sorting, folders, covers
+  library/               library screen, view models, sorting, folders, covers, backup/restore
     data/                repository interfaces and models, free of Room and Android types
       local/             Room entities, DAOs, migrations, TypeConverters
   sync/                  KOReader progress sync, pure Kotlin, no Android dependencies
+  opds/                  OPDS catalog client, feeds, download manager, and UI
+  export/                notes and highlights export (Markdown, Obsidian vault zip)
   di/AppContainer.kt     application-scoped wiring, the single construction site
 app/src/test/            JVM unit tests
 app/src/androidTest/     instrumented tests; assets/benchmark-books holds EPUB fixtures
@@ -113,19 +114,20 @@ DESIGN.md                visual design contract: tokens, type, shape, motion, co
 - Stable book identity is the trimmed, non-blank `metadata.identifier`, falling back to the SHA-256 file hash. KOReader sync identity is `FileHashUtil.koreaderHash`.
 - For paths under `context.filesDir`, use `absolutePath` for database lookups; `canonicalPath` resolves symlinks and breaks matching. Use `canonicalPath` only for traversal checks.
 - Room: `Migration(n, n + 1)` objects only, never `fallbackToDestructiveMigration`. SQLite types are `TEXT`, `INTEGER`, and `REAL`; there is no `BOOLEAN`.
-- Substitute through the existing seams, never new ones: `KoreaderSyncApi`, `EpubImporter`, `TtsPlayerAdapter`, all wired in `AppContainer`.
+- Substitute through the existing seams, never new ones: `KoreaderSyncApi`, `EpubImporter`, `OpdsClient`, `NotesExporter`, all wired in `AppContainer`.
 - Push progress and save state inside `withContext(NonCancellable)` during teardown.
 - Put pure logic behind injected lambdas so it tests without a device; see `ReaderSettingsController` and `ReaderTtsController`.
 
 Add a schema change as an incremental migration, and register it:
 
 ```kotlin
-val MIGRATION_6_7 = object : Migration(6, 7) {
+val MIGRATION_9_10 = object : Migration(9, 10) {
     override fun migrate(db: SupportSQLiteDatabase) {
-        db.execSQL("ALTER TABLE books ADD COLUMN lastReadAtEpochMillis INTEGER")
+        db.execSQL("ALTER TABLE books ADD COLUMN rating INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE books ADD COLUMN tags TEXT NOT NULL DEFAULT ''")
     }
 }
-// ...then bump @Database(version = 7) and add MIGRATION_6_7 to .addMigrations(...)
+// ...then bump @Database(version = 10) and add MIGRATION_9_10 to .addMigrations(...)
 ```
 
 ## Testing and mocking

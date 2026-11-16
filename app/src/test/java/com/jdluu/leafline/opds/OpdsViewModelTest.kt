@@ -71,9 +71,11 @@ class OpdsViewModelTest {
         var lastFetchedUrl: String? = null
         var lastSearchTemplate: String? = null
         var lastSearchQuery: String? = null
+        var lastAuthHeader: String? = null
 
-        override suspend fun fetchFeed(url: String): Result<OpdsFeedResult> {
+        override suspend fun fetchFeed(url: String, authHeader: String?): Result<OpdsFeedResult> {
             lastFetchedUrl = url
+            lastAuthHeader = authHeader
             return Result.success(
                 OpdsFeedResult(
                     title = "Feed for $url",
@@ -98,9 +100,10 @@ class OpdsViewModelTest {
             )
         }
 
-        override suspend fun searchFeed(searchTemplateUrl: String, query: String): Result<OpdsFeedResult> {
+        override suspend fun searchFeed(searchTemplateUrl: String, query: String, authHeader: String?): Result<OpdsFeedResult> {
             lastSearchTemplate = searchTemplateUrl
             lastSearchQuery = query
+            lastAuthHeader = authHeader
             return Result.success(
                 OpdsFeedResult(
                     title = "Search Results for $query",
@@ -275,5 +278,52 @@ class OpdsViewModelTest {
 
         assertTrue(viewModel.isBookInLibrary(matchingBook))
         assertFalse(viewModel.isBookInLibrary(otherBook))
+    }
+
+    @Test
+    fun authenticatedFeed_propagatesAuthHeaderToFetchAndSearch() = runTest {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val feedStore = OpdsFeedStore.fromContext(context)
+        val opdsClient = FakeOpdsClient()
+        val repo = FakeLibraryRepository()
+        val downloadManager = OpdsDownloadManager(
+            context = context,
+            opdsClient = opdsClient,
+            importer = com.jdluu.leafline.ReadiumEpubImporter(context),
+            repository = repo,
+            scope = this
+        )
+
+        val viewModel = OpdsViewModel(
+            feedStore = feedStore,
+            opdsClient = opdsClient,
+            downloadManager = downloadManager,
+            libraryRepository = repo
+        )
+        testScheduler.advanceUntilIdle()
+
+        // Built-in feeds have no auth header
+        assertEquals(null, opdsClient.lastAuthHeader)
+
+        // Add custom feed with Basic Auth
+        viewModel.addCustomFeed(
+            title = "Secured Calibre",
+            url = "https://calibre.local/opds",
+            username = "myuser",
+            password = "mypassword"
+        )
+        testScheduler.advanceUntilIdle()
+
+        val expectedHeader = "Basic " + java.util.Base64.getEncoder().encodeToString("myuser:mypassword".toByteArray(Charsets.UTF_8))
+        assertEquals(expectedHeader, viewModel.currentAuthHeader)
+        assertEquals(expectedHeader, opdsClient.lastAuthHeader)
+        assertEquals("https://calibre.local/opds", opdsClient.lastFetchedUrl)
+
+        // Search within authenticated feed
+        viewModel.search("Isaac Asimov")
+        testScheduler.advanceUntilIdle()
+
+        assertEquals("Isaac Asimov", opdsClient.lastSearchQuery)
+        assertEquals(expectedHeader, opdsClient.lastAuthHeader)
     }
 }
