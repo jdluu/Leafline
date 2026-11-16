@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-16
+
 ### Added
 - **TTS Foreground Audio Service & Media Notification**:
   - Implemented `TtsAudioService` running as an Android `mediaPlayback` foreground service to keep text-to-speech continuous across screen lock and app switches.
