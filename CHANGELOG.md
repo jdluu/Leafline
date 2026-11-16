@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **TTS Foreground Audio Service & Media Notification**:
+  - Implemented `TtsAudioService` running as an Android `mediaPlayback` foreground service to keep text-to-speech continuous across screen lock and app switches.
+  - Implemented `TtsNotificationManager` building a media-styled (`Notification.MediaStyle`) playback notification with transport actions (Previous, Play/Pause toggle, Next, Stop).
+  - Wires deep link navigation on notification tap to resume `ReaderActivity` immediately.
+  - Synchronizes dynamic chapter, book title, author, and play/pause state in real-time.
 - **TTS MediaSession & Headset Remote Controls**:
   - Integrated `TtsMediaSessionManager` with Android `MediaSession` exposing full transport controls (Play, Pause, Skip Next, Skip Previous, Stop).
   - Synchronizes book title, author, and active chapter metadata to lockscreen, notification center, and connected remote devices (Bluetooth head units, watches).

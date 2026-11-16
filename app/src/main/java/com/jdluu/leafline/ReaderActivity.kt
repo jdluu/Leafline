@@ -214,6 +214,7 @@ import com.jdluu.leafline.reader.tts.TtsSleepState
 import com.jdluu.leafline.reader.tts.TtsAudioFocusManager
 import com.jdluu.leafline.reader.tts.AudioBecomingNoisyReceiver
 import com.jdluu.leafline.reader.tts.TtsMediaSessionManager
+import com.jdluu.leafline.reader.tts.TtsAudioService
 import com.jdluu.leafline.reader.tts.throttleLatest
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.navigator.HyperlinkNavigator
@@ -347,6 +348,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     private var searchSheetVisible = mutableStateOf(false)
     private var bookTitle = mutableStateOf("")
     private var bookAuthor = mutableStateOf<String?>(null)
+    private var currentChapterTitle = mutableStateOf<String?>(null)
 
     /** Sync conflict state for the bottom sheet. */
     private val syncConflictState = MutableStateFlow<SyncConflictState?>(null)
@@ -615,11 +617,46 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     )
                     ttsMediaSessionManager = sessionMgr
 
+                    TtsAudioService.serviceListener = object : TtsAudioService.Listener {
+                        override fun onPlay() { ttsController.play() }
+                        override fun onPause() { ttsController.pause() }
+                        override fun onSkipNext() { ttsController.skipNext() }
+                        override fun onSkipPrevious() { ttsController.skipPrevious() }
+                        override fun onStop() { ttsController.stop() }
+                    }
+
                     launch {
                         combine(ttsController.state, ttsController.rate) { state, rate ->
                             state to rate
                         }.collect { (state, rate) ->
                             ttsMediaSessionManager?.updatePlaybackState(state, rate)
+                            when (state) {
+                                ReaderTtsState.PLAYING -> {
+                                    TtsAudioService.startOrUpdate(
+                                        context = this@ReaderActivity,
+                                        bookTitle = bookTitle.value,
+                                        author = bookAuthor.value,
+                                        chapterTitle = currentChapterTitle.value,
+                                        isPlaying = true,
+                                        sessionToken = ttsMediaSessionManager?.sessionToken
+                                    )
+                                }
+                                ReaderTtsState.PAUSED -> {
+                                    TtsAudioService.startOrUpdate(
+                                        context = this@ReaderActivity,
+                                        bookTitle = bookTitle.value,
+                                        author = bookAuthor.value,
+                                        chapterTitle = currentChapterTitle.value,
+                                        isPlaying = false,
+                                        sessionToken = ttsMediaSessionManager?.sessionToken
+                                    )
+                                }
+                                ReaderTtsState.IDLE,
+                                ReaderTtsState.ERROR,
+                                ReaderTtsState.UNAVAILABLE -> {
+                                    TtsAudioService.stop(this@ReaderActivity)
+                                }
+                            }
                         }
                     }
                 }
@@ -930,6 +967,8 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         ttsNavigator = null
         ttsMediaSessionManager?.release()
         ttsMediaSessionManager = null
+        TtsAudioService.serviceListener = null
+        TtsAudioService.stop(this)
         navigationHistory.clear()
         jumpNoticeDismissJob?.cancel()
         if (isFinishing) {
@@ -1562,11 +1601,22 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     ttsController.onLocatorChanged(utteranceLocator.href.toString())
                     val chapterTitle = tocLinks.value.find { it.first.href.toString() == utteranceLocator.href.toString() }?.first?.title
                         ?: publication?.metadata?.title
+                    currentChapterTitle.value = chapterTitle
                     ttsMediaSessionManager?.updateMetadata(
                         bookTitle = bookTitle.value,
                         author = bookAuthor.value,
                         chapterTitle = chapterTitle
                     )
+                    if (ttsController.state.value == ReaderTtsState.PLAYING || ttsController.state.value == ReaderTtsState.PAUSED) {
+                        TtsAudioService.startOrUpdate(
+                            context = this@ReaderActivity,
+                            bookTitle = bookTitle.value,
+                            author = bookAuthor.value,
+                            chapterTitle = chapterTitle,
+                            isPlaying = (ttsController.state.value == ReaderTtsState.PLAYING),
+                            sessionToken = ttsMediaSessionManager?.sessionToken
+                        )
+                    }
                 }
         }
 
