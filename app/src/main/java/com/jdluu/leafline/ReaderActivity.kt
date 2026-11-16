@@ -210,6 +210,8 @@ import com.jdluu.leafline.reader.tts.ReaderTtsController
 import com.jdluu.leafline.reader.tts.ReaderTtsState
 import com.jdluu.leafline.reader.tts.TtsSleepOption
 import com.jdluu.leafline.reader.tts.TtsSleepState
+import com.jdluu.leafline.reader.tts.TtsAudioFocusManager
+import com.jdluu.leafline.reader.tts.AudioBecomingNoisyReceiver
 import com.jdluu.leafline.reader.tts.throttleLatest
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.navigator.HyperlinkNavigator
@@ -305,6 +307,12 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     private var ttsJob: Job? = null
     private val ttsObserveJobs = mutableListOf<Job>()
     private lateinit var ttsController: ReaderTtsController
+    private lateinit var ttsAudioFocusManager: TtsAudioFocusManager
+    private val audioBecomingNoisyReceiver = AudioBecomingNoisyReceiver {
+        if (this::ttsController.isInitialized) {
+            ttsController.pause()
+        }
+    }
 
     /** Lazily wired once the navigator exists; see onCreate. */
     private val goToLocator: (org.readium.r2.shared.publication.Locator) -> Unit = { locator ->
@@ -579,6 +587,13 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                             Toast.makeText(this@ReaderActivity, message, Toast.LENGTH_SHORT).show()
                         }
                     }
+                )
+                ttsAudioFocusManager = TtsAudioFocusManager.fromContext(
+                    context = this@ReaderActivity,
+                    onPausePlayback = { ttsController.pause() },
+                    onResumePlayback = { ttsController.play() },
+                    onDuckingVolume = { duckRatio -> handleTtsVolumeChange(duckRatio) },
+                    onRestoreVolume = { handleTtsVolumeChange(1.0f) }
                 )
                 searchHistoryStore = SearchHistoryStore.create(this@ReaderActivity)
                 bookSearcher = BookSearcher(
@@ -877,6 +892,10 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         }
         if (this::ttsController.isInitialized) {
             ttsController.stop()
+        }
+        audioBecomingNoisyReceiver.unregister(this)
+        if (this::ttsAudioFocusManager.isInitialized) {
+            ttsAudioFocusManager.abandonAudioFocus()
         }
         ttsNavigator?.asMedia3Player()?.volume = 1.0f
         ttsNavigator?.close()
@@ -1355,6 +1374,16 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     }
 
     private fun handleTtsPlay(): Boolean {
+        if (this::ttsAudioFocusManager.isInitialized) {
+            val granted = ttsAudioFocusManager.requestAudioFocus()
+            if (!granted) {
+                Log.w(TAG, "Audio focus request denied; cannot start TTS")
+                ttsController.onEngineError("Audio focus unavailable")
+                return false
+            }
+        }
+        audioBecomingNoisyReceiver.register(this@ReaderActivity)
+
         val nav = ttsNavigator
         if (nav != null) {
             Log.d(TAG, "Resuming TTS playback")
@@ -1406,11 +1435,19 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
 
     private fun handleTtsPause() {
         Log.d(TAG, "Pausing TTS playback")
+        audioBecomingNoisyReceiver.unregister(this@ReaderActivity)
+        if (this::ttsAudioFocusManager.isInitialized && !ttsAudioFocusManager.pausedDueToTransientLoss) {
+            ttsAudioFocusManager.abandonAudioFocus()
+        }
         ttsNavigator?.pause()
     }
 
     private fun handleTtsStop() {
         Log.d(TAG, "Stopping TTS playback")
+        audioBecomingNoisyReceiver.unregister(this@ReaderActivity)
+        if (this::ttsAudioFocusManager.isInitialized) {
+            ttsAudioFocusManager.abandonAudioFocus()
+        }
         ttsJob?.cancel()
         ttsJob = null
         ttsObserveJobs.forEach { it.cancel() }
