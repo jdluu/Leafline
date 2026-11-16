@@ -12,6 +12,27 @@ import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
 /**
+ * Turns a bare status code into something a reader can act on. OkHttp reports an empty
+ * message for HTTP/2 responses, which used to surface as a trailing "HTTP 401:".
+ */
+internal fun opdsHttpErrorMessage(
+    code: Int,
+    serverMessage: String,
+    action: String? = null
+): String {
+    val detail = when {
+        code == 401 || code == 403 ->
+            "This catalog needs a sign-in. Edit the catalog and add your credentials."
+        code == 404 -> "Catalog not found. The feed address may have moved."
+        code in 500..599 -> "The catalog server had a problem. Try again later."
+        serverMessage.isNotBlank() -> serverMessage
+        else -> "The catalog rejected the request."
+    }
+    val prefix = if (action != null) "${action.replaceFirstChar { it.uppercase() }}: " else ""
+    return "$prefix$detail (HTTP $code)"
+}
+
+/**
  * HTTP client for fetching OPDS catalog feeds, searching feeds, and downloading EPUB publications.
  */
 open class OpdsClient(
@@ -19,7 +40,8 @@ open class OpdsClient(
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .followRedirects(true)
-        .build()
+        .build(),
+    private val userAgent: String = "Leafline (Android; OPDS Client)"
 ) {
 
     /**
@@ -32,7 +54,7 @@ open class OpdsClient(
         runCatching {
             val builder = Request.Builder()
                 .url(url)
-                .header("User-Agent", "Leafline-Reader/0.3.0 (Android; OPDS Client)")
+                .header("User-Agent", userAgent)
                 .header("Accept", "application/atom+xml, application/opds+json, application/json, text/xml, */*")
 
             if (!authHeader.isNullOrBlank()) {
@@ -42,7 +64,7 @@ open class OpdsClient(
             val request = builder.build()
             okHttpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
-                    throw IllegalStateException("HTTP ${response.code}: ${response.message}")
+                    throw IllegalStateException(opdsHttpErrorMessage(response.code, response.message))
                 }
                 val body = response.body ?: throw IllegalStateException("Empty response body from $url")
                 val bytes = body.bytes()
@@ -138,7 +160,7 @@ open class OpdsClient(
         runCatching {
             val builder = Request.Builder()
                 .url(downloadUrl)
-                .header("User-Agent", "Leafline-Reader/0.3.0 (Android; OPDS Client)")
+                .header("User-Agent", userAgent)
 
             if (!authHeader.isNullOrBlank()) {
                 builder.header("Authorization", authHeader)
@@ -148,7 +170,7 @@ open class OpdsClient(
 
             okHttpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
-                    throw IllegalStateException("HTTP ${response.code} downloading book: ${response.message}")
+                    throw IllegalStateException(opdsHttpErrorMessage(response.code, response.message, "download failed"))
                 }
 
                 val body = response.body ?: throw IllegalStateException("Download body was empty")

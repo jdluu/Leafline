@@ -46,8 +46,8 @@ and paragraph indents, with reading chrome out of the way:
   search, advanced full-text in-book search (match case, whole word, regex, chapter filtering, and recent search history), offline dictionary lookup (ColorDict/GoldenDict/system Define), text sharing, and system text actions
 - **Notes & highlights export** — Export annotations, notes, and highlights to Markdown, Obsidian-compatible vault ZIP archives, Readwise CSV, and Anki flashcard TSV decks
 - **100% on-device backup & restore** — Export and restore complete library metadata, collections, bookmarks, and annotations via JSON
-- **Customizable reading & style presets** — Curated typography and accessibility presets (including OpenDyslexic and Accessible DfA), adjustable fonts, themes (including sepia),
-  margins, line height, interactive scrubber, edge tap zones, volume key page turning, reading progress HUD
+- **Customizable reading & style presets** — Curated typography and accessibility presets (including OpenDyslexic and Accessible DfA), adjustable fonts, text size,
+  themes (including sepia), margins, line height, interactive scrubber, edge tap zones, volume key page turning, reading progress HUD
   with estimated time left, page-turn animation, and per-book brightness
 - **Text-to-speech & sleep timer** — Optional on-device reading aloud with configurable playback
   speed, sentence-by-sentence skip navigation, countdown sleep timer (5 to 60 min or End of Chapter) with audio volume fade-out and auto-pause, synchronized page turning, and spoken utterance highlighting

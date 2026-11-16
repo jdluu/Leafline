@@ -505,6 +505,10 @@ private fun FeedContentView(
         else -> 4
     }
 
+    // Catalogs sometimes expose a "Home" link that points back at the feed itself; treat
+    // those as noise so the reader is not sent in a loop and the empty state can appear.
+    val navigationLinks = feed.navigationLinks.filterNot { it.href == feed.feedUrl }
+
     LazyVerticalGrid(
         columns = GridCells.Fixed(columns),
         contentPadding = PaddingValues(Spacing.sm),
@@ -513,7 +517,7 @@ private fun FeedContentView(
         modifier = Modifier.fillMaxSize()
     ) {
         // Navigation subsections (e.g. Categories, Genres)
-        if (feed.navigationLinks.isNotEmpty()) {
+        if (navigationLinks.isNotEmpty()) {
             item(span = { GridItemSpan(columns) }) {
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                     Text(
@@ -528,7 +532,7 @@ private fun FeedContentView(
                             .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
                     ) {
-                        feed.navigationLinks.forEach { navLink ->
+                        navigationLinks.forEach { navLink ->
                             SuggestionChip(
                                 onClick = { onSubfeedClick(navLink) },
                                 label = { Text(navLink.title) },
@@ -603,7 +607,7 @@ private fun FeedContentView(
         }
 
         // Empty state when nothing returned
-        if (feed.books.isEmpty() && feed.groups.isEmpty() && feed.navigationLinks.isEmpty()) {
+        if (feed.books.isEmpty() && feed.groups.isEmpty() && navigationLinks.isEmpty()) {
             item(span = { GridItemSpan(columns) }) {
                 Box(
                     modifier = Modifier
@@ -995,9 +999,10 @@ private fun AddOpdsFeedDialog(
                     modifier = Modifier.padding(top = Spacing.xs)
                 )
 
-                Row(
+                androidx.compose.foundation.layout.FlowRow(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xs)
                 ) {
                     OpdsAuthType.entries.forEach { type ->
                         FilterChip(

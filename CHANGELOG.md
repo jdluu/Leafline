@@ -21,6 +21,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-11-16
+
+Patch release from a full device pass over 0.4.0 on a Pixel 7 (Android 17): every
+screen was exercised by hand, and the defects below only surfaced in use, not in
+the unit tests or lint.
+
+### Added
+- **Reader text size control**: Stepper in Reader Settings from 80% to 160% in 10%
+  steps, persisted per reading preferences and clamped on restore.
+- **Settings version block**: "Leafline <version>" with the on-device privacy
+  statement at the foot of Settings, so support reports can name the installed
+  build.
+- **Batch action overflow menu**: Remaining bulk actions (edit tags, export notes,
+  delete) moved into an overflow menu when the selection bar runs out of room.
+- **Restore result summary**: Backup restore now reports matched books,
+  collections, bookmarks, and highlights with correct singular/plural wording.
+
+### Fixed
+- **Reader**: Programmatic jumps (contents, search, bookmarks) were labelled
+  "Footnote / Link" in the jump notice; each source now supplies its own
+  description.
+- **Reader**: Text-to-speech sentence following pushed a navigation-history entry
+  and showed a jump banner on every utterance.
+- **Reader**: Bookmarks created in a chapter were stored with no label and listed
+  by resource file name; they now capture the chapter title.
+- **Reader**: Highlights without a Readium `text.exact` locator field were listed
+  by their XHTML file name; they now quote the highlighted passage with context.
+- **Reader**: Contents tab labels were ellipsised ("Content…") because counts were
+  appended to each tab title; counts now live inside each pane.
+- **Library**: The active collection chip's close glyph did not clear the filter.
+- **Library**: The sort menu clipped "A-Z" / "Z-A" option spacing.
+- **Library**: The reading goals editor squeezed its value field vertically.
+- **Library**: Reading Insights metrics and tag rows could overflow their columns.
+- **Library**: The selection bar title overflowed instead of ellipsising, and its
+  action row was truncated on narrow screens.
+- **Library**: Backup restore buttons sat under the gesture bar on gesture-nav
+  devices; the sheet now reserves navigation bar insets.
+- **Backup**: Exported backups recorded `appVersion` as the literal `1.0`; the
+  real installed version is now written.
+- **Explore**: Catalog failures read "HTTP 401:" with no guidance; 401/403, 404,
+  and 5xx now explain what the reader can do.
+- **Explore**: Catalogs exposing a "Home" link that points at the feed itself
+  suppressed the empty state and looped; self-links are filtered as noise.
+- **Explore**: The selected catalog was forgotten on every restart; it is now
+  persisted.
+- **Explore**: The API token field in the Add Catalog dialog was compressed
+  vertically.
+- **Explore**: Requests now send an accurate `User-Agent` with the app version, so
+  catalog servers can tell builds apart.
+
 ## [0.4.0] - 2026-11-16
 
 ### Added

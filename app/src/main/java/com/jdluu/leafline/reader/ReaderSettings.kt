@@ -56,6 +56,29 @@ fun snapPageMargins(value: Double): Double {
     return clampPageMargins(snapped)
 }
 
+/** Default reading text scale, matching Readium's own default. */
+const val FONT_SIZE_DEFAULT = 1.0
+
+/** Smallest reading text scale allowed by the reader stepper. */
+const val FONT_SIZE_MIN = 0.8
+
+/** Largest reading text scale allowed by the reader stepper. */
+const val FONT_SIZE_MAX = 1.6
+
+/** Increment used by the reader text size stepper. */
+const val FONT_SIZE_STEP = 0.1
+
+/** Clamps a reading text scale into the supported range. */
+fun clampFontSize(value: Double): Double {
+    return value.coerceIn(FONT_SIZE_MIN, FONT_SIZE_MAX)
+}
+
+/** Snaps a reading text scale to the nearest stepper increment inside the supported range. */
+fun snapFontSize(value: Double): Double {
+    val snapped = kotlin.math.round(value / FONT_SIZE_STEP) * FONT_SIZE_STEP
+    return clampFontSize(kotlin.math.round(snapped * 100) / 100)
+}
+
 /** Whether a publication renders with its publisher styles or reader overrides. */
 enum class StyleMode {
     PUBLISHER,

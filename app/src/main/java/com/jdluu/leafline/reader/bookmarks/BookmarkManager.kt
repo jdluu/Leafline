@@ -22,14 +22,15 @@ class BookmarkManager(
     private val onSheetClosed: () -> Unit = {},
 ) {
 
-    fun toggle(bookStableId: String?) {
+    fun toggle(bookStableId: String?, label: String? = null) {
         val stableId = bookStableId ?: return
         val locatorJson = navigatorLocator() ?: return
         scope.launch {
             try {
                 val result = repository.toggleBookmark(
                     bookId = stableId,
-                    locatorJson = locatorJson
+                    locatorJson = locatorJson,
+                    label = label?.takeIf { it.isNotBlank() }
                 )
                 onBookmarkToggled(
                     when (result) {

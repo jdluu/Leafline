@@ -18,7 +18,9 @@ class LibraryBackupManager(
     private val bookDao: BookDao,
     private val collectionDao: CollectionDao,
     private val bookmarkDao: BookmarkDao,
-    private val annotationDao: AnnotationDao
+    private val annotationDao: AnnotationDao,
+    /** Recorded in the file so a shared backup can be traced to the build that wrote it. */
+    private val appVersion: String = "1.0"
 ) {
 
     suspend fun createBackup(): LibraryBackup = withContext(Dispatchers.IO) {
@@ -64,7 +66,7 @@ class LibraryBackupManager(
         LibraryBackup(
             version = 1,
             exportedAt = System.currentTimeMillis(),
-            appVersion = "1.0",
+            appVersion = appVersion,
             books = books,
             collections = collections,
             bookmarks = bookmarks,

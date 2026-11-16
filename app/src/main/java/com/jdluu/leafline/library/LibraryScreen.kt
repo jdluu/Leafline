@@ -214,11 +214,14 @@ fun LibraryScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
             if (selectionMode) {
+                var showSelectionOverflow by remember { mutableStateOf(false) }
                 TopAppBar(
                     title = {
                         Text(
                             "${selectedBookIds.size} selected",
-                            style = MaterialTheme.typography.titleLarge
+                            style = MaterialTheme.typography.titleLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     },
                     navigationIcon = {
@@ -257,29 +260,52 @@ fun LibraryScreen(
                                     }
                                 }
                             }
-                            IconButton(onClick = { showBatchTagDialog = true }) {
-                                Icon(Icons.AutoMirrored.Filled.Label, contentDescription = "Edit tags for selected books")
-                            }
                             if (collections.isNotEmpty()) {
                                 IconButton(onClick = { showBatchCollectionDialog = true }) {
                                     Icon(Icons.Default.CollectionsBookmark, contentDescription = "Add selected to collection")
                                 }
                             }
-                            if (notesExporter != null) {
-                                IconButton(onClick = {
-                                    scope.launch {
-                                        val selectedBooks = books.filter { it.stableId in selectedBookIds }
-                                        val batchData = selectedBooks.map { book ->
-                                            notesExporter.getExportDataForBook(book)
-                                        }
-                                        exportBatchTarget = batchData
-                                    }
-                                }) {
-                                    Icon(Icons.Default.Download, contentDescription = "Export notes for selected books")
+                            Box {
+                                IconButton(onClick = { showSelectionOverflow = true }) {
+                                    Icon(Icons.Default.MoreVert, contentDescription = "More bulk actions")
                                 }
-                            }
-                            IconButton(onClick = { showBatchDeleteConfirm = true }) {
-                                Icon(Icons.Default.Delete, contentDescription = "Delete selected books")
+                                DropdownMenu(
+                                    expanded = showSelectionOverflow,
+                                    onDismissRequest = { showSelectionOverflow = false }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("Edit tags") },
+                                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.Label, contentDescription = null) },
+                                        onClick = {
+                                            showSelectionOverflow = false
+                                            showBatchTagDialog = true
+                                        }
+                                    )
+                                    if (notesExporter != null) {
+                                        DropdownMenuItem(
+                                            text = { Text("Export notes") },
+                                            leadingIcon = { Icon(Icons.Default.Download, contentDescription = null) },
+                                            onClick = {
+                                                showSelectionOverflow = false
+                                                scope.launch {
+                                                    val selectedBooks = books.filter { it.stableId in selectedBookIds }
+                                                    val batchData = selectedBooks.map { book ->
+                                                        notesExporter.getExportDataForBook(book)
+                                                    }
+                                                    exportBatchTarget = batchData
+                                                }
+                                            }
+                                        )
+                                    }
+                                    DropdownMenuItem(
+                                        text = { Text("Delete books") },
+                                        leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
+                                        onClick = {
+                                            showSelectionOverflow = false
+                                            showBatchDeleteConfirm = true
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -399,6 +425,13 @@ fun LibraryScreen(
         )
         }
 
+        val sectionTitle = when {
+            selectedCollection != null ->
+                collections.firstOrNull { it.id == selectedCollection }?.name ?: "Collection"
+            readingStatusFilter != null -> readingStatusFilter!!.displayName
+            else -> "All books"
+        }
+
         LibraryFilterBar(
             searchActive = searchActive,
             query = query,
@@ -474,7 +507,7 @@ fun LibraryScreen(
 
                 item {
                     Text(
-                        text = if (readingStatusFilter != null) readingStatusFilter!!.displayName else "All books",
+                        text = sectionTitle,
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.padding(top = Spacing.xs)
                     )
@@ -543,7 +576,7 @@ fun LibraryScreen(
 
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     Text(
-                        text = if (readingStatusFilter != null) readingStatusFilter!!.displayName else "All books",
+                        text = sectionTitle,
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.padding(top = Spacing.xs)
                     )
@@ -1345,9 +1378,8 @@ private fun LibrarySortMenu(
             DropdownMenuItem(
                 text = {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
                     ) {
                         Text(option.label)
                         if (isSelected) {
@@ -2313,6 +2345,29 @@ private fun MetadataRow(label: String, value: String) {
     }
 }
 
+@Composable
+private fun InsightMetric(
+    value: String,
+    label: String,
+    modifier: Modifier = Modifier,
+    emphasised: Boolean = true
+) {
+    Column(modifier = modifier.semantics(mergeDescendants = true) {}) {
+        Text(
+            text = value,
+            style = MaterialTheme.typography.headlineMedium,
+            color = if (emphasised) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
 private fun formatEpochMillis(millis: Long): String {
     val sdf = java.text.SimpleDateFormat("MMM d, yyyy", java.util.Locale.US)
     return sdf.format(java.util.Date(millis))
@@ -2324,6 +2379,7 @@ internal fun formatReadingDuration(durationMillis: Long): String {
     val hours = totalMinutes / 60L
     val minutes = totalMinutes % 60L
     return when {
+        durationMillis <= 0L -> "0 min"
         totalMinutes < 1L -> "< 1 min"
         hours == 0L -> "$minutes min"
         minutes == 0L -> "${hours}h"
@@ -2388,52 +2444,36 @@ private fun ReadingInsightsSheet(
                         style = MaterialTheme.typography.titleMedium
                     )
                     Spacer(Modifier.height(Spacing.xs))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
-                            Text(
-                                text = formatReadingDuration(todayStats.activeDurationMillis),
-                                style = MaterialTheme.typography.headlineMedium,
-                                color = MaterialTheme.colorScheme.primary
+                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+                        ) {
+                            InsightMetric(
+                                value = formatReadingDuration(todayStats.activeDurationMillis),
+                                label = "Time read",
+                                modifier = Modifier.weight(1f)
                             )
-                            Text(
-                                text = "Time read",
-                                style = MaterialTheme.typography.labelMedium
-                            )
-                        }
-                        Column {
-                            Text(
-                                text = "${todayStats.sessionCount}",
-                                style = MaterialTheme.typography.headlineMedium,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Text(
-                                text = "Sessions",
-                                style = MaterialTheme.typography.labelMedium
+                            InsightMetric(
+                                value = "${todayStats.sessionCount}",
+                                label = "Sessions",
+                                modifier = Modifier.weight(1f)
                             )
                         }
-                        Column {
-                            Text(
-                                text = "${todayStats.booksOpened}",
-                                style = MaterialTheme.typography.headlineMedium,
-                                color = MaterialTheme.colorScheme.primary
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+                        ) {
+                            InsightMetric(
+                                value = "${todayStats.booksOpened}",
+                                label = "Books opened",
+                                modifier = Modifier.weight(1f)
                             )
-                            Text(
-                                text = "Books opened",
-                                style = MaterialTheme.typography.labelMedium
-                            )
-                        }
-                        Column {
-                            Text(
-                                text = if (currentStreak > 0) "$currentStreak d" else "0 d",
-                                style = MaterialTheme.typography.headlineMedium,
-                                color = if (currentStreak > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = "Streak",
-                                style = MaterialTheme.typography.labelMedium
+                            InsightMetric(
+                                value = if (currentStreak > 0) "$currentStreak d" else "0 d",
+                                label = "Streak",
+                                emphasised = currentStreak > 0,
+                                modifier = Modifier.weight(1f)
                             )
                         }
                     }
@@ -2766,9 +2806,10 @@ private fun EditReadingGoalsDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Row(
+                androidx.compose.foundation.layout.FlowRow(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xs)
                 ) {
                     listOf(15, 20, 30, 45, 60).forEach { mins ->
                         FilterChip(
@@ -2791,9 +2832,10 @@ private fun EditReadingGoalsDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Row(
+                androidx.compose.foundation.layout.FlowRow(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xs)
                 ) {
                     listOf(5, 12, 24, 52).forEach { count ->
                         FilterChip(

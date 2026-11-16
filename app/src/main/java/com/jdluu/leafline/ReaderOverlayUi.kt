@@ -192,6 +192,10 @@ import com.jdluu.leafline.library.data.LocatorIdentity
 import com.jdluu.leafline.library.LibrarySortStore
 import com.jdluu.leafline.reader.BRIGHTNESS_MAX
 import com.jdluu.leafline.reader.BRIGHTNESS_MIN
+import com.jdluu.leafline.reader.FONT_SIZE_DEFAULT
+import com.jdluu.leafline.reader.FONT_SIZE_MAX
+import com.jdluu.leafline.reader.FONT_SIZE_MIN
+import com.jdluu.leafline.reader.FONT_SIZE_STEP
 import com.jdluu.leafline.reader.PAGE_MARGINS_DEFAULT
 import com.jdluu.leafline.reader.PAGE_MARGINS_MAX
 import com.jdluu.leafline.reader.PAGE_MARGINS_MIN
@@ -206,6 +210,7 @@ import com.jdluu.leafline.reader.TapZoneConfig
 import com.jdluu.leafline.reader.TapZoneLayout
 import com.jdluu.leafline.reader.clampBrightness
 import com.jdluu.leafline.reader.effectiveTapZoneAction
+import com.jdluu.leafline.reader.snapFontSize
 import com.jdluu.leafline.reader.snapPageMargins
 import com.jdluu.leafline.reader.styleModeFor
 import com.jdluu.leafline.reader.pageTurnIsAnimated
@@ -1290,15 +1295,41 @@ internal fun formatCreatedAt(epochMillis: Long): String {
 }
 
 internal fun annotationExcerpt(annotation: Annotation): String {
-    return try {
-        val text = org.json.JSONObject(annotation.locatorJson).optJSONObject("text")
-        text?.optString("exact")?.takeIf { it.isNotBlank() }
-            ?: LocatorIdentity.displayTitle(annotation.locatorJson)
-            ?: "Highlight"
-    } catch (e: Exception) {
-        LocatorIdentity.displayTitle(annotation.locatorJson) ?: "Highlight"
+    val text = runCatching {
+        org.json.JSONObject(annotation.locatorJson).optJSONObject("text")
+    }.getOrNull()
+    val exact = text?.optString("exact")?.takeIf { it.isNotBlank() }
+    val highlight = text?.optString("highlight")?.takeIf { it.isNotBlank() }
+    return when {
+        exact != null -> collapseWhitespace(exact)
+        text != null && highlight != null -> excerptAround(
+            before = text.optString("before"),
+            highlight = highlight,
+            after = text.optString("after")
+        )
+        else -> LocatorIdentity.displayTitle(annotation.locatorJson) ?: "Highlight"
     }
 }
+
+/** Readium omits `text.exact` for some locators, so quote the highlight with its context. */
+private fun excerptAround(before: String, highlight: String, after: String): String {
+    // Slice raw text first and collapse whitespace only after joining, otherwise the
+    // boundary spaces around the highlight are lost ("monopolisingthebusiness").
+    val lead = before.takeLast(EXCERPT_CONTEXT_CHARS)
+    val trail = after.take(EXCERPT_CONTEXT_CHARS)
+    val body = collapseWhitespace(lead + highlight + trail).take(EXCERPT_MAX_CHARS).trimEnd()
+    return buildString {
+        if (lead.isNotBlank()) append("…")
+        append(body)
+        if (trail.isNotBlank()) append("…")
+    }
+}
+
+private fun collapseWhitespace(value: String): String =
+    value.replace(Regex("\\s+"), " ").trim()
+
+private const val EXCERPT_CONTEXT_CHARS = 60
+private const val EXCERPT_MAX_CHARS = 90
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -2102,6 +2133,46 @@ internal fun ReaderSettingsSheet(
                         }
                     }
                 )
+            }
+
+            Text("Text size", style = MaterialTheme.typography.labelLarge)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(top = 4.dp, bottom = Spacing.sm)
+            ) {
+                IconButton(onClick = {
+                    applyCustomPreference { prefs ->
+                        val current = prefs.fontSize ?: FONT_SIZE_DEFAULT
+                        if (current > FONT_SIZE_MIN) {
+                            prefs.copy(fontSize = snapFontSize(current - FONT_SIZE_STEP))
+                        } else {
+                            prefs
+                        }
+                    }
+                }) {
+                    Icon(Icons.Default.Remove, contentDescription = "Decrease text size")
+                }
+                val fontSizeValue = preferences.fontSize ?: FONT_SIZE_DEFAULT
+                Text(
+                    text = "${(fontSizeValue * 100).toInt()}%",
+                    modifier = Modifier
+                        .padding(horizontal = Padding.compact)
+                        .semantics {
+                            contentDescription = "Text size: ${(fontSizeValue * 100).toInt()} percent"
+                        }
+                )
+                IconButton(onClick = {
+                    applyCustomPreference { prefs ->
+                        val current = prefs.fontSize ?: FONT_SIZE_DEFAULT
+                        if (current < FONT_SIZE_MAX) {
+                            prefs.copy(fontSize = snapFontSize(current + FONT_SIZE_STEP))
+                        } else {
+                            prefs
+                        }
+                    }
+                }) {
+                    Icon(Icons.Default.Add, contentDescription = "Increase text size")
+                }
             }
 
             Text("Page margins", style = MaterialTheme.typography.labelLarge)

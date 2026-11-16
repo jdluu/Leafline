@@ -24,6 +24,7 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
@@ -472,7 +473,35 @@ fun SettingsTab(
             )
             HorizontalDivider(modifier = Modifier.padding(vertical = Spacing.md))
             KoreaderSyncSection(modifier = Modifier.fillMaxWidth())
+            HorizontalDivider(modifier = Modifier.padding(vertical = Spacing.md))
+            AboutFooter()
         }
+    }
+}
+
+/**
+ * Version and privacy footer. Support and bug reports need the installed build, and the
+ * on-device promise is worth restating where the sync fields live.
+ */
+@Composable
+private fun AboutFooter() {
+    val context = LocalContext.current
+    val versionName = remember {
+        runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName
+        }.getOrNull() ?: "unknown"
+    }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "Leafline $versionName",
+            style = MaterialTheme.typography.titleSmall
+        )
+        Text(
+            text = "All reading data stays on this device. No analytics, crash reporting, or telemetry.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = Spacing.xs)
+        )
     }
 }
 

@@ -34,7 +34,9 @@ class OpdsViewModel(
     val feedSources: StateFlow<List<OpdsFeedSource>> = _feedSources.asStateFlow()
 
     private val _selectedSource = MutableStateFlow<OpdsFeedSource>(
-        _feedSources.value.firstOrNull() ?: OpdsFeedStore.BUILT_IN_FEEDS.first()
+        _feedSources.value.firstOrNull { it.id == feedStore.loadSelectedFeedId() }
+            ?: _feedSources.value.firstOrNull()
+            ?: OpdsFeedStore.BUILT_IN_FEEDS.first()
     )
     val selectedSource: StateFlow<OpdsFeedSource> = _selectedSource.asStateFlow()
 
@@ -61,6 +63,7 @@ class OpdsViewModel(
     fun selectSource(source: OpdsFeedSource) {
         if (_selectedSource.value.id == source.id && _breadcrumbs.value.size <= 1) return
         _selectedSource.value = source
+        feedStore.saveSelectedFeedId(source.id)
         _searchQuery.value = ""
         loadRootFeed(source)
     }
