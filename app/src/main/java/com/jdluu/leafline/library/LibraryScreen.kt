@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -2336,6 +2337,11 @@ private fun ReadingInsightsSheet(
     viewModel: LibraryViewModel,
     onDismiss: () -> Unit
 ) {
+    val readingGoals by viewModel.readingGoals.collectAsState()
+    val allBooks by viewModel.books.collectAsState()
+    val finishedBooksCount = remember(allBooks) { allBooks.count { it.readingStatus == ReadingStatus.FINISHED } }
+    var showEditGoalsDialog by remember { mutableStateOf(false) }
+
     var todayStats by remember { mutableStateOf(ReadingAggregate.EMPTY) }
     var weeklyStats by remember { mutableStateOf(ReadingAggregate.EMPTY) }
     var recentDailyStats by remember { mutableStateOf<List<Pair<LocalDate, ReadingAggregate>>>(emptyList()) }
@@ -2431,6 +2437,145 @@ private fun ReadingInsightsSheet(
                             )
                         }
                     }
+                }
+            }
+
+            Spacer(Modifier.height(Spacing.md))
+
+            val todayMinutes = todayStats.activeMinutes
+            val dailyTarget = readingGoals.dailyMinutes
+            val dailyProgress = if (dailyTarget > 0) (todayMinutes.toFloat() / dailyTarget.toFloat()).coerceIn(0f, 1f) else 0f
+            val dailyGoalReached = todayMinutes >= dailyTarget
+
+            val booksTarget = readingGoals.booksTarget
+            val booksProgress = if (booksTarget > 0) (finishedBooksCount.toFloat() / booksTarget.toFloat()).coerceIn(0f, 1f) else 0f
+            val booksGoalReached = finishedBooksCount >= booksTarget
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Column(modifier = Modifier.padding(Spacing.md)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Reading Goals",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        TextButton(
+                            onClick = { showEditGoalsDialog = true },
+                            modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                        ) {
+                            Text("Edit")
+                        }
+                    }
+
+                    Spacer(Modifier.height(Spacing.xs))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "Daily reading target",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "$todayMinutes / $dailyTarget min",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        if (dailyGoalReached) {
+                            Surface(
+                                shape = MaterialTheme.shapes.small,
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                modifier = Modifier.padding(vertical = Spacing.xs)
+                            ) {
+                                Text(
+                                    text = "Goal met! 🎉",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = Spacing.xs, vertical = 2.dp)
+                                )
+                            }
+                        } else {
+                            Text(
+                                text = "${(dailyProgress * 100).toInt()}%",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(Spacing.xs))
+                    LinearProgressIndicator(
+                        progress = { dailyProgress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(MaterialTheme.shapes.small),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surface
+                    )
+
+                    Spacer(Modifier.height(Spacing.md))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "Books finished target",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "$finishedBooksCount / $booksTarget books",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        if (booksGoalReached) {
+                            Surface(
+                                shape = MaterialTheme.shapes.small,
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                modifier = Modifier.padding(vertical = Spacing.xs)
+                            ) {
+                                Text(
+                                    text = "Goal met! 🏆",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = Spacing.xs, vertical = 2.dp)
+                                )
+                            }
+                        } else {
+                            Text(
+                                text = "${(booksProgress * 100).toInt()}%",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(Spacing.xs))
+                    LinearProgressIndicator(
+                        progress = { booksProgress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(MaterialTheme.shapes.small),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surface
+                    )
                 }
             }
 
@@ -2562,7 +2707,128 @@ private fun ReadingInsightsSheet(
                 Text("Close")
             }
         }
+
+        if (showEditGoalsDialog) {
+            EditReadingGoalsDialog(
+                initialDailyMinutes = readingGoals.dailyMinutes,
+                initialBooksTarget = readingGoals.booksTarget,
+                onDismiss = { showEditGoalsDialog = false },
+                onSave = { dailyMins, booksTarget ->
+                    viewModel.updateReadingGoals(dailyMins, booksTarget)
+                }
+            )
+        }
     }
+}
+
+@Composable
+private fun EditReadingGoalsDialog(
+    initialDailyMinutes: Int,
+    initialBooksTarget: Int,
+    onDismiss: () -> Unit,
+    onSave: (dailyMinutes: Int, booksTarget: Int) -> Unit
+) {
+    var dailyMinutesText by remember { mutableStateOf(initialDailyMinutes.toString()) }
+    var booksTargetText by remember { mutableStateOf(initialBooksTarget.toString()) }
+
+    val parsedDailyMinutes = dailyMinutesText.trim().toIntOrNull()
+    val parsedBooksTarget = booksTargetText.trim().toIntOrNull()
+    val isValid = parsedDailyMinutes != null && parsedDailyMinutes > 0 &&
+            parsedBooksTarget != null && parsedBooksTarget > 0
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Edit Reading Goals",
+                style = MaterialTheme.typography.titleLarge
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+            ) {
+                Text(
+                    text = "Set your personal reading targets. All goals and stats remain entirely private on your device.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                OutlinedTextField(
+                    value = dailyMinutesText,
+                    onValueChange = { dailyMinutesText = it.filter { ch -> ch.isDigit() } },
+                    label = { Text("Daily target (minutes)") },
+                    singleLine = true,
+                    isError = parsedDailyMinutes == null || parsedDailyMinutes <= 0,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+                ) {
+                    listOf(15, 20, 30, 45, 60).forEach { mins ->
+                        FilterChip(
+                            selected = parsedDailyMinutes == mins,
+                            onClick = { dailyMinutesText = mins.toString() },
+                            label = { Text("${mins}m") },
+                            modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(Spacing.xs))
+
+                OutlinedTextField(
+                    value = booksTargetText,
+                    onValueChange = { booksTargetText = it.filter { ch -> ch.isDigit() } },
+                    label = { Text("Books target") },
+                    singleLine = true,
+                    isError = parsedBooksTarget == null || parsedBooksTarget <= 0,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+                ) {
+                    listOf(5, 12, 24, 52).forEach { count ->
+                        FilterChip(
+                            selected = parsedBooksTarget == count,
+                            onClick = { booksTargetText = count.toString() },
+                            label = { Text("$count") },
+                            modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (isValid) {
+                        onSave(parsedDailyMinutes!!, parsedBooksTarget!!)
+                        onDismiss()
+                    }
+                },
+                enabled = isValid,
+                modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+            ) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 

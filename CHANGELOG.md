@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Local-First Reading Goals**:
+  - Added configurable daily reading duration targets (e.g., 20 mins/day) and book reading targets, stored privately on-device via `ReadingGoalStore`.
+  - Added reading goal progress bars with percentage indicators, goal completion celebration badges, and an in-app goal editor (`EditReadingGoalsDialog`) directly inside the Reading Insights sheet.
+  - 100% private and on-device with zero telemetry or network calls.
 - **In-App Book Metadata Editor**:
   - Added in-app metadata editor directly in the book detail modal allowing users to edit book title, authors, series name, series index / volume number, publisher, and description.
   - Added `LibraryViewModel.updateBookMetadata` persisting updates to Room database with reactive UI updates across the library grid and reader.

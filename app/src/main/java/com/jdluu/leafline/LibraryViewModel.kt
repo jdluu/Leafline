@@ -31,6 +31,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import com.jdluu.leafline.library.data.ReadingAggregate
 import com.jdluu.leafline.library.data.ReadingSessionRepository
+import com.jdluu.leafline.library.ReadingGoalStore
+import com.jdluu.leafline.library.ReadingGoals
 import java.time.LocalDate
 
 class LibraryViewModel(
@@ -38,7 +40,8 @@ class LibraryViewModel(
     private val coverLoader: CoverLoader? = null,
     private val sortStore: LibrarySortStore? = null,
     private val readingSessionRepository: ReadingSessionRepository? = null,
-    private val layoutStore: LibraryLayoutStore? = null
+    private val layoutStore: LibraryLayoutStore? = null,
+    private val readingGoalStore: ReadingGoalStore? = null
 ) : ViewModel() {
 
     val books: StateFlow<List<LibraryBook>> = repository.getAllBooks()
@@ -85,6 +88,9 @@ class LibraryViewModel(
 
     private val _layout = MutableStateFlow(layoutStore?.load() ?: LibraryLayout.GRID)
     val layout: StateFlow<LibraryLayout> = _layout.asStateFlow()
+
+    private val _readingGoals = MutableStateFlow(readingGoalStore?.loadGoals() ?: ReadingGoals())
+    val readingGoals: StateFlow<ReadingGoals> = _readingGoals.asStateFlow()
 
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query.asStateFlow()
@@ -526,5 +532,14 @@ class LibraryViewModel(
             result.add(date to aggregate)
         }
         return result
+    }
+
+    fun updateReadingGoals(dailyMinutes: Int, booksTarget: Int) {
+        val newGoals = ReadingGoals(
+            dailyMinutes = dailyMinutes.coerceAtLeast(1),
+            booksTarget = booksTarget.coerceAtLeast(1)
+        )
+        _readingGoals.value = newGoals
+        readingGoalStore?.saveGoals(newGoals)
     }
 }
