@@ -83,12 +83,16 @@ fun NotesExportSheet(
             listOf(
                 ExportFormat.VAULT_ZIP,
                 ExportFormat.OBSIDIAN_MARKDOWN,
+                ExportFormat.READWISE_CSV,
+                ExportFormat.ANKI_TSV,
                 ExportFormat.STRUCTURED_JSON,
                 ExportFormat.PLAIN_TEXT
             )
         } else {
             listOf(
                 ExportFormat.OBSIDIAN_MARKDOWN,
+                ExportFormat.READWISE_CSV,
+                ExportFormat.ANKI_TSV,
                 ExportFormat.STRUCTURED_JSON,
                 ExportFormat.PLAIN_TEXT
             )

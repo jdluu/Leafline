@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Anki Flashcards & Readwise Export Formats**:
+  - Added Anki TSV flashcard deck generation with HTML front/back cards, book tagging, and chapter attribution.
+  - Added official Readwise-compatible CSV export format (`Highlight,Book Title,Book Author,URL,Note,Location,Date`) with RFC 4180 escaping.
+  - Integrated Anki TSV and Readwise CSV choices into both single-book and batch export flows in `NotesExportSheet`.
 - **OPDS Catalog Authentication & Search**:
   - Added HTTP Basic Auth and Bearer Token credential support for custom OPDS feeds (enabling integration with protected Calibre-Web, Kavita, and Audiobookshelf servers).
   - OpenSearch XML description document template resolution and search term substitution.

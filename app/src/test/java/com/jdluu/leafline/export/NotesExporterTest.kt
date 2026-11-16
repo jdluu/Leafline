@@ -124,6 +124,18 @@ class NotesExporterTest {
         val txtResult = exporter.exportSingle(data, ExportFormat.PLAIN_TEXT)
         assertEquals("Great Book-Notes.txt", txtResult.filename)
         assertTrue(txtResult.content.contains("Great Book"))
+
+        val csvResult = exporter.exportSingle(data, ExportFormat.READWISE_CSV)
+        assertEquals("Great Book-Notes.csv", csvResult.filename)
+        assertEquals("text/csv", csvResult.mimeType)
+        assertTrue(csvResult.content.contains("Highlight,Book Title,Book Author,URL,Note,Location,Date"))
+        assertTrue(csvResult.content.contains("hello world"))
+
+        val tsvResult = exporter.exportSingle(data, ExportFormat.ANKI_TSV)
+        assertEquals("Great Book-Notes.tsv", tsvResult.filename)
+        assertEquals("text/tab-separated-values", tsvResult.mimeType)
+        assertTrue(tsvResult.content.contains("#separator:tab"))
+        assertTrue(tsvResult.content.contains("hello world"))
     }
 
     @Test
@@ -144,6 +156,14 @@ class NotesExporterTest {
         assertTrue(batchResult.filename.startsWith("Leafline-Notes-") && batchResult.filename.endsWith(".zip"))
         assertNotNull(batchResult.binaryPayload)
         assertTrue(batchResult.binaryPayload!!.isNotEmpty())
+
+        val batchCsvResult = exporter.exportBatch(listOf(data), ExportFormat.READWISE_CSV)
+        assertTrue(batchCsvResult.filename.startsWith("Leafline-Notes-") && batchCsvResult.filename.endsWith(".csv"))
+        assertTrue(batchCsvResult.textPayload!!.contains("Highlight,Book Title,Book Author,URL,Note,Location,Date"))
+
+        val batchTsvResult = exporter.exportBatch(listOf(data), ExportFormat.ANKI_TSV)
+        assertTrue(batchTsvResult.filename.startsWith("Leafline-Notes-") && batchTsvResult.filename.endsWith(".tsv"))
+        assertTrue(batchTsvResult.textPayload!!.contains("#separator:tab"))
     }
 
     @Test

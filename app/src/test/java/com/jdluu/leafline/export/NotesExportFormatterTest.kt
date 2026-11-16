@@ -210,4 +210,93 @@ class NotesExportFormatterTest {
         assertEquals("A_B_C_____", NotesExportFormatter.sanitizeFileName("A/B\\C*<>|\""))
         assertEquals("Untitled", NotesExportFormatter.sanitizeFileName("???:::***"))
     }
+
+    @Test
+    fun formatSingleBookReadwiseCsvGeneratesValidCsvHeaderAndRows() {
+        val csv = NotesExportFormatter.formatSingleBookReadwiseCsv(bookExportData)
+        val lines = csv.trim().lines()
+        assertEquals("Highlight,Book Title,Book Author,URL,Note,Location,Date", lines[0])
+        assertEquals(3, lines.size) // header + 2 highlights
+
+        // First row
+        assertTrue(lines[1].contains("I must not fear. Fear is the mind-killer."))
+        assertTrue(lines[1].contains("Dune"))
+        assertTrue(lines[1].contains("Frank Herbert"))
+        assertTrue(lines[1].contains("The famous litany against fear."))
+        assertTrue(lines[1].contains("Chapter One"))
+
+        // Second row
+        assertTrue(lines[2].contains("The mystery of life isn't a problem to solve"))
+        assertTrue(lines[2].contains("Chapter Three"))
+    }
+
+    @Test
+    fun formatBatchReadwiseCsvGeneratesCombinedRows() {
+        val book2 = LibraryBook(stableId = "book-99", title = "Foundation", authors = listOf("Isaac Asimov"))
+        val annot = Annotation(id = 10, bookId = "book-99", locatorJson = """{"text":{"exact":"Violence is the last refuge"}}""", colorHex = "#FFEB3B", note = "Salvor Hardin", createdAt = 1000L)
+        val book2Data = BookExportData(book2, listOf(annot), emptyList())
+
+        val csv = NotesExportFormatter.formatBatchReadwiseCsv(listOf(bookExportData, book2Data))
+        val lines = csv.trim().lines()
+        assertEquals("Highlight,Book Title,Book Author,URL,Note,Location,Date", lines[0])
+        assertEquals(4, lines.size) // header + 3 highlights
+        assertTrue(csv.contains("Dune"))
+        assertTrue(csv.contains("Foundation"))
+        assertTrue(csv.contains("Violence is the last refuge"))
+    }
+
+    @Test
+    fun formatSingleBookAnkiTsvGeneratesValidAnkiDeck() {
+        val tsv = NotesExportFormatter.formatSingleBookAnkiTsv(bookExportData)
+        val lines = tsv.trim().lines()
+        assertEquals("#separator:tab", lines[0])
+        assertEquals("#html:true", lines[1])
+        assertEquals("#tags column:4", lines[2])
+        assertEquals(5, lines.size) // 3 header lines + 2 flashcards
+
+        // Card with note
+        val card1 = lines[3].split('\t')
+        assertEquals(4, card1.size)
+        assertTrue(card1[0].contains("The famous litany against fear."))
+        assertTrue(card1[1].contains("I must not fear. Fear is the mind-killer."))
+        assertTrue(card1[2].contains("Dune by Frank Herbert (Chapter One)"))
+        assertTrue(card1[3].contains("leafline"))
+        assertTrue(card1[3].contains("book_dune"))
+        assertTrue(card1[3].contains("color_yellow"))
+        assertTrue(card1[3].contains("collection_favorites"))
+        assertTrue(card1[3].contains("sci-fi"))
+
+        // Card without note
+        val card2 = lines[4].split('\t')
+        assertEquals(4, card2.size)
+        assertTrue(card2[0].contains("Quote from <i>Dune</i> (Chapter Three)"))
+        assertTrue(card2[1].contains("The mystery of life isn't a problem to solve"))
+    }
+
+    @Test
+    fun formatBatchAnkiTsvCombinesDecksWithTags() {
+        val book2 = LibraryBook(stableId = "book-99", title = "Foundation", authors = listOf("Isaac Asimov"), tags = listOf("classic"))
+        val annot = Annotation(id = 10, bookId = "book-99", locatorJson = """{"text":{"exact":"Violence is the last refuge"}}""", colorHex = "#5543A047", note = null, createdAt = 1000L)
+        val book2Data = BookExportData(book2, listOf(annot), listOf("Sci-Fi"))
+
+        val tsv = NotesExportFormatter.formatBatchAnkiTsv(listOf(bookExportData, book2Data))
+        val lines = tsv.trim().lines()
+        assertEquals(6, lines.size) // 3 headers + 3 cards
+        assertTrue(tsv.contains("Foundation"))
+        assertTrue(tsv.contains("Violence is the last refuge"))
+    }
+
+    @Test
+    fun escapeCsvFieldHandlesQuotesAndCommas() {
+        assertEquals("simple", NotesExportFormatter.escapeCsvField("simple"))
+        assertEquals("\"hello, world\"", NotesExportFormatter.escapeCsvField("hello, world"))
+        assertEquals("\"he said \"\"hi\"\"\"", NotesExportFormatter.escapeCsvField("he said \"hi\""))
+        assertEquals("\"line1\nline2\"", NotesExportFormatter.escapeCsvField("line1\nline2"))
+    }
+
+    @Test
+    fun escapeHtmlEscapesSpecialCharsAndTabs() {
+        val escaped = NotesExportFormatter.escapeHtml("<b>\"Test\" & 'Quote'</b>\tTab")
+        assertEquals("&lt;b&gt;&quot;Test&quot; &amp; 'Quote'&lt;/b&gt;    Tab", escaped)
+    }
 }

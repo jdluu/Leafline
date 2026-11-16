@@ -44,7 +44,7 @@ and paragraph indents, with reading chrome out of the way:
   weekly insights, reading streak counter, interactive 7-day activity chart, and estimated time remaining
 - **Bookmarks, annotations & dictionary** — Multi-color highlights, color filtering, notes
   search, advanced full-text in-book search (match case, whole word, regex, chapter filtering, and recent search history), offline dictionary lookup (ColorDict/GoldenDict/system Define), text sharing, and system text actions
-- **Notes & highlights export** — Export annotations, notes, and highlights to Markdown or Obsidian-compatible vault ZIP archives
+- **Notes & highlights export** — Export annotations, notes, and highlights to Markdown, Obsidian-compatible vault ZIP archives, Readwise CSV, and Anki flashcard TSV decks
 - **100% on-device backup & restore** — Export and restore complete library metadata, collections, bookmarks, and annotations via JSON
 - **Customizable reading & style presets** — Curated typography and accessibility presets (including OpenDyslexic and Accessible DfA), adjustable fonts, themes (including sepia),
   margins, line height, interactive scrubber, edge tap zones, volume key page turning, reading progress HUD
