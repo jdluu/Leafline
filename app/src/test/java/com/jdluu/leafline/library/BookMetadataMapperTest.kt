@@ -260,4 +260,41 @@ class BookMetadataMapperTest {
         assertEquals("/books/another/path.epub", result.filePath)
         assertEquals("sha256-abc123", result.fileHash)
     }
+
+    @OptIn(ExperimentalTime::class)
+    @Test
+    fun `series and seriesIndex extracted from belongsToSeries`() {
+        val metadata = Metadata(
+            belongsTo = mapOf(
+                "series" to listOf(
+                    Contributor(
+                        localizedName = LocalizedString("The Lord of the Rings"),
+                        position = 2.0
+                    )
+                )
+            )
+        )
+        val result = BookMetadataMapper.map(
+            metadata = metadata,
+            filePath = "/books/lotr2.epub",
+            fileHash = "hash123",
+            addedAt = Instant.parse("2024-01-15T10:30:00Z")
+        )
+        assertEquals("The Lord of the Rings", result.series)
+        assertEquals(2.0f, result.seriesIndex)
+    }
+
+    @OptIn(ExperimentalTime::class)
+    @Test
+    fun `series and seriesIndex are null when not present`() {
+        val metadata = Metadata()
+        val result = BookMetadataMapper.map(
+            metadata = metadata,
+            filePath = "/books/standalone.epub",
+            fileHash = "hash123",
+            addedAt = Instant.parse("2024-01-15T10:30:00Z")
+        )
+        assertNull(result.series)
+        assertNull(result.seriesIndex)
+    }
 }

@@ -1,6 +1,7 @@
 package com.jdluu.leafline.library
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class LibrarySortTest {
@@ -182,6 +183,48 @@ class LibrarySortTest {
     }
 
     @Test
+    fun `SERIES sorts by series name ascending then seriesIndex ascending then title`() {
+        val books = listOf(
+            book("1", "Fellowship", addedAt = 100).copy(series = "Lord of the Rings", seriesIndex = 1f),
+            book("2", "Two Towers", addedAt = 200).copy(series = "Lord of the Rings", seriesIndex = 2f),
+            book("3", "Return of the King", addedAt = 300).copy(series = "Lord of the Rings", seriesIndex = 3f),
+            book("4", "The Hobbit", addedAt = 400).copy(series = "Middle-earth", seriesIndex = null),
+            book("5", "Standalone", addedAt = 500).copy(series = null, seriesIndex = null)
+        )
+
+        val sorted = LibrarySort.SERIES.sorted(books, ascending = true)
+
+        assertEquals(listOf("1", "2", "3", "4", "5"), sorted.map { it.stableId })
+    }
+
+    @Test
+    fun `SERIES sorts by series name descending then seriesIndex descending`() {
+        val books = listOf(
+            book("1", "Fellowship", addedAt = 100).copy(series = "Lord of the Rings", seriesIndex = 1f),
+            book("2", "Return of the King", addedAt = 300).copy(series = "Lord of the Rings", seriesIndex = 3f),
+            book("3", "The Hobbit", addedAt = 400).copy(series = "Middle-earth", seriesIndex = null),
+            book("4", "Standalone", addedAt = 500).copy(series = null, seriesIndex = null)
+        )
+
+        val sorted = LibrarySort.SERIES.sorted(books, ascending = false)
+
+        assertEquals(listOf("3", "2", "1", "4"), sorted.map { it.stableId })
+    }
+
+    @Test
+    fun `formattedSeries formats whole and decimal indices properly`() {
+        val bookWhole = book("1", "Book 1").copy(series = "Foundation", seriesIndex = 1.0f)
+        val bookFraction = book("2", "Book 1.5").copy(series = "Foundation", seriesIndex = 1.5f)
+        val bookNoIndex = book("3", "Book 0").copy(series = "Foundation", seriesIndex = null)
+        val bookNoSeries = book("4", "Standalone").copy(series = null, seriesIndex = null)
+
+        assertEquals("Foundation #1", bookWhole.formattedSeries())
+        assertEquals("Foundation #1.5", bookFraction.formattedSeries())
+        assertEquals("Foundation", bookNoIndex.formattedSeries())
+        assertNull(bookNoSeries.formattedSeries())
+    }
+
+    @Test
     fun `fromNameOrDefault parses stored names`() {
         assertEquals(LibrarySort.TITLE, LibrarySort.fromNameOrDefault("TITLE"))
         assertEquals(LibrarySort.AUTHOR, LibrarySort.fromNameOrDefault("AUTHOR"))
@@ -189,6 +232,7 @@ class LibrarySortTest {
         assertEquals(LibrarySort.RECENTLY_READ, LibrarySort.fromNameOrDefault("RECENTLY_READ"))
         assertEquals(LibrarySort.PROGRESS, LibrarySort.fromNameOrDefault("PROGRESS"))
         assertEquals(LibrarySort.RATING, LibrarySort.fromNameOrDefault("RATING"))
+        assertEquals(LibrarySort.SERIES, LibrarySort.fromNameOrDefault("SERIES"))
     }
 
     @Test

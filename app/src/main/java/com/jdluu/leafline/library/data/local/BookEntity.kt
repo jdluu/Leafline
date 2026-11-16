@@ -24,7 +24,9 @@ data class BookEntity(
     val lastReadAtEpochMillis: Long? = null,
     val readingStatus: String = "unread",
     val rating: Int? = null,
-    val tags: List<String> = emptyList()
+    val tags: List<String> = emptyList(),
+    val series: String? = null,
+    val seriesIndex: Float? = null
 ) {
     companion object {
         fun fromLibraryBook(book: LibraryBook): BookEntity {
@@ -46,7 +48,9 @@ data class BookEntity(
                 lastLocatorJson = book.lastLocatorJson,
                 readingStatus = book.readingStatus.dbValue,
                 rating = book.rating,
-                tags = book.tags
+                tags = book.tags,
+                series = book.series,
+                seriesIndex = book.seriesIndex
             )
         }
 
@@ -69,7 +73,9 @@ data class BookEntity(
                 lastLocatorJson = entity.lastLocatorJson,
                 readingStatus = ReadingStatus.fromDb(entity.readingStatus),
                 rating = entity.rating,
-                tags = entity.tags
+                tags = entity.tags,
+                series = entity.series,
+                seriesIndex = entity.seriesIndex
             )
         }
     }

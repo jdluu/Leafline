@@ -1506,6 +1506,16 @@ fun BookGridTile(
                     modifier = Modifier.padding(top = 2.dp)
                 )
             }
+            book.formattedSeries()?.let { seriesText ->
+                Text(
+                    text = seriesText,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
             if ((book.rating != null && book.rating > 0) || book.tags.isNotEmpty()) {
                 Row(
                     modifier = Modifier
@@ -1753,6 +1763,14 @@ private fun BookDetailSheet(
                             book.authors.joinToString(", "),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    book.formattedSeries()?.let { seriesText ->
+                        Text(
+                            text = seriesText,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(top = 2.dp)
                         )
                     }
                     val progressFraction = ReadingProgressMath.percentageFromLocator(book.lastLocatorJson)

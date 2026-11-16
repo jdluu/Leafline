@@ -17,7 +17,7 @@ interface BookDao {
 
     @Query(
         "SELECT * FROM books " +
-            "WHERE title LIKE '%' || :query || '%' OR authors LIKE '%' || :query || '%' OR tags LIKE '%' || :query || '%' " +
+            "WHERE title LIKE '%' || :query || '%' OR authors LIKE '%' || :query || '%' OR tags LIKE '%' || :query || '%' OR series LIKE '%' || :query || '%' " +
             "ORDER BY addedAtEpochMillis DESC"
     )
     fun searchBooks(query: String): Flow<List<BookEntity>>
@@ -57,6 +57,9 @@ interface BookDao {
 
     @Query("UPDATE books SET tags = :tags WHERE stableId = :stableId")
     suspend fun setTags(stableId: String, tags: List<String>)
+
+    @Query("UPDATE books SET series = :series, seriesIndex = :seriesIndex WHERE stableId = :stableId")
+    suspend fun setSeries(stableId: String, series: String?, seriesIndex: Float?)
 
     @Query("SELECT * FROM books WHERE readingStatus = :readingStatus ORDER BY addedAtEpochMillis DESC")
     fun getBooksByReadingStatus(readingStatus: String): Flow<List<BookEntity>>
