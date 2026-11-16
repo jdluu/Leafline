@@ -1315,8 +1315,12 @@ internal fun annotationExcerpt(annotation: Annotation): String {
 private fun excerptAround(before: String, highlight: String, after: String): String {
     // Slice raw text first and collapse whitespace only after joining, otherwise the
     // boundary spaces around the highlight are lost ("monopolisingthebusiness").
-    val lead = before.takeLast(EXCERPT_CONTEXT_CHARS)
-    val trail = after.take(EXCERPT_CONTEXT_CHARS)
+    // Cut on word boundaries, but only when the slice was actually truncated: a short
+    // context starts and ends on real word boundaries already.
+    val leadSlice = before.takeLast(EXCERPT_CONTEXT_CHARS)
+    val trailSlice = after.take(EXCERPT_CONTEXT_CHARS)
+    val lead = if (before.length > EXCERPT_CONTEXT_CHARS) trimToLastWord(leadSlice) else leadSlice
+    val trail = if (after.length > EXCERPT_CONTEXT_CHARS) trimToFirstWord(trailSlice) else trailSlice
     val body = collapseWhitespace(lead + highlight + trail).take(EXCERPT_MAX_CHARS).trimEnd()
     return buildString {
         if (lead.isNotBlank()) append("…")
@@ -1324,6 +1328,14 @@ private fun excerptAround(before: String, highlight: String, after: String): Str
         if (trail.isNotBlank()) append("…")
     }
 }
+
+/** Drops a partial leading word left by a mid-sentence slice. */
+private fun trimToLastWord(text: String): String =
+    text.indexOf(' ').let { if (it >= 0) text.substring(it + 1) else text }
+
+/** Drops a partial trailing word left by a mid-sentence slice. */
+private fun trimToFirstWord(text: String): String =
+    text.lastIndexOf(' ').let { if (it >= 0) text.substring(0, it) else text }
 
 private fun collapseWhitespace(value: String): String =
     value.replace(Regex("\\s+"), " ").trim()
@@ -3309,6 +3321,12 @@ internal fun formatMinimalFooterText(
         MinimalHudMode.CHAPTER_ONLY -> chapter ?: progressText
     }
 }
+
+/**
+ * Height reserved at the bottom of the reading view for the minimal footer: its 48dp
+ * minimum touch target plus the 6dp bottom margin it is laid out with.
+ */
+internal const val READER_FOOTER_INSET_DP = 54
 
 @Composable
 internal fun MinimalReadingFooter(

@@ -211,7 +211,6 @@ import com.jdluu.leafline.reader.tts.ReaderTtsController
 import com.jdluu.leafline.reader.tts.ReaderTtsState
 import com.jdluu.leafline.reader.tts.TtsSleepOption
 import com.jdluu.leafline.reader.tts.TtsSleepState
-import com.jdluu.leafline.reader.tts.TtsAudioFocusManager
 import com.jdluu.leafline.reader.tts.AudioBecomingNoisyReceiver
 import com.jdluu.leafline.reader.tts.TtsMediaSessionManager
 import com.jdluu.leafline.reader.tts.TtsAudioService
@@ -310,7 +309,6 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     private var ttsJob: Job? = null
     private val ttsObserveJobs = mutableListOf<Job>()
     private lateinit var ttsController: ReaderTtsController
-    private lateinit var ttsAudioFocusManager: TtsAudioFocusManager
     private val audioBecomingNoisyReceiver = AudioBecomingNoisyReceiver {
         if (this::ttsController.isInitialized) {
             ttsController.pause()
@@ -601,13 +599,6 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                             Toast.makeText(this@ReaderActivity, message, Toast.LENGTH_SHORT).show()
                         }
                     }
-                )
-                ttsAudioFocusManager = TtsAudioFocusManager.fromContext(
-                    context = this@ReaderActivity,
-                    onPausePlayback = { ttsController.pause() },
-                    onResumePlayback = { ttsController.play() },
-                    onDuckingVolume = { duckRatio -> handleTtsVolumeChange(duckRatio) },
-                    onRestoreVolume = { handleTtsVolumeChange(1.0f) }
                 )
                 if (ttsFactory != null) {
                     val sessionMgr = TtsMediaSessionManager.create(
@@ -941,6 +932,27 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         }
     }
 
+    /**
+     * Reserves space for the minimal reading footer so page text never renders underneath it.
+     * The height is [READER_FOOTER_INSET_DP]: the footer's 48dp touch target plus its margin.
+     */
+    private fun applyReadingFooterInset(showFooter: Boolean) {
+        val container = findViewById<View>(R.id.navigator_container) ?: return
+        val bottom = if (showFooter) {
+            (READER_FOOTER_INSET_DP * resources.displayMetrics.density).roundToInt()
+        } else {
+            0
+        }
+        if (container.paddingBottom != bottom) {
+            container.setPadding(
+                container.paddingLeft,
+                container.paddingTop,
+                container.paddingRight,
+                bottom
+            )
+        }
+    }
+
     private fun applyOrientation(orientation: ReaderOrientation) {
         requestedOrientation = when (orientation) {
             ReaderOrientation.AUTO -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
@@ -967,9 +979,6 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             ttsController.stop()
         }
         audioBecomingNoisyReceiver.unregister(this)
-        if (this::ttsAudioFocusManager.isInitialized) {
-            ttsAudioFocusManager.abandonAudioFocus()
-        }
         ttsNavigator?.asMedia3Player()?.volume = 1.0f
         ttsNavigator?.close()
         ttsNavigator = null
@@ -1162,6 +1171,11 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     ?: publication?.tableOfContents?.firstOrNull { it.href.toString() == currentChapterHref }?.title
                 val syncConflict by syncConflictState.collectAsState()
                 val currentSettings by settingsController.settings.collectAsState()
+                // The minimal footer is drawn over the page, so reserve its height in the
+                // navigator; otherwise the last line of every page runs under the label.
+                LaunchedEffect(currentSettings.showMinimalHud) {
+                    applyReadingFooterInset(currentSettings.showMinimalHud)
+                }
                 val ttsState by ttsController.state.collectAsState()
                 val ttsSleepState by ttsController.sleepState.collectAsStateWithLifecycle()
                 val canNavigateHistoryBack by navigationHistory.canGoBack.collectAsState()
@@ -1461,14 +1475,11 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     }
 
     private fun handleTtsPlay(): Boolean {
-        if (this::ttsAudioFocusManager.isInitialized) {
-            val granted = ttsAudioFocusManager.requestAudioFocus()
-            if (!granted) {
-                Log.w(TAG, "Audio focus request denied; cannot start TTS")
-                ttsController.onEngineError("Audio focus unavailable")
-                return false
-            }
-        }
+        // Audio focus is owned by Readium's TTS navigator (org.readium...tts.session
+        // .AudioFocusManager requests it when playback starts). Claiming it here as well
+        // produced two competing GAIN requests: the navigator's request took focus back
+        // and the system delivered AUDIOFOCUS_LOSS to us ~100ms after play, so every
+        // resume paused itself immediately.
         audioBecomingNoisyReceiver.register(this@ReaderActivity)
 
         val nav = ttsNavigator
@@ -1523,18 +1534,12 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     private fun handleTtsPause() {
         Log.d(TAG, "Pausing TTS playback")
         audioBecomingNoisyReceiver.unregister(this@ReaderActivity)
-        if (this::ttsAudioFocusManager.isInitialized && !ttsAudioFocusManager.pausedDueToTransientLoss) {
-            ttsAudioFocusManager.abandonAudioFocus()
-        }
         ttsNavigator?.pause()
     }
 
     private fun handleTtsStop() {
         Log.d(TAG, "Stopping TTS playback")
         audioBecomingNoisyReceiver.unregister(this@ReaderActivity)
-        if (this::ttsAudioFocusManager.isInitialized) {
-            ttsAudioFocusManager.abandonAudioFocus()
-        }
         ttsJob?.cancel()
         ttsJob = null
         ttsObserveJobs.forEach { it.cancel() }
