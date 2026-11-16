@@ -138,6 +138,10 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import com.jdluu.leafline.reader.font.CustomFont
+import org.readium.r2.navigator.preferences.FontFamily
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Switch
@@ -347,7 +351,10 @@ internal fun ReaderOverlay(
     onPreviousChapter: () -> Unit = {},
     onNextChapter: () -> Unit = {},
     onSeekToPercentage: ((Double) -> Unit)? = null,
-    onCycleMinimalHudMode: () -> Unit = {}
+    onCycleMinimalHudMode: () -> Unit = {},
+    customFonts: List<CustomFont> = emptyList(),
+    onImportFont: () -> Unit = {},
+    onDeleteFont: (CustomFont) -> Unit = {}
 ) {
     BackHandler(enabled = !toolbarVisible && jumpNotice != null) {
         onNavigateHistoryBack()
@@ -513,7 +520,10 @@ internal fun ReaderOverlay(
                 ReaderSettingsSheet(
                     settings = currentSettings,
                     onSettingsChange = onSettingsChange,
-                    onDismiss = onDismissSettings
+                    onDismiss = onDismissSettings,
+                    customFonts = customFonts,
+                    onImportFont = onImportFont,
+                    onDeleteFont = onDeleteFont
                 )
             }
 
@@ -1929,9 +1939,13 @@ internal fun searchExcerpt(result: BookSearchResult): AnnotatedString {
 internal fun ReaderSettingsSheet(
     settings: ReaderSettings,
     onSettingsChange: (ReaderSettings) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    customFonts: List<CustomFont> = emptyList(),
+    onImportFont: () -> Unit = {},
+    onDeleteFont: (CustomFont) -> Unit = {}
 ) {
     val preferences = settings.epub
+    var showFontManagerDialog by remember { mutableStateOf(false) }
     // Typography knobs imply custom styles: touching them while publisher
     // styles are active switches the mode so the preview matches the choice.
     val applyCustomPreference: ((EpubPreferences) -> EpubPreferences) -> Unit = { transform ->
@@ -2009,6 +2023,85 @@ internal fun ReaderSettingsSheet(
                         modifier = Modifier.padding(end = Spacing.xs)
                     )
                 }
+                customFonts.forEach { customFont ->
+                    val fontFam = FontFamily(customFont.name)
+                    FilterChip(
+                        selected = preferences.fontFamily == fontFam,
+                        onClick = {
+                            applyCustomPreference { it.copy(fontFamily = fontFam) }
+                        },
+                        label = { Text(customFont.name) },
+                        modifier = Modifier.padding(end = Spacing.xs)
+                    )
+                }
+                AssistChip(
+                    onClick = onImportFont,
+                    label = { Text("Import font…") },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp) // touch-target-ok: decorative icon inside chip
+                        )
+                    },
+                    modifier = Modifier.padding(end = Spacing.xs)
+                )
+            }
+
+            if (customFonts.isNotEmpty()) {
+                TextButton(
+                    onClick = { showFontManagerDialog = true },
+                    modifier = Modifier.padding(bottom = Spacing.xs)
+                ) {
+                    Icon(
+                        Icons.Default.Settings,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp) // touch-target-ok: decorative icon inside text button
+                    )
+                    Spacer(Modifier.width(Spacing.xs))
+                    Text("Manage imported fonts (${customFonts.size})")
+                }
+            }
+
+            if (showFontManagerDialog) {
+                AlertDialog(
+                    onDismissRequest = { showFontManagerDialog = false },
+                    title = { Text("Imported Fonts") },
+                    text = {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            customFonts.forEach { font ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(font.name, style = MaterialTheme.typography.bodyLarge)
+                                        Text(font.fileName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            onDeleteFont(font)
+                                        }
+                                    ) {
+                                        Icon(Icons.Default.Delete, contentDescription = "Delete ${font.name}")
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showFontManagerDialog = false }) {
+                            Text("Done")
+                        }
+                    }
+                )
             }
 
             Text("Page margins", style = MaterialTheme.typography.labelLarge)

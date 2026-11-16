@@ -233,6 +233,12 @@ import org.readium.r2.shared.util.getOrElse
 import org.readium.r2.shared.util.http.DefaultHttpClient
 import org.readium.r2.streamer.PublicationOpener
 import org.readium.r2.streamer.parser.DefaultPublicationParser
+import androidx.activity.result.contract.ActivityResultContracts
+import android.provider.OpenableColumns
+import com.jdluu.leafline.reader.font.CustomFont
+import com.jdluu.leafline.reader.font.CustomFontInjector
+import com.jdluu.leafline.reader.font.FontStore
+import org.readium.r2.navigator.preferences.FontFamily
 import java.io.File
 import java.io.IOException
 
@@ -347,6 +353,15 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     private lateinit var sessionRecorder: ReadingSessionRecorder
     private var sessionRestored: Boolean = false
     private var lifetimeActiveDurationMillis: Long = 0L
+    private lateinit var fontStore: FontStore
+    private val customFontsState = mutableStateOf<List<CustomFont>>(emptyList())
+    private val fontPickerLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            importFontFromUri(uri)
+        }
+    }
 
     @OptIn(ExperimentalReadiumApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -358,6 +373,8 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         bookmarkRepository = appContainer.bookmarkRepository
         annotationRepository = appContainer.annotationRepository
         libraryRepository = appContainer.libraryRepository
+        fontStore = FontStore(this)
+        customFontsState.value = fontStore.getCustomFonts()
         readerPreferencesStore = ReaderPreferencesStore.fromContext(this)
 
         sessionRecorder = ReadingSessionRecorder(
@@ -578,6 +595,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     }
                 )
 
+                val fontDeclarations = customFontsState.value
                 val navigatorFactory = EpubNavigatorFactory(pub)
                 val fragmentFactory = navigatorFactory.createFragmentFactory(
                     initialLocator = initialLocator,
@@ -585,7 +603,11 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     listener = this@ReaderActivity,
                     configuration = EpubNavigatorFragment.Configuration(
                         selectionActionModeCallback = textSelectionManager.selectionActionMode()
-                    )
+                    ).apply {
+                        for (font in fontDeclarations) {
+                            addFontFamilyDeclaration(FontFamily(font.name)) {}
+                        }
+                    }
                 )
 
                 supportFragmentManager.fragmentFactory = fragmentFactory
@@ -594,6 +616,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     replace(R.id.navigator_container, EpubNavigatorFragment::class.java, null, NAVIGATOR_TAG)
                 }
                 navigator = supportFragmentManager.findFragmentByTag(NAVIGATOR_TAG) as EpubNavigatorFragment
+                CustomFontInjector.inject(navigator, fontDeclarations)
                 tapZoneHandler = com.jdluu.leafline.reader.navigation.TapZoneHandler(
                     context = this@ReaderActivity,
                     scope = lifecycleScope,
@@ -605,6 +628,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                 navigator?.addInputListener(tapZoneHandler.inputListener)
                 launch {
                     navigator?.currentLocator?.collect { locator ->
+                        CustomFontInjector.inject(navigator, customFontsState.value)
                         tapZoneHandler.onReadingPositionChanged(locator)
                     }
                 }
@@ -978,6 +1002,26 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         }
     }
 
+    private fun importFontFromUri(androidUri: android.net.Uri) {
+        val fileName = contentResolver.query(androidUri, null, null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (nameIndex != -1) cursor.getString(nameIndex) else null
+            } else null
+        }
+        fontStore.importFont(androidUri, fileName).onSuccess { customFont ->
+            customFontsState.value = fontStore.getCustomFonts()
+            CustomFontInjector.inject(navigator, customFontsState.value)
+            val current = settingsController.settings.value
+            val base = if (styleModeFor(current.epub.publisherStyles) == StyleMode.PUBLISHER) {
+                current.epub.withStyleMode(StyleMode.CUSTOM)
+            } else {
+                current.epub
+            }
+            settingsController.submit(current.copy(epub = base.copy(fontFamily = FontFamily(customFont.name))))
+        }
+    }
+
     private fun addReaderOverlay() {
         val touchContainer = ReaderOverlayTouchContainer(this) {
             isLoadingPublication.value ||
@@ -1078,6 +1122,19 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     onOpenToc = { scope.launch { drawerState.open() } },
                     onOpenSettings = { settingsSheetVisible.value = true },
                     onDismissSettings = { settingsSheetVisible.value = false },
+                    customFonts = customFontsState.value,
+                    onImportFont = {
+                        fontPickerLauncher.launch(arrayOf("font/*", "application/*"))
+                    },
+                    onDeleteFont = { font ->
+                        fontStore.deleteFont(font)
+                        customFontsState.value = fontStore.getCustomFonts()
+                        CustomFontInjector.inject(navigator, customFontsState.value)
+                        val current = settingsController.settings.value
+                        if (current.epub.fontFamily?.name == font.name) {
+                            settingsController.submit(current.copy(epub = current.epub.copy(fontFamily = null)))
+                        }
+                    },
                     onToggleBookmark = { bookmarkManager.toggle(bookStableId) },
                     onOpenBookmarks = { bookmarkSheetVisible.value = true },
                     onDismissBookmarks = { bookmarkSheetVisible.value = false },

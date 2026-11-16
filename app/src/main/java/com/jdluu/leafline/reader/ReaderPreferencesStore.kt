@@ -27,7 +27,10 @@ import org.readium.r2.shared.ExperimentalReadiumApi
  * unset so the toggle can never restore sepia.
  */
 @OptIn(ExperimentalReadiumApi::class)
-class ReaderPreferencesStore(private val preferences: SharedPreferences) {
+class ReaderPreferencesStore(
+    private val preferences: SharedPreferences,
+    private val fontStore: com.jdluu.leafline.reader.font.FontStore? = null
+) {
 
     fun load(initialReduceMotion: Boolean = false): ReaderSettings {
         return ReaderSettings(
@@ -87,7 +90,11 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
     private fun loadEpubPreferences(): EpubPreferences {
         val restored = EpubPreferences(
             fontFamily = preferences.getString(KEY_FONT_FAMILY, null)
-                ?.let(::fontFamilyFromStoredName),
+                ?.let { storedName ->
+                    fontFamilyFromStoredName(storedName) { name ->
+                        fontStore?.findByName(name) != null
+                    }
+                },
             lineHeight = restoreDouble(KEY_LINE_HEIGHT),
             pageMargins = restoreDouble(KEY_PAGE_MARGINS)?.let(::snapPageMargins),
             publisherStyles = restoreBoolean(KEY_PUBLISHER_STYLES),
@@ -257,7 +264,8 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
 
         fun fromContext(context: Context): ReaderPreferencesStore {
             return ReaderPreferencesStore(
-                context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                preferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE),
+                fontStore = com.jdluu.leafline.reader.font.FontStore(context)
             )
         }
     }
