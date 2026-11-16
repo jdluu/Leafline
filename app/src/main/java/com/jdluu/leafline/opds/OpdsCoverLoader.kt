@@ -23,7 +23,11 @@ object OpdsCoverLoader {
         OkHttpClient.Builder().build()
     }
 
-    suspend fun loadCover(coverUrl: String, cacheDir: File): Bitmap? = withContext(Dispatchers.IO) {
+    suspend fun loadCover(
+        coverUrl: String,
+        cacheDir: File,
+        authHeader: String? = null
+    ): Bitmap? = withContext(Dispatchers.IO) {
         val memoryCached = BitmapMemoryCache.get(coverUrl)
         if (memoryCached != null) return@withContext memoryCached
 
@@ -39,8 +43,11 @@ object OpdsCoverLoader {
         }
 
         try {
-            val request = Request.Builder().url(coverUrl).build()
-            httpClient.newCall(request).execute().use { response ->
+            val builder = Request.Builder().url(coverUrl)
+            if (!authHeader.isNullOrBlank()) {
+                builder.header("Authorization", authHeader)
+            }
+            httpClient.newCall(builder.build()).execute().use { response ->
                 if (!response.isSuccessful) return@withContext null
                 val bytes = response.body?.bytes() ?: return@withContext null
 
@@ -90,13 +97,13 @@ object OpdsCoverLoader {
  * Composable helper to asynchronously load a remote OPDS cover image.
  */
 @Composable
-fun rememberOpdsCoverBitmap(url: String?): Bitmap? {
+fun rememberOpdsCoverBitmap(url: String?, authHeader: String? = null): Bitmap? {
     if (url == null) return null
     val context = androidx.compose.ui.platform.LocalContext.current
     val cached = remember(url) { BitmapMemoryCache.get(url) }
     if (cached != null) return cached
 
-    return produceState<Bitmap?>(initialValue = null, url) {
-        value = OpdsCoverLoader.loadCover(url, context.cacheDir)
+    return produceState<Bitmap?>(initialValue = null, url, authHeader) {
+        value = OpdsCoverLoader.loadCover(url, context.cacheDir, authHeader)
     }.value
 }
