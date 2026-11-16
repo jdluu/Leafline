@@ -49,6 +49,12 @@ class ReaderSettingsTest {
     }
 
     @Test
+    fun `custom font family names resolve when recognized by predicate`() {
+        assertEquals(FontFamily("Bookerly"), fontFamilyFromStoredName("Bookerly") { it == "Bookerly" })
+        assertNull(fontFamilyFromStoredName("Bookerly") { false })
+    }
+
+    @Test
     fun `unset publisher styles behave as custom`() {
         assertEquals(StyleMode.CUSTOM, styleModeFor(null))
         assertEquals(StyleMode.CUSTOM, styleModeFor(false))

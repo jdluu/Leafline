@@ -25,11 +25,12 @@ val READER_FONT_FAMILIES: List<Pair<FontFamily?, String>> = listOf(
 )
 
 /**
- * Resolves a persisted font family name against [READER_FONT_FAMILIES]. Returns
- * null for unknown names so stale stored values fall back to the original font.
+ * Resolves a persisted font family name against [READER_FONT_FAMILIES] or custom fonts.
+ * Returns null for unknown names so stale stored values fall back to the original font.
  */
-fun fontFamilyFromStoredName(name: String): FontFamily? {
+fun fontFamilyFromStoredName(name: String, isCustomFont: (String) -> Boolean = { false }): FontFamily? {
     return READER_FONT_FAMILIES.firstOrNull { it.first?.name == name }?.first
+        ?: if (isCustomFont(name)) FontFamily(name) else null
 }
 
 /** Default page margin fraction applied around the reading surface. */
