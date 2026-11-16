@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **TTS MediaSession & Headset Remote Controls**:
+  - Integrated `TtsMediaSessionManager` with Android `MediaSession` exposing full transport controls (Play, Pause, Skip Next, Skip Previous, Stop).
+  - Synchronizes book title, author, and active chapter metadata to lockscreen, notification center, and connected remote devices (Bluetooth head units, watches).
+  - Wires hardware media buttons (headset single-click play/pause toggle, next/previous skips) directly to reader speech playback.
 - **TTS Audio Focus & Noisy Audio Management**:
   - Integrated `TtsAudioFocusManager` to handle system audio focus during text-to-speech reading.
   - Automatically ducks speech volume to 20% on transient notifications or navigation alerts (`AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK`) and restores volume when focus returns.

@@ -189,6 +189,7 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.NonCancellable
@@ -212,6 +213,7 @@ import com.jdluu.leafline.reader.tts.TtsSleepOption
 import com.jdluu.leafline.reader.tts.TtsSleepState
 import com.jdluu.leafline.reader.tts.TtsAudioFocusManager
 import com.jdluu.leafline.reader.tts.AudioBecomingNoisyReceiver
+import com.jdluu.leafline.reader.tts.TtsMediaSessionManager
 import com.jdluu.leafline.reader.tts.throttleLatest
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.navigator.HyperlinkNavigator
@@ -313,6 +315,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             ttsController.pause()
         }
     }
+    private var ttsMediaSessionManager: TtsMediaSessionManager? = null
 
     /** Lazily wired once the navigator exists; see onCreate. */
     private val goToLocator: (org.readium.r2.shared.publication.Locator) -> Unit = { locator ->
@@ -343,6 +346,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     private var exportSheetData = mutableStateOf<BookExportData?>(null)
     private var searchSheetVisible = mutableStateOf(false)
     private var bookTitle = mutableStateOf("")
+    private var bookAuthor = mutableStateOf<String?>(null)
 
     /** Sync conflict state for the bottom sheet. */
     private val syncConflictState = MutableStateFlow<SyncConflictState?>(null)
@@ -566,6 +570,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                 }
 
                 bookTitle.value = pub.metadata.title ?: loadedBook?.title ?: "Reading"
+                bookAuthor.value = pub.metadata.authors.firstOrNull()?.name ?: loadedBook?.authors?.firstOrNull()
                 tocLinks.value = flattenToc(pub.tableOfContents)
                 this@ReaderActivity.publication = pub
                 val ttsFactory = runCatching {
@@ -595,6 +600,29 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     onDuckingVolume = { duckRatio -> handleTtsVolumeChange(duckRatio) },
                     onRestoreVolume = { handleTtsVolumeChange(1.0f) }
                 )
+                if (ttsFactory != null) {
+                    val sessionMgr = TtsMediaSessionManager.create(
+                        context = this@ReaderActivity,
+                        onPlay = { ttsController.play() },
+                        onPause = { ttsController.pause() },
+                        onSkipNext = { ttsController.skipNext() },
+                        onSkipPrevious = { ttsController.skipPrevious() },
+                        onStop = { ttsController.stop() }
+                    )
+                    sessionMgr.updateMetadata(
+                        bookTitle = bookTitle.value,
+                        author = bookAuthor.value
+                    )
+                    ttsMediaSessionManager = sessionMgr
+
+                    launch {
+                        combine(ttsController.state, ttsController.rate) { state, rate ->
+                            state to rate
+                        }.collect { (state, rate) ->
+                            ttsMediaSessionManager?.updatePlaybackState(state, rate)
+                        }
+                    }
+                }
                 searchHistoryStore = SearchHistoryStore.create(this@ReaderActivity)
                 bookSearcher = BookSearcher(
                     scope = lifecycleScope,
@@ -900,6 +928,8 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         ttsNavigator?.asMedia3Player()?.volume = 1.0f
         ttsNavigator?.close()
         ttsNavigator = null
+        ttsMediaSessionManager?.release()
+        ttsMediaSessionManager = null
         navigationHistory.clear()
         jumpNoticeDismissJob?.cancel()
         if (isFinishing) {
@@ -1530,6 +1560,13 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                         Log.w(TAG, "Could not apply TTS utterance decoration", e)
                     }
                     ttsController.onLocatorChanged(utteranceLocator.href.toString())
+                    val chapterTitle = tocLinks.value.find { it.first.href.toString() == utteranceLocator.href.toString() }?.first?.title
+                        ?: publication?.metadata?.title
+                    ttsMediaSessionManager?.updateMetadata(
+                        bookTitle = bookTitle.value,
+                        author = bookAuthor.value,
+                        chapterTitle = chapterTitle
+                    )
                 }
         }
 
