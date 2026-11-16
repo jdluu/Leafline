@@ -7,6 +7,8 @@ import com.jdluu.leafline.library.LibraryLayout
 import com.jdluu.leafline.library.LibrarySort
 import com.jdluu.leafline.library.ProgressFilter
 import com.jdluu.leafline.library.LibraryLayoutStore
+import com.jdluu.leafline.library.ReadingGoalStore
+import com.jdluu.leafline.library.ReadingGoals
 import com.jdluu.leafline.library.ReadingStatus
 import com.jdluu.leafline.library.data.Collection
 import com.jdluu.leafline.library.data.LibraryRepository
@@ -475,6 +477,43 @@ class LibraryViewModelTest {
             assertEquals(2.0f, updated.seriesIndex)
             assertEquals("Acme Books", updated.publisher)
             assertEquals("New Description", updated.description)
+        }
+
+    @Test
+    fun `readingGoals initializes with default values when no store provided`() =
+        runTest(dispatcher) {
+            val fakeRepo = FakeLibraryRepository(books = flowOf(emptyList()))
+            val viewModel = LibraryViewModel(repository = fakeRepo)
+
+            assertEquals(ReadingGoals.DEFAULT_DAILY_MINUTES, viewModel.readingGoals.value.dailyMinutes)
+            assertEquals(ReadingGoals.DEFAULT_BOOKS_TARGET, viewModel.readingGoals.value.booksTarget)
+        }
+
+    @Test
+    fun `updateReadingGoals updates state flow and persists to readingGoalStore`() =
+        runTest(dispatcher) {
+            val context: Context = ApplicationProvider.getApplicationContext()
+            context.getSharedPreferences(ReadingGoalStore.PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .clear()
+                .commit()
+
+            val store = ReadingGoalStore.fromContext(context)
+            val fakeRepo = FakeLibraryRepository(books = flowOf(emptyList()))
+            val viewModel = LibraryViewModel(
+                repository = fakeRepo,
+                readingGoalStore = store
+            )
+
+            viewModel.updateReadingGoals(dailyMinutes = 35, booksTarget = 25)
+            advanceUntilIdle()
+
+            assertEquals(35, viewModel.readingGoals.value.dailyMinutes)
+            assertEquals(25, viewModel.readingGoals.value.booksTarget)
+
+            val loadedFromStore = store.loadGoals()
+            assertEquals(35, loadedFromStore.dailyMinutes)
+            assertEquals(25, loadedFromStore.booksTarget)
         }
 }
 
