@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **TTS Sleep Timer Fade-Out & Preset Expansion**:
+  - Added 5-minute and 10-minute quick presets to the TTS sleep timer selection sheet.
+  - Implemented gradual audio volume fade-out over the final 30 seconds before auto-pausing playback, providing a gentle audio transition into silence.
+  - Added real-time visual indicator in the sleep timer bottom sheet and control chip displaying active fade-out state (`Fading MM:SS`).
+  - Added automated volume restoration to 100% on manual pause/resume, playback stop, or sleep timer cancellation.
+
 ## [0.3.0] - 2026-11-15
 
 ### Added

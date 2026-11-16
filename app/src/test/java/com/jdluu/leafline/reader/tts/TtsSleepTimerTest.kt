@@ -14,8 +14,22 @@ class TtsSleepTimerTest {
         assertEquals(TtsSleepOption.OFF, state.option)
         assertNull(state.remainingSeconds)
         assertNull(state.targetChapterHref)
+        assertEquals(30, state.fadeDurationSeconds)
+        assertFalse(state.isFadingOut)
+        assertEquals(1.0f, state.volumeMultiplier)
         assertFalse(state.isActive)
         assertEquals("Timer", formatSleepTimerLabel(state))
+    }
+
+    @Test
+    fun `options include 5 and 10 minutes presets`() {
+        assertEquals(5, TtsSleepOption.MINUTES_5.minutes)
+        assertEquals("5 min", TtsSleepOption.MINUTES_5.label)
+        assertTrue(TtsSleepOption.MINUTES_5.isTimed)
+
+        assertEquals(10, TtsSleepOption.MINUTES_10.minutes)
+        assertEquals("10 min", TtsSleepOption.MINUTES_10.label)
+        assertTrue(TtsSleepOption.MINUTES_10.isTimed)
     }
 
     @Test
@@ -42,6 +56,23 @@ class TtsSleepTimerTest {
 
         val state5 = TtsSleepState(option = TtsSleepOption.MINUTES_60, remainingSeconds = 3665)
         assertEquals("1:01:05", formatSleepTimerLabel(state5))
+    }
+
+    @Test
+    fun `fading out formatting prefixes Fading`() {
+        val state1 = TtsSleepState(
+            option = TtsSleepOption.MINUTES_5,
+            remainingSeconds = 25,
+            isFadingOut = true
+        )
+        assertEquals("Fading 00:25", formatSleepTimerLabel(state1))
+
+        val state2 = TtsSleepState(
+            option = TtsSleepOption.MINUTES_60,
+            remainingSeconds = 3605,
+            isFadingOut = true
+        )
+        assertEquals("Fading 1:00:05", formatSleepTimerLabel(state2))
     }
 
     @Test

@@ -112,6 +112,7 @@ dependencies {
     implementation("org.readium.kotlin-toolkit:readium-streamer:$readiumVersion")
     implementation("org.readium.kotlin-toolkit:readium-navigator:$readiumVersion")
     implementation("org.readium.kotlin-toolkit:readium-navigator-media-tts:$readiumVersion")
+    compileOnly("androidx.media3:media3-common:1.10.0")
     implementation("org.readium.kotlin-toolkit:readium-opds:$readiumVersion")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")

@@ -52,6 +52,11 @@ interface TtsPlayerAdapter {
     fun setRate(rate: Float) {}
 
     /**
+     * Adjust playback volume attenuation multiplier (e.g. 1.0f full down to 0.0f silent).
+     */
+    fun setVolume(volume: Float) {}
+
+    /**
      * Skip to the previous sentence or utterance.
      */
     fun skipPrevious() {}
@@ -76,6 +81,7 @@ class ReaderTtsController(
     private val onPause: () -> Unit = {},
     private val onStop: () -> Unit = {},
     private val onSetRate: (Float) -> Unit = {},
+    private val onSetVolume: (Float) -> Unit = {},
     private val onSkipPrevious: () -> Unit = {},
     private val onSkipNext: () -> Unit = {},
     private val onError: (String?) -> Unit = {}
@@ -92,6 +98,7 @@ class ReaderTtsController(
         onPause = { adapter.pause() },
         onStop = { adapter.stop() },
         onSetRate = { adapter.setRate(it) },
+        onSetVolume = { adapter.setVolume(it) },
         onSkipPrevious = { adapter.skipPrevious() },
         onSkipNext = { adapter.skipNext() },
         onError = onError
@@ -168,6 +175,7 @@ class ReaderTtsController(
         if (_state.value != ReaderTtsState.UNAVAILABLE) {
             timerJob?.cancel()
             timerJob = null
+            onSetVolume(1.0f)
             _sleepState.value = TtsSleepState(option = TtsSleepOption.OFF)
             onStop()
             _state.value = ReaderTtsState.IDLE
@@ -193,11 +201,17 @@ class ReaderTtsController(
     }
 
     /**
-     * Configures the sleep timer with an option and optional current chapter href.
+     * Configures the sleep timer with an option, optional current chapter href,
+     * and optional fade duration in seconds (defaults to 30s).
      */
-    fun setSleepTimer(option: TtsSleepOption, currentChapterHref: String? = null) {
+    fun setSleepTimer(
+        option: TtsSleepOption,
+        currentChapterHref: String? = null,
+        fadeDurationSeconds: Int = 30
+    ) {
         timerJob?.cancel()
         timerJob = null
+        onSetVolume(1.0f)
 
         if (option == TtsSleepOption.OFF) {
             _sleepState.value = TtsSleepState(option = TtsSleepOption.OFF)
@@ -207,7 +221,8 @@ class ReaderTtsController(
         if (option == TtsSleepOption.END_OF_CHAPTER) {
             _sleepState.value = TtsSleepState(
                 option = TtsSleepOption.END_OF_CHAPTER,
-                targetChapterHref = normalizeChapterHref(currentChapterHref)
+                targetChapterHref = normalizeChapterHref(currentChapterHref),
+                fadeDurationSeconds = fadeDurationSeconds
             )
             return
         }
@@ -216,7 +231,10 @@ class ReaderTtsController(
         val totalSeconds = minutes * 60L
         _sleepState.value = TtsSleepState(
             option = option,
-            remainingSeconds = totalSeconds
+            remainingSeconds = totalSeconds,
+            fadeDurationSeconds = fadeDurationSeconds,
+            isFadingOut = false,
+            volumeMultiplier = 1.0f
         )
 
         timerJob = scope.launch {
@@ -224,9 +242,23 @@ class ReaderTtsController(
             while (remaining > 0) {
                 delay(1000)
                 remaining--
-                _sleepState.value = _sleepState.value.copy(remainingSeconds = remaining)
+                val shouldFade = remaining <= fadeDurationSeconds && fadeDurationSeconds > 0
+                val multiplier = if (shouldFade) {
+                    (remaining.toFloat() / fadeDurationSeconds.toFloat()).coerceIn(0.0f, 1.0f)
+                } else {
+                    1.0f
+                }
+                _sleepState.value = _sleepState.value.copy(
+                    remainingSeconds = remaining,
+                    isFadingOut = shouldFade,
+                    volumeMultiplier = multiplier
+                )
+                if (shouldFade) {
+                    onSetVolume(multiplier)
+                }
             }
             _sleepState.value = TtsSleepState(option = TtsSleepOption.OFF)
+            onSetVolume(1.0f)
             pause()
         }
     }
@@ -262,6 +294,7 @@ class ReaderTtsController(
         if (_state.value != ReaderTtsState.UNAVAILABLE) {
             timerJob?.cancel()
             timerJob = null
+            onSetVolume(1.0f)
             _sleepState.value = TtsSleepState(option = TtsSleepOption.OFF)
             onStop()
             _lastErrorMessage.value = message
@@ -277,6 +310,7 @@ class ReaderTtsController(
         if (_state.value != ReaderTtsState.UNAVAILABLE) {
             timerJob?.cancel()
             timerJob = null
+            onSetVolume(1.0f)
             _sleepState.value = TtsSleepState(option = TtsSleepOption.OFF)
             onStop()
             _state.value = ReaderTtsState.IDLE
