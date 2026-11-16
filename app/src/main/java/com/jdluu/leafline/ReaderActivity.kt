@@ -318,6 +318,12 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     }
     private var ttsMediaSessionManager: TtsMediaSessionManager? = null
 
+    /** Description handed to [onJumpToLocator] by the next programmatic navigation. */
+    private var pendingJumpDescription: String? = null
+
+    /** Href of a TTS-driven follow; jumps to it are not recorded in history. */
+    private var suppressedJumpHref: String? = null
+
     /** Lazily wired once the navigator exists; see onCreate. */
     private val goToLocator: (org.readium.r2.shared.publication.Locator) -> Unit = { locator ->
         currentLocation.value?.let { from ->
@@ -327,6 +333,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                 description = "Bookmark / Highlight"
             )
         }
+        pendingJumpDescription = "Bookmark / Highlight"
         navigator?.go(locator, false)
     }
 
@@ -836,6 +843,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                 description = link.title ?: "Chapter"
             )
         }
+        pendingJumpDescription = link.title ?: "Chapter"
         navigator?.go(link, false)
         toolbarVisible.value = false
     }
@@ -1011,6 +1019,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         bookSearcher.state.value.query?.let { searchHistoryStore.recordQuery(it) }
         activeSearchResultId = result.id
         applySearchDecorations()
+        pendingJumpDescription = "Search result"
         navigator?.go(locator, false)
         searchSheetVisible.value = false
         toolbarVisible.value = false
@@ -1223,7 +1232,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                             settingsController.submit(current.copy(epub = current.epub.copy(fontFamily = null)))
                         }
                     },
-                    onToggleBookmark = { bookmarkManager.toggle(bookStableId) },
+                    onToggleBookmark = { bookmarkManager.toggle(bookStableId, currentChapterTitle) },
                     onOpenBookmarks = { bookmarkSheetVisible.value = true },
                     onDismissBookmarks = { bookmarkSheetVisible.value = false },
                     onBookmarkClick = { bookmarkManager.navigateTo(it) }, // TODO: delegate to bookmarkManager
@@ -1382,11 +1391,20 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     }
 
     override fun onJumpToLocator(locator: Locator) {
+        // TTS sentence following shares the current href: never treat it as a jump.
+        if (suppressedJumpHref == locator.href.toString()) {
+            suppressedJumpHref = null
+            return
+        }
         val current = currentLocation.value ?: return
+        // Programmatic jumps (contents, search, bookmarks) set this before calling
+        // navigator.go, otherwise the notice mislabels every jump as a footnote.
+        val description = pendingJumpDescription ?: "Footnote / Link"
+        pendingJumpDescription = null
         navigationHistory.recordJump(
             from = current,
             to = locator,
-            description = "Footnote / Link"
+            description = description
         )
     }
 
@@ -1626,6 +1644,10 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                 .mapNotNull { it.tokenLocator ?: it.utteranceLocator }
                 .distinctUntilChanged()
                 .collect { locator ->
+                    // TTS following the spoken sentence is not a user jump: mark the
+                    // target so onJumpToLocator does not push history or show a banner
+                    // on every utterance.
+                    suppressedJumpHref = locator.href.toString()
                     this@ReaderActivity.navigator?.go(locator, animated = false)
                 }
         }

@@ -67,7 +67,7 @@ fun LibraryFilterBar(
                     IconButton(
                         onClick = onCloseSearch
                     ) {
-                        Icon(Icons.Default.Close, contentDescription = "Clear search")
+                        Icon(Icons.Default.Close, contentDescription = "Close search")
                     }
                 }
             )
@@ -91,7 +91,11 @@ fun LibraryFilterBar(
                     val count = collectionCounts[collection.id] ?: 0
                     FilterChip(
                         selected = isSelected,
-                        onClick = { onSelectCollection(collection.id) },
+                        onClick = {
+                            // Tapping the active collection clears the filter so the
+                            // trailing close glyph is not a dead control.
+                            onSelectCollection(if (isSelected) null else collection.id)
+                        },
                         label = {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -118,10 +122,18 @@ fun LibraryFilterBar(
                                 Icon(
                                     Icons.Default.Close,
                                     contentDescription = null,
-                                    modifier = Modifier.size(16.dp) // touch-target-ok: decorative chip icon
+                                    modifier = Modifier.size(16.dp) // touch-target-ok: whole chip is the 48dp target
                                 )
                             }
-                        } else null
+                        } else null,
+                        modifier = Modifier.semantics {
+                            val bookWord = if (count == 1) "book" else "books"
+                            contentDescription = if (isSelected) {
+                                "$count $bookWord in ${collection.name}, selected. Tap to clear"
+                            } else {
+                                "Filter by ${collection.name}, $count $bookWord"
+                            }
+                        }
                     )
                 }
             }

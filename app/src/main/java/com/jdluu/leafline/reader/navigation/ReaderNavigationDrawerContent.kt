@@ -119,17 +119,14 @@ fun ReaderNavigationDrawerContent(
             modifier = Modifier.fillMaxWidth()
         ) {
             ReaderNavigationTab.entries.forEach { tab ->
-                val count = when (tab) {
-                    ReaderNavigationTab.CONTENTS -> tocLinks.size
-                    ReaderNavigationTab.BOOKMARKS -> bookmarks.size
-                    ReaderNavigationTab.HIGHLIGHTS -> annotations.size
-                }
                 Tab(
                     selected = selectedTab == tab,
                     onClick = { onTabSelected(tab) },
                     text = {
+                        // Counts live inside each pane; appending them here widens the
+                        // labels until PrimaryTabRow ellipsises them ("Content…").
                         Text(
-                            text = if (count > 0) "${tab.title} ($count)" else tab.title,
+                            text = tab.title,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -340,6 +337,14 @@ private fun BookmarkTabContent(
         }
     } else {
         LazyColumn(modifier = modifier.fillMaxSize()) {
+            item {
+                Text(
+                    text = if (bookmarks.size == 1) "1 bookmark" else "${bookmarks.size} bookmarks",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = Padding.screen, vertical = Spacing.xs)
+                )
+            }
             items(bookmarks, key = { it.id }) { bookmark ->
                 SwipeToDismissBox(
                     state = rememberSwipeToDismissBoxState(

@@ -27,7 +27,7 @@ import com.jdluu.leafline.sync.KoreaderSyncClient
  * the main thread; dependencies are exposed as constructor-injected values
  * rather than fetched from a singleton service locator.
  */
-class AppContainer(context: Context) {
+class AppContainer(private val context: Context) {
 
     val database: LeaflineDatabase = LeaflineDatabase.build(context)
 
@@ -57,13 +57,22 @@ class AppContainer(context: Context) {
             bookDao = database.bookDao(),
             collectionDao = database.collectionDao(),
             bookmarkDao = database.bookmarkDao(),
-            annotationDao = database.annotationDao()
+            annotationDao = database.annotationDao(),
+            appVersion = runCatching {
+                context.packageManager.getPackageInfo(context.packageName, 0).versionName
+            }.getOrNull() ?: "unknown"
         )
     }
 
     val opdsFeedStore: OpdsFeedStore by lazy { OpdsFeedStore.fromContext(context) }
 
-    val opdsClient: OpdsClient by lazy { OpdsClient() }
+    val opdsClient: OpdsClient by lazy {
+        // Report the real installed version so servers and support can tell builds apart.
+        val versionName = runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName
+        }.getOrNull() ?: "unknown"
+        OpdsClient(userAgent = "Leafline/$versionName (Android; OPDS Client)")
+    }
 
     val notesExporter: NotesExporter by lazy {
         NotesExporter(

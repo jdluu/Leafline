@@ -18,6 +18,7 @@ class OpdsFeedStore(
     companion object {
         private const val PREFS_NAME = "leafline_opds_feeds"
         private const val KEY_CUSTOM_FEEDS = "custom_opds_feeds_json"
+        private const val KEY_SELECTED_FEED = "opds_selected_feed_id"
 
         val BUILT_IN_FEEDS = listOf(
             OpdsFeedSource(
@@ -47,6 +48,15 @@ class OpdsFeedStore(
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             return OpdsFeedStore(prefs)
         }
+    }
+
+    /**
+     * Remembers which catalog the reader was last browsing so the choice survives a restart.
+     */
+    fun loadSelectedFeedId(): String? = prefs.getString(KEY_SELECTED_FEED, null)
+
+    fun saveSelectedFeedId(id: String) {
+        prefs.edit().putString(KEY_SELECTED_FEED, id).apply()
     }
 
     /**

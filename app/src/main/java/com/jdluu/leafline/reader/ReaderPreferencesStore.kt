@@ -61,6 +61,7 @@ class ReaderPreferencesStore(
         preferences.edit()
             .putString(KEY_THEME, settings.theme?.name)
             .putString(KEY_FONT_FAMILY, epub.fontFamily?.name)
+            .putNullableDouble(KEY_FONT_SIZE, epub.fontSize?.let(::snapFontSize))
             .putNullableDouble(KEY_LINE_HEIGHT, epub.lineHeight)
             .putNullableDouble(KEY_PAGE_MARGINS, epub.pageMargins?.let(::snapPageMargins))
             .putNullableBoolean(KEY_PUBLISHER_STYLES, epub.publisherStyles)
@@ -96,6 +97,7 @@ class ReaderPreferencesStore(
                     }
                 },
             lineHeight = restoreDouble(KEY_LINE_HEIGHT),
+            fontSize = restoreDouble(KEY_FONT_SIZE)?.let(::snapFontSize),
             pageMargins = restoreDouble(KEY_PAGE_MARGINS)?.let(::snapPageMargins),
             publisherStyles = restoreBoolean(KEY_PUBLISHER_STYLES),
             scroll = restoreBoolean(KEY_SCROLL),
@@ -234,6 +236,7 @@ class ReaderPreferencesStore(
     companion object {
         private const val KEY_THEME = "reader_theme"
         private const val KEY_FONT_FAMILY = "reader_font_family"
+        private const val KEY_FONT_SIZE = "reader_font_size"
         private const val KEY_LINE_HEIGHT = "reader_line_height"
         private const val KEY_PAGE_MARGINS = "reader_page_margins"
         private const val KEY_PUBLISHER_STYLES = "reader_publisher_styles"

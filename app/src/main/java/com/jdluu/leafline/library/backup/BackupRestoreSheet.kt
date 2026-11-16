@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -111,6 +112,8 @@ fun BackupRestoreSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                // Without this the last card sits under the gesture bar on gesture-nav devices.
+                .navigationBarsPadding()
                 .padding(horizontal = Padding.screen, vertical = Spacing.sm)
                 .verticalScroll(rememberScrollState())
         ) {
@@ -135,6 +138,51 @@ fun BackupRestoreSheet(
                     color = MaterialTheme.colorScheme.primary
                 )
             }
+
+                AnimatedVisibility(visible = statusMessage != null) {
+                    statusMessage?.let { msg ->
+                        Spacer(Modifier.height(Spacing.md))
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(Spacing.md),
+                                horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+                            ) {
+                                Icon(
+                                    imageVector = if (restoreSummary != null) Icons.Default.CheckCircle else Icons.Default.Info,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.size(24.dp) // touch-target-ok: decorative feedback icon
+                                )
+                                Column {
+                                    Text(
+                                        text = msg,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                    restoreSummary?.let { summary ->
+                                        Spacer(Modifier.height(4.dp))
+                                        Text(
+                                            text = buildString {
+                                                append("${summary.booksMatched} ${plural(summary.booksMatched, "book")} matched • ")
+                                                append("${summary.collectionsRestored} ${plural(summary.collectionsRestored, "collection")} restored • ")
+                                                append("${summary.bookmarksRestored} ${plural(summary.bookmarksRestored, "bookmark")} • ")
+                                                append("${summary.annotationsRestored} ${plural(summary.annotationsRestored, "highlight")}")
+                                            },
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
 
             Spacer(Modifier.height(Spacing.md))
             HorizontalDivider()
@@ -234,47 +282,11 @@ fun BackupRestoreSheet(
                 }
             }
 
-            AnimatedVisibility(visible = statusMessage != null) {
-                statusMessage?.let { msg ->
-                    Spacer(Modifier.height(Spacing.md))
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(Spacing.md),
-                            horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
-                        ) {
-                            Icon(
-                                imageVector = if (restoreSummary != null) Icons.Default.CheckCircle else Icons.Default.Info,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                modifier = Modifier.size(24.dp) // touch-target-ok: decorative feedback icon
-                            )
-                            Column {
-                                Text(
-                                    text = msg,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                                )
-                                restoreSummary?.let { summary ->
-                                    Spacer(Modifier.height(4.dp))
-                                    Text(
-                                        text = "${summary.booksMatched} books matched • ${summary.collectionsRestored} collections restored • ${summary.bookmarksRestored} bookmarks • ${summary.annotationsRestored} highlights",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
             Spacer(Modifier.height(Spacing.lg))
         }
     }
 }
+
+/** Pluralises a count for the restore summary, e.g. "1 collection" vs "2 collections". */
+private fun plural(count: Int, singular: String): String =
+    if (count == 1) singular else "${singular}s"
