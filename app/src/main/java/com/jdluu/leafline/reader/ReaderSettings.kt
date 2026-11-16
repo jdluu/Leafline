@@ -2,7 +2,9 @@ package com.jdluu.leafline.reader
 
 import com.jdluu.leafline.reader.theme.ReaderTheme
 import org.readium.r2.navigator.epub.EpubPreferences
+import org.readium.r2.navigator.preferences.ColumnCount
 import org.readium.r2.navigator.preferences.FontFamily
+import org.readium.r2.shared.ExperimentalReadiumApi
 
 /**
  * Selectable EPUB font families offered by the reader settings sheet, backed by
@@ -69,12 +71,14 @@ fun styleModeFor(publisherStyles: Boolean?): StyleMode {
  * typography overrides so Readium renders the publication's own styles;
  * custom mode keeps the reader-controlled values and disables publisher styles.
  */
+@OptIn(ExperimentalReadiumApi::class)
 fun EpubPreferences.withStyleMode(mode: StyleMode): EpubPreferences {
     return when (mode) {
         StyleMode.PUBLISHER -> copy(
             fontFamily = null,
             lineHeight = null,
             pageMargins = null,
+            hyphens = null,
             publisherStyles = true
         )
         StyleMode.CUSTOM -> copy(publisherStyles = false)
@@ -218,6 +222,7 @@ enum class MinimalHudMode {
  * Readium; it is converted at the Android boundary where preferences are
  * submitted to the navigator.
  */
+@OptIn(ExperimentalReadiumApi::class)
 data class ReaderSettings(
     val epub: EpubPreferences = EpubPreferences(),
     /**

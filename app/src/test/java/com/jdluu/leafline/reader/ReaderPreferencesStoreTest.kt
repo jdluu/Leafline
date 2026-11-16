@@ -12,6 +12,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import com.jdluu.leafline.reader.theme.ReaderTheme
 import org.readium.r2.navigator.epub.EpubPreferences
+import org.readium.r2.navigator.preferences.ColumnCount
 import org.readium.r2.navigator.preferences.FontFamily
 import org.readium.r2.shared.ExperimentalReadiumApi
 
@@ -42,6 +43,8 @@ class ReaderPreferencesStoreTest {
         assertNull(loaded.epub.pageMargins)
         assertNull(loaded.epub.publisherStyles)
         assertNull(loaded.epub.scroll)
+        assertNull(loaded.epub.hyphens)
+        assertNull(loaded.epub.columnCount)
         assertEquals(TapZoneConfig.DEFAULT, loaded.tapZoneConfig)
         assertEquals(PageTurnAnimation.SLIDE, loaded.pageTurnAnimation)
         assertNull(loaded.brightness)
@@ -68,7 +71,9 @@ class ReaderPreferencesStoreTest {
                     lineHeight = 1.6,
                     pageMargins = 0.75,
                     publisherStyles = false,
-                    scroll = true
+                    scroll = true,
+                    hyphens = false,
+                    columnCount = ColumnCount.TWO
                 ),
                 theme = ReaderTheme.SEPIA,
                 tapZoneConfig = TapZoneConfig(
@@ -99,6 +104,8 @@ class ReaderPreferencesStoreTest {
         assertEquals(0.75, loaded.epub.pageMargins!!, 1e-9)
         assertEquals(false, loaded.epub.publisherStyles)
         assertEquals(true, loaded.epub.scroll)
+        assertEquals(false, loaded.epub.hyphens)
+        assertEquals(ColumnCount.TWO, loaded.epub.columnCount)
         assertEquals(TapZoneAction.NEXT_PAGE, loaded.tapZoneConfig.leftZone)
         assertEquals(TapZoneAction.NONE, loaded.tapZoneConfig.centerZone)
         assertEquals(TapZoneAction.TOGGLE_MENU, loaded.tapZoneConfig.rightZone)
@@ -410,5 +417,34 @@ class ReaderPreferencesStoreTest {
         assertTrue(store.load().reduceMotion)
         store.save(ReaderSettings(reduceMotion = false))
         assertFalse(store.load().reduceMotion)
+    }
+
+    @Test
+    fun `save and reload hyphens true and false round-trips`() {
+        val store = ReaderPreferencesStore.fromContext(context)
+        store.save(ReaderSettings(epub = EpubPreferences(hyphens = true)))
+        assertEquals(true, store.load().epub.hyphens)
+
+        store.save(ReaderSettings(epub = EpubPreferences(hyphens = false)))
+        assertEquals(false, store.load().epub.hyphens)
+    }
+
+    @Test
+    fun `save and reload column count round-trips`() {
+        val store = ReaderPreferencesStore.fromContext(context)
+        store.save(ReaderSettings(epub = EpubPreferences(columnCount = ColumnCount.ONE)))
+        assertEquals(ColumnCount.ONE, store.load().epub.columnCount)
+
+        store.save(ReaderSettings(epub = EpubPreferences(columnCount = ColumnCount.AUTO)))
+        assertEquals(ColumnCount.AUTO, store.load().epub.columnCount)
+    }
+
+    @Test
+    fun `corrupt stored column count falls back to null`() {
+        val preferences =
+            context.getSharedPreferences(ReaderPreferencesStore.PREFS_NAME, Context.MODE_PRIVATE)
+        preferences.edit().putString("reader_column_count", "INVALID_COLUMNS").commit()
+        val store = ReaderPreferencesStore.fromContext(context)
+        assertNull(store.load().epub.columnCount)
     }
 }

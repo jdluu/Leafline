@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.jdluu.leafline.reader.theme.ReaderTheme
 import org.readium.r2.navigator.epub.EpubPreferences
+import org.readium.r2.navigator.preferences.ColumnCount
+import org.readium.r2.shared.ExperimentalReadiumApi
 
 /**
  * SharedPreferences-backed persistence for [ReaderSettings].
@@ -24,6 +26,7 @@ import org.readium.r2.navigator.epub.EpubPreferences
  * is stored alongside; unknown names and a stored sepia value fall back to
  * unset so the toggle can never restore sepia.
  */
+@OptIn(ExperimentalReadiumApi::class)
 class ReaderPreferencesStore(private val preferences: SharedPreferences) {
 
     fun load(initialReduceMotion: Boolean = false): ReaderSettings {
@@ -59,6 +62,8 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
             .putNullableDouble(KEY_PAGE_MARGINS, epub.pageMargins?.let(::snapPageMargins))
             .putNullableBoolean(KEY_PUBLISHER_STYLES, epub.publisherStyles)
             .putNullableBoolean(KEY_SCROLL, epub.scroll)
+            .putNullableBoolean(KEY_HYPHENS, epub.hyphens)
+            .putString(KEY_COLUMN_COUNT, epub.columnCount?.name)
             .putString(KEY_TAP_ZONE_LEFT, settings.tapZoneConfig.leftZone.name)
             .putString(KEY_TAP_ZONE_CENTER, settings.tapZoneConfig.centerZone.name)
             .putString(KEY_TAP_ZONE_RIGHT, settings.tapZoneConfig.rightZone.name)
@@ -86,7 +91,15 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
             lineHeight = restoreDouble(KEY_LINE_HEIGHT),
             pageMargins = restoreDouble(KEY_PAGE_MARGINS)?.let(::snapPageMargins),
             publisherStyles = restoreBoolean(KEY_PUBLISHER_STYLES),
-            scroll = restoreBoolean(KEY_SCROLL)
+            scroll = restoreBoolean(KEY_SCROLL),
+            hyphens = restoreBoolean(KEY_HYPHENS),
+            columnCount = preferences.getString(KEY_COLUMN_COUNT, null)?.let { name ->
+                try {
+                    ColumnCount.valueOf(name)
+                } catch (_: IllegalArgumentException) {
+                    null
+                }
+            }
         )
         // A stored publisher-mode selection drops stale custom typography so a
         // restart cannot reintroduce overrides the user switched away from.
@@ -218,6 +231,8 @@ class ReaderPreferencesStore(private val preferences: SharedPreferences) {
         private const val KEY_PAGE_MARGINS = "reader_page_margins"
         private const val KEY_PUBLISHER_STYLES = "reader_publisher_styles"
         private const val KEY_SCROLL = "reader_scroll"
+        private const val KEY_HYPHENS = "reader_hyphens"
+        private const val KEY_COLUMN_COUNT = "reader_column_count"
         private const val KEY_TAP_ZONE_LEFT = "reader_tap_zone_left"
         private const val KEY_TAP_ZONE_CENTER = "reader_tap_zone_center"
         private const val KEY_TAP_ZONE_RIGHT = "reader_tap_zone_right"
