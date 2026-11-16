@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **In-App Book Metadata Editor**:
+  - Added in-app metadata editor directly in the book detail modal allowing users to edit book title, authors, series name, series index / volume number, publisher, and description.
+  - Added `LibraryViewModel.updateBookMetadata` persisting updates to Room database with reactive UI updates across the library grid and reader.
 - **Anki Flashcards & Readwise Export Formats**:
   - Added Anki TSV flashcard deck generation with HTML front/back cards, book tagging, and chapter attribution.
   - Added official Readwise-compatible CSV export format (`Highlight,Book Title,Book Author,URL,Note,Location,Date`) with RFC 4180 escaping.
