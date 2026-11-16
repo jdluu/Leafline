@@ -26,6 +26,7 @@ class ReaderTtsControllerTest {
         val calls = mutableListOf<String>()
         val errorNotifications = mutableListOf<String?>()
         val rateChanges = mutableListOf<Float>()
+        val volumeChanges = mutableListOf<Float>()
         var playReturns: Boolean = playResult
         var playShouldThrow: Boolean = false
 
@@ -40,6 +41,7 @@ class ReaderTtsControllerTest {
             onPause = { calls += "pause" },
             onStop = { calls += "stop" },
             onSetRate = { rateChanges += it },
+            onSetVolume = { volumeChanges += it },
             onSkipPrevious = { calls += "skipPrevious" },
             onSkipNext = { calls += "skipNext" },
             onError = { errorNotifications += it }
@@ -380,5 +382,86 @@ class ReaderTtsControllerTest {
         assertEquals(ReaderTtsState.IDLE, harness.controller.state.value)
         assertEquals(TtsSleepOption.OFF, harness.controller.sleepState.value.option)
         assertFalse(harness.controller.sleepState.value.isActive)
+    }
+
+    @Test
+    fun `MINUTES_5 and MINUTES_10 timed options initialize and count down`() = runTest {
+        val harness5 = Harness(scope = this)
+        harness5.controller.play()
+        harness5.controller.setSleepTimer(TtsSleepOption.MINUTES_5)
+        assertEquals(TtsSleepOption.MINUTES_5, harness5.controller.sleepState.value.option)
+        assertEquals(300L, harness5.controller.sleepState.value.remainingSeconds)
+        assertFalse(harness5.controller.sleepState.value.isFadingOut)
+
+        advanceTimeBy(5_001)
+        assertEquals(295L, harness5.controller.sleepState.value.remainingSeconds)
+
+        val harness10 = Harness(scope = this)
+        harness10.controller.play()
+        harness10.controller.setSleepTimer(TtsSleepOption.MINUTES_10)
+        assertEquals(TtsSleepOption.MINUTES_10, harness10.controller.sleepState.value.option)
+        assertEquals(600L, harness10.controller.sleepState.value.remainingSeconds)
+        assertFalse(harness10.controller.sleepState.value.isFadingOut)
+    }
+
+    @Test
+    fun `timed sleep timer fades out volume during the last 30 seconds`() = runTest {
+        val harness = Harness(scope = this)
+        harness.controller.play()
+        harness.controller.setSleepTimer(TtsSleepOption.MINUTES_5) // 300 seconds
+
+        // Advance 270 seconds (30s remaining: start of fade)
+        advanceTimeBy(270_001)
+        assertEquals(30L, harness.controller.sleepState.value.remainingSeconds)
+        assertTrue(harness.controller.sleepState.value.isFadingOut)
+        assertEquals(1.0f, harness.controller.sleepState.value.volumeMultiplier, 0.01f)
+
+        // Advance 15 seconds (15s remaining: 50% volume)
+        advanceTimeBy(15_000)
+        assertEquals(15L, harness.controller.sleepState.value.remainingSeconds)
+        assertTrue(harness.controller.sleepState.value.isFadingOut)
+        assertEquals(0.5f, harness.controller.sleepState.value.volumeMultiplier, 0.01f)
+        assertTrue(harness.volumeChanges.any { Math.abs(it - 0.5f) < 0.01f })
+
+        // Advance remaining 15 seconds to trigger expiration
+        advanceTimeBy(15_000)
+        assertEquals(ReaderTtsState.PAUSED, harness.controller.state.value)
+        assertEquals(TtsSleepOption.OFF, harness.controller.sleepState.value.option)
+        assertFalse(harness.controller.sleepState.value.isActive)
+        assertFalse(harness.controller.sleepState.value.isFadingOut)
+        assertEquals(1.0f, harness.controller.sleepState.value.volumeMultiplier, 0.01f)
+        assertEquals(1.0f, harness.volumeChanges.last(), 0.01f)
+    }
+
+    @Test
+    fun `canceling sleep timer during fade-out restores volume to 1_0`() = runTest {
+        val harness = Harness(scope = this)
+        harness.controller.play()
+        harness.controller.setSleepTimer(TtsSleepOption.MINUTES_5)
+
+        // Advance into fade-out
+        advanceTimeBy(285_001) // 15s remaining
+        assertTrue(harness.controller.sleepState.value.isFadingOut)
+
+        harness.controller.cancelSleepTimer()
+        assertEquals(TtsSleepOption.OFF, harness.controller.sleepState.value.option)
+        assertFalse(harness.controller.sleepState.value.isActive)
+        assertEquals(1.0f, harness.volumeChanges.last(), 0.01f)
+    }
+
+    @Test
+    fun `adapter secondary constructor delegates setVolume`() {
+        val adapterCalls = mutableListOf<String>()
+        val volumeCalls = mutableListOf<Float>()
+        val adapter = object : TtsPlayerAdapter {
+            override fun play(): Boolean = true
+            override fun pause() { adapterCalls += "pause" }
+            override fun stop() { adapterCalls += "stop" }
+            override fun setVolume(volume: Float) { volumeCalls += volume }
+        }
+
+        val controller = ReaderTtsController(adapter = adapter)
+        controller.setSleepTimer(TtsSleepOption.OFF)
+        assertEquals(listOf(1.0f), volumeCalls)
     }
 }

@@ -7,6 +7,8 @@ import java.util.Locale
  */
 enum class TtsSleepOption(val label: String, val minutes: Int? = null) {
     OFF("Off", null),
+    MINUTES_5("5 min", 5),
+    MINUTES_10("10 min", 10),
     MINUTES_15("15 min", 15),
     MINUTES_30("30 min", 30),
     MINUTES_45("45 min", 45),
@@ -22,11 +24,17 @@ enum class TtsSleepOption(val label: String, val minutes: Int? = null) {
  * @param option The selected sleep option (off, timed, or end of chapter).
  * @param remainingSeconds Seconds remaining until auto-pause for timed options.
  * @param targetChapterHref Normalized chapter href being tracked for [TtsSleepOption.END_OF_CHAPTER].
+ * @param fadeDurationSeconds Seconds over which volume fades down before pausing (default 30s).
+ * @param isFadingOut Whether gradual volume fade-out is currently in progress.
+ * @param volumeMultiplier Normalized volume attenuation factor from 1.0f (full) down to 0.0f (silent).
  */
 data class TtsSleepState(
     val option: TtsSleepOption = TtsSleepOption.OFF,
     val remainingSeconds: Long? = null,
-    val targetChapterHref: String? = null
+    val targetChapterHref: String? = null,
+    val fadeDurationSeconds: Int = 30,
+    val isFadingOut: Boolean = false,
+    val volumeMultiplier: Float = 1.0f
 ) {
     val isActive: Boolean get() = option != TtsSleepOption.OFF
 }
@@ -37,6 +45,7 @@ data class TtsSleepState(
  * - Off -> "Timer"
  * - End of chapter -> "End ch."
  * - Timed -> "MM:SS" (or "H:MM:SS" if >= 60 minutes)
+ * - Fading -> "Fading MM:SS"
  */
 fun formatSleepTimerLabel(state: TtsSleepState): String {
     if (!state.isActive) return "Timer"
@@ -45,12 +54,18 @@ fun formatSleepTimerLabel(state: TtsSleepState): String {
     val seconds = state.remainingSeconds ?: return "${state.option.minutes ?: 0}m"
     val mins = seconds / 60
     val secs = seconds % 60
-    return if (mins >= 60) {
+    val timeStr = if (mins >= 60) {
         val hours = mins / 60
         val remMins = mins % 60
         String.format(Locale.ROOT, "%d:%02d:%02d", hours, remMins, secs)
     } else {
         String.format(Locale.ROOT, "%02d:%02d", mins, secs)
+    }
+
+    return if (state.isFadingOut) {
+        "Fading $timeStr"
+    } else {
+        timeStr
     }
 }
 

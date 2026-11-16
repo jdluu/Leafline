@@ -2879,10 +2879,16 @@ internal fun TtsSleepTimerSheet(
                             tint = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                         Text(
-                            text = if (currentState.option == TtsSleepOption.END_OF_CHAPTER) {
-                                "Pausing at the end of the chapter"
-                            } else {
-                                "Time remaining: ${formatSleepTimerLabel(currentState)}"
+                            text = when {
+                                currentState.option == TtsSleepOption.END_OF_CHAPTER -> {
+                                    "Pausing at the end of the chapter"
+                                }
+                                currentState.isFadingOut -> {
+                                    "Gradually fading audio: ${formatSleepTimerLabel(currentState)}"
+                                }
+                                else -> {
+                                    "Time remaining: ${formatSleepTimerLabel(currentState)}"
+                                }
                             },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -2895,6 +2901,8 @@ internal fun TtsSleepTimerSheet(
 
             val options = listOf(
                 TtsSleepOption.OFF to ("Off" to "Do not pause automatically"),
+                TtsSleepOption.MINUTES_5 to ("5 minutes" to "Pause after 5 minutes of reading"),
+                TtsSleepOption.MINUTES_10 to ("10 minutes" to "Pause after 10 minutes of reading"),
                 TtsSleepOption.MINUTES_15 to ("15 minutes" to "Pause after 15 minutes of reading"),
                 TtsSleepOption.MINUTES_30 to ("30 minutes" to "Pause after 30 minutes of reading"),
                 TtsSleepOption.MINUTES_45 to ("45 minutes" to "Pause after 45 minutes of reading"),

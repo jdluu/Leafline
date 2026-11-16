@@ -554,6 +554,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     onPause = { handleTtsPause() },
                     onStop = { handleTtsStop() },
                     onSetRate = { rate -> handleTtsRateChange(rate) },
+                    onSetVolume = { volume -> handleTtsVolumeChange(volume) },
                     onSkipPrevious = { ttsNavigator?.skipToPreviousUtterance() },
                     onSkipNext = { ttsNavigator?.skipToNextUtterance() },
                     onError = { message ->
@@ -844,6 +845,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         if (this::ttsController.isInitialized) {
             ttsController.stop()
         }
+        ttsNavigator?.asMedia3Player()?.volume = 1.0f
         ttsNavigator?.close()
         ttsNavigator = null
         navigationHistory.clear()
@@ -1362,6 +1364,10 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         }
         ttsNavigator?.close()
         ttsNavigator = null
+    }
+
+    private fun handleTtsVolumeChange(volume: Float) {
+        ttsNavigator?.asMedia3Player()?.volume = volume
     }
 
     private fun handleTtsRateChange(rate: Float) {
