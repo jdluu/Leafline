@@ -733,6 +733,17 @@ fun LibraryScreen(
                 detailSheetBook = null
                 onOpenBook(book)
             },
+            onUpdateMetadata = { title, authors, series, seriesIndex, publisher, description ->
+                viewModel.updateBookMetadata(
+                    stableId = book.stableId,
+                    title = title,
+                    authors = authors,
+                    series = series,
+                    seriesIndex = seriesIndex,
+                    publisher = publisher,
+                    description = description
+                )
+            },
             onExportNotes = if (notesExporter != null) {
                 { exportBookTarget = currentBook }
             } else null,
@@ -1702,6 +1713,7 @@ private fun BookDetailSheet(
     onAddToCollection: (Long) -> Unit,
     onRemoveFromCollection: (Long) -> Unit,
     onOpen: () -> Unit,
+    onUpdateMetadata: ((title: String, authors: List<String>, series: String?, seriesIndex: Float?, publisher: String?, description: String?) -> Unit)? = null,
     onExportNotes: (() -> Unit)? = null,
     onGetReadingStats: suspend () -> ReadingAggregate = { ReadingAggregate.EMPTY }
 ) {
@@ -1709,6 +1721,13 @@ private fun BookDetailSheet(
     var optimisticRating by remember(book.rating) { mutableStateOf(book.rating) }
     var optimisticTags by remember(book.tags) { mutableStateOf(book.tags) }
     var optimisticCollectionIds by remember(bookCollectionIds) { mutableStateOf(bookCollectionIds) }
+    var optimisticTitle by remember(book.title) { mutableStateOf(book.title) }
+    var optimisticAuthors by remember(book.authors) { mutableStateOf(book.authors) }
+    var optimisticSeries by remember(book.series) { mutableStateOf(book.series) }
+    var optimisticSeriesIndex by remember(book.seriesIndex) { mutableStateOf(book.seriesIndex) }
+    var optimisticPublisher by remember(book.publisher) { mutableStateOf(book.publisher) }
+    var optimisticDescription by remember(book.description) { mutableStateOf(book.description) }
+    var showEditMetadataDialog by remember { mutableStateOf(false) }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -1757,15 +1776,15 @@ private fun BookDetailSheet(
                 }
                 Spacer(Modifier.width(Spacing.sm))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(book.title, style = MaterialTheme.typography.titleLarge)
-                    if (book.authors.isNotEmpty()) {
+                    Text(optimisticTitle, style = MaterialTheme.typography.titleLarge)
+                    if (optimisticAuthors.isNotEmpty()) {
                         Text(
-                            book.authors.joinToString(", "),
+                            optimisticAuthors.joinToString(", "),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    book.formattedSeries()?.let { seriesText ->
+                    formatSeriesText(optimisticSeries, optimisticSeriesIndex)?.let { seriesText ->
                         Text(
                             text = seriesText,
                             style = MaterialTheme.typography.labelMedium,
@@ -1811,7 +1830,7 @@ private fun BookDetailSheet(
                 }
             }
 
-            if (!book.description.isNullOrBlank()) {
+            if (!optimisticDescription.isNullOrBlank()) {
                 var descriptionExpanded by remember { mutableStateOf(false) }
                 Spacer(Modifier.height(Spacing.sm))
                 HorizontalDivider()
@@ -1819,13 +1838,13 @@ private fun BookDetailSheet(
                 Text("Description", style = MaterialTheme.typography.titleSmall)
                 Spacer(Modifier.height(Spacing.xs))
                 Text(
-                    text = book.description,
+                    text = optimisticDescription!!,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = if (descriptionExpanded) Int.MAX_VALUE else 4,
                     overflow = TextOverflow.Ellipsis
                 )
-                if (book.description.length > 180) {
+                if (optimisticDescription!!.length > 180) {
                     TextButton(
                         onClick = { descriptionExpanded = !descriptionExpanded },
                         modifier = Modifier.padding(top = 2.dp)
@@ -1840,14 +1859,31 @@ private fun BookDetailSheet(
             Spacer(Modifier.height(Padding.compact))
 
             // Metadata section
-            Text("Metadata", style = MaterialTheme.typography.titleSmall)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Metadata", style = MaterialTheme.typography.titleSmall)
+                if (onUpdateMetadata != null) {
+                    TextButton(onClick = { showEditMetadataDialog = true }) {
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp) // touch-target-ok: button decorative icon
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Edit")
+                    }
+                }
+            }
             Spacer(Modifier.height(Spacing.xs))
             MetadataRow("Status", optimisticStatus.displayName)
             optimisticRating?.let { MetadataRow("Rating", "$it / 5 stars") }
             if (optimisticTags.isNotEmpty()) {
                 MetadataRow("Tags", optimisticTags.joinToString(", ") { "#$it" })
             }
-            book.publisher?.let { MetadataRow("Publisher", it) }
+            optimisticPublisher?.let { MetadataRow("Publisher", it) }
             book.pageCount?.let { MetadataRow("Pages", it.toString()) }
             book.language?.let { MetadataRow("Language", it) }
             book.publishedAtEpochMillis?.let { millis ->
@@ -2111,6 +2147,147 @@ private fun BookDetailSheet(
             Spacer(Modifier.height(Spacing.sm))
         }
     }
+
+    if (showEditMetadataDialog && onUpdateMetadata != null) {
+        EditBookMetadataDialog(
+            initialTitle = optimisticTitle,
+            initialAuthors = optimisticAuthors,
+            initialSeries = optimisticSeries,
+            initialSeriesIndex = optimisticSeriesIndex,
+            initialPublisher = optimisticPublisher,
+            initialDescription = optimisticDescription,
+            onDismiss = { showEditMetadataDialog = false },
+            onSave = { newTitle, newAuthors, newSeries, newSeriesIndex, newPublisher, newDescription ->
+                optimisticTitle = newTitle
+                optimisticAuthors = newAuthors
+                optimisticSeries = newSeries
+                optimisticSeriesIndex = newSeriesIndex
+                optimisticPublisher = newPublisher
+                optimisticDescription = newDescription
+                onUpdateMetadata(newTitle, newAuthors, newSeries, newSeriesIndex, newPublisher, newDescription)
+            }
+        )
+    }
+}
+
+@Composable
+private fun EditBookMetadataDialog(
+    initialTitle: String,
+    initialAuthors: List<String>,
+    initialSeries: String?,
+    initialSeriesIndex: Float?,
+    initialPublisher: String?,
+    initialDescription: String?,
+    onDismiss: () -> Unit,
+    onSave: (title: String, authors: List<String>, series: String?, seriesIndex: Float?, publisher: String?, description: String?) -> Unit
+) {
+    var title by remember { mutableStateOf(initialTitle) }
+    var authors by remember { mutableStateOf(initialAuthors.joinToString(", ")) }
+    var series by remember { mutableStateOf(initialSeries.orEmpty()) }
+    var seriesIndex by remember {
+        mutableStateOf(
+            initialSeriesIndex?.let { if (it % 1f == 0f) it.toInt().toString() else it.toString() }.orEmpty()
+        )
+    }
+    var publisher by remember { mutableStateOf(initialPublisher.orEmpty()) }
+    var description by remember { mutableStateOf(initialDescription.orEmpty()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit metadata", style = MaterialTheme.typography.titleLarge) },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+            ) {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Title *") },
+                    singleLine = true,
+                    isError = title.isBlank(),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = authors,
+                    onValueChange = { authors = it },
+                    label = { Text("Authors (comma-separated)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+                ) {
+                    OutlinedTextField(
+                        value = series,
+                        onValueChange = { series = it },
+                        label = { Text("Series (optional)") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = seriesIndex,
+                        onValueChange = { seriesIndex = it },
+                        label = { Text("Volume #") },
+                        singleLine = true,
+                        modifier = Modifier.width(100.dp)
+                    )
+                }
+                OutlinedTextField(
+                    value = publisher,
+                    onValueChange = { publisher = it },
+                    label = { Text("Publisher (optional)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Description (optional)") },
+                    minLines = 3,
+                    maxLines = 6,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (title.isNotBlank()) {
+                        val parsedAuthors = authors.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                        val parsedSeriesIndex = seriesIndex.trim().toFloatOrNull()
+                        onSave(
+                            title.trim(),
+                            parsedAuthors,
+                            series.trim().takeIf { it.isNotEmpty() },
+                            parsedSeriesIndex,
+                            publisher.trim().takeIf { it.isNotEmpty() },
+                            description.trim().takeIf { it.isNotEmpty() }
+                        )
+                        onDismiss()
+                    }
+                },
+                enabled = title.isNotBlank()
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+private fun formatSeriesText(series: String?, seriesIndex: Float?): String? {
+    val s = series?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    val idx = seriesIndex ?: return s
+    val formattedIndex = if (idx % 1f == 0f) idx.toInt().toString() else idx.toString()
+    return "$s #$formattedIndex"
 }
 
 @Composable

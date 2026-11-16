@@ -437,6 +437,45 @@ class LibraryViewModelTest {
 
         assertEquals(listOf(42L to "Classics"), repository.renamedCollections)
     }
+
+    @Test
+    fun `updateBookMetadata trims fields, parses authors and series, and updates repository`() =
+        runTest(dispatcher) {
+            val initialBook = LibraryBook(
+                stableId = "book-1",
+                title = "Original Title",
+                authors = listOf("Original Author"),
+                series = null,
+                seriesIndex = null,
+                publisher = "Original Publisher",
+                description = "Original Description"
+            )
+            val fakeRepo = FakeLibraryRepository(
+                books = flowOf(listOf(initialBook)),
+                booksById = mapOf("book-1" to initialBook)
+            )
+            val viewModel = LibraryViewModel(repository = fakeRepo)
+
+            viewModel.updateBookMetadata(
+                stableId = "book-1",
+                title = "  New Title  ",
+                authors = listOf(" Author 1 ", "Author 2 "),
+                series = "  Dune  ",
+                seriesIndex = 2.0f,
+                publisher = "  Acme Books  ",
+                description = "  New Description  "
+            )
+            advanceUntilIdle()
+
+            assertEquals(1, fakeRepo.updatedBooks.size)
+            val updated = fakeRepo.updatedBooks.first()
+            assertEquals("New Title", updated.title)
+            assertEquals(listOf("Author 1", "Author 2"), updated.authors)
+            assertEquals("Dune", updated.series)
+            assertEquals(2.0f, updated.seriesIndex)
+            assertEquals("Acme Books", updated.publisher)
+            assertEquals("New Description", updated.description)
+        }
 }
 
 private fun testBook(

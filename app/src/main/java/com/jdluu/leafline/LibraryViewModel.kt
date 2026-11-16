@@ -444,6 +444,29 @@ class LibraryViewModel(
         }
     }
 
+    fun updateBookMetadata(
+        stableId: String,
+        title: String,
+        authors: List<String>,
+        series: String?,
+        seriesIndex: Float?,
+        publisher: String? = null,
+        description: String? = null
+    ) {
+        viewModelScope.launch {
+            val book = repository.getBookByStableId(stableId) ?: return@launch
+            val updated = book.copy(
+                title = title.trim(),
+                authors = authors.map { it.trim() }.filter { it.isNotEmpty() },
+                series = series?.trim()?.takeIf { it.isNotEmpty() },
+                seriesIndex = seriesIndex,
+                publisher = publisher?.trim()?.takeIf { it.isNotEmpty() } ?: book.publisher,
+                description = description?.trim()?.takeIf { it.isNotEmpty() } ?: book.description
+            )
+            repository.updateBook(updated)
+        }
+    }
+
     // -- Collection operations --
 
     fun selectCollection(id: Long?) {
