@@ -21,6 +21,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-11-16
+
+### Fixed
+- **Reader**: The reading status footer was drawn over the page with no reserved
+  space, so the last line of text ran underneath it. The navigator now reserves
+  the footer's height, keeping page text clear of the label.
+- **TTS**: Playback paused itself about 100 ms after starting or resuming. The app
+  and Readium's TTS navigator both requested audio focus, and the navigator's
+  request took focus back, delivering `AUDIOFOCUS_LOSS` to the app's listener. The
+  app no longer claims audio focus for TTS and defers to the navigator, which
+  already handles interruption and resume. Headphone-disconnect pausing is
+  unchanged.
+- **Reader**: Highlight excerpts truncated mid-word; context is now cut on word
+  boundaries.
+
+### Removed
+- `TtsAudioFocusManager`, superseded by the navigator's own audio focus handling.
+
 ## [0.4.1] - 2026-11-16
 
 Patch release from a full device pass over 0.4.0 on a Pixel 7 (Android 17): every

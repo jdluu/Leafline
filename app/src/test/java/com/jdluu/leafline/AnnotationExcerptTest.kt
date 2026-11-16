@@ -58,6 +58,20 @@ class AnnotationExcerptTest {
     }
 
     @Test
+    fun `a truncated context is cut on word boundaries`() {
+        val long = """
+            {"href": "OEBPS/ch1.xhtml",
+             "text": {"before": "...the whale was a monster of the sea and the sailors feared him greatly whenever the wind blew hard from the north", "highlight": " whaling", "after": " industry grew across the islands of the pacific ocean and beyond the cape of good hope"}}
+        """.trimIndent()
+        val excerpt = annotationExcerpt(annotation(long))
+
+        val body = excerpt.removePrefix("\u2026").removeSuffix("\u2026")
+        assertFalse("starts mid-word: $excerpt", body.startsWith("orth") || body.startsWith("rth"))
+        assertTrue("no leading context: $excerpt", excerpt.startsWith("\u2026"))
+        assertTrue("highlight missing: $excerpt", body.contains("whaling"))
+    }
+
+    @Test
     fun `spaces around the highlight survive the join`() {
         val excerpt = annotationExcerpt(annotation(highlightOnly))
 
