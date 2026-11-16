@@ -6,6 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.readium.r2.navigator.epub.EpubPreferences
+import org.readium.r2.navigator.preferences.ColumnCount
 import org.readium.r2.navigator.preferences.FontFamily
 import org.readium.r2.shared.ExperimentalReadiumApi
 
@@ -61,6 +62,8 @@ class ReaderSettingsTest {
             fontFamily = FontFamily.SERIF,
             lineHeight = 1.8,
             pageMargins = 1.0,
+            hyphens = false,
+            columnCount = ColumnCount.TWO,
             publisherStyles = false
         )
 
@@ -70,6 +73,8 @@ class ReaderSettingsTest {
         assertNull(switched.fontFamily)
         assertNull(switched.lineHeight)
         assertNull(switched.pageMargins)
+        assertNull(switched.hyphens)
+        assertEquals(ColumnCount.TWO, switched.columnCount)
         assertEquals(true, switched.scroll)
     }
 

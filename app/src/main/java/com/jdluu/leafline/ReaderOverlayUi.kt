@@ -247,6 +247,7 @@ import org.readium.r2.navigator.DecorableNavigator
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.navigator.epub.EpubPreferences
+import org.readium.r2.navigator.preferences.ColumnCount
 import org.readium.r2.navigator.input.InputListener
 import org.readium.r2.navigator.input.TapEvent
 import org.readium.r2.shared.ExperimentalReadiumApi
@@ -2090,6 +2091,72 @@ internal fun ReaderSettingsSheet(
                     Icon(Icons.Default.Add, contentDescription = "Increase line height")
                 }
             }
+
+            Text("Columns", style = MaterialTheme.typography.labelLarge)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = Spacing.xs, bottom = Spacing.xs),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+            ) {
+                val currentColumnCount = preferences.columnCount ?: ColumnCount.AUTO
+                listOf(
+                    ColumnCount.AUTO to "Auto",
+                    ColumnCount.ONE to "1 Column",
+                    ColumnCount.TWO to "2 Columns"
+                ).forEach { (count, label) ->
+                    FilterChip(
+                        selected = currentColumnCount == count,
+                        onClick = {
+                            applyCustomPreference { it.copy(columnCount = count) }
+                        },
+                        label = { Text(label) }
+                    )
+                }
+            }
+            Text(
+                text = when (preferences.columnCount ?: ColumnCount.AUTO) {
+                    ColumnCount.AUTO -> "Single column in portrait, dual columns on wide screens or landscape."
+                    ColumnCount.ONE -> "Single column layout across all orientations."
+                    ColumnCount.TWO -> "Two-column side-by-side spread."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = Spacing.sm)
+            )
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(
+                        value = preferences.hyphens ?: true,
+                        role = Role.Switch,
+                        onValueChange = { checked ->
+                            applyCustomPreference { it.copy(hyphens = checked) }
+                        }
+                    )
+            ) {
+                Text(
+                    "Hyphenation",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                Switch(
+                    checked = preferences.hyphens ?: true,
+                    onCheckedChange = null
+                )
+            }
+            Text(
+                text = if (preferences.hyphens != false) {
+                    "Words are hyphenated across line breaks to balance text justification."
+                } else {
+                    "Words are kept intact at line ends without hyphen breaks."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp, bottom = Spacing.sm)
+            )
 
             Text("Styles", style = MaterialTheme.typography.labelLarge)
             Row(modifier = Modifier.padding(top = 8.dp)) {
