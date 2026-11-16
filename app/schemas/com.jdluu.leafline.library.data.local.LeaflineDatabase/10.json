@@ -1,0 +1,391 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 10,
+    "identityHash": "8d886bdf8f8f6be86418b9c33818afda",
+    "entities": [
+      {
+        "tableName": "books",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`stableId` TEXT NOT NULL, `title` TEXT NOT NULL, `authors` TEXT NOT NULL, `language` TEXT, `description` TEXT, `publisher` TEXT, `publishedAtEpochMillis` INTEGER, `filePath` TEXT NOT NULL, `fileHash` TEXT NOT NULL, `addedAtEpochMillis` INTEGER, `pageCount` INTEGER, `lastLocatorJson` TEXT, `coverPath` TEXT, `koreaderHash` TEXT, `lastReadAtEpochMillis` INTEGER, `readingStatus` TEXT NOT NULL, `rating` INTEGER, `tags` TEXT NOT NULL, PRIMARY KEY(`stableId`))",
+        "fields": [
+          {
+            "fieldPath": "stableId",
+            "columnName": "stableId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "authors",
+            "columnName": "authors",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "language",
+            "columnName": "language",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "publisher",
+            "columnName": "publisher",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "publishedAtEpochMillis",
+            "columnName": "publishedAtEpochMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "filePath",
+            "columnName": "filePath",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fileHash",
+            "columnName": "fileHash",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "addedAtEpochMillis",
+            "columnName": "addedAtEpochMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "pageCount",
+            "columnName": "pageCount",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "lastLocatorJson",
+            "columnName": "lastLocatorJson",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "coverPath",
+            "columnName": "coverPath",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "koreaderHash",
+            "columnName": "koreaderHash",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "lastReadAtEpochMillis",
+            "columnName": "lastReadAtEpochMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "readingStatus",
+            "columnName": "readingStatus",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rating",
+            "columnName": "rating",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "tags",
+            "columnName": "tags",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "stableId"
+          ]
+        }
+      },
+      {
+        "tableName": "bookmarks",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `bookId` TEXT NOT NULL, `locatorJson` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `label` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bookId",
+            "columnName": "bookId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "locatorJson",
+            "columnName": "locatorJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "label",
+            "columnName": "label",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_bookmarks_bookId",
+            "unique": false,
+            "columnNames": [
+              "bookId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_bookmarks_bookId` ON `${TABLE_NAME}` (`bookId`)"
+          }
+        ]
+      },
+      {
+        "tableName": "annotations",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `bookId` TEXT NOT NULL, `locatorJson` TEXT NOT NULL, `colorHex` TEXT NOT NULL, `note` TEXT, `createdAt` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bookId",
+            "columnName": "bookId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "locatorJson",
+            "columnName": "locatorJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "colorHex",
+            "columnName": "colorHex",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "note",
+            "columnName": "note",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_annotations_bookId",
+            "unique": false,
+            "columnNames": [
+              "bookId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_annotations_bookId` ON `${TABLE_NAME}` (`bookId`)"
+          }
+        ]
+      },
+      {
+        "tableName": "collections",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `createdAtEpochMillis` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMillis",
+            "columnName": "createdAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_collections_name",
+            "unique": false,
+            "columnNames": [
+              "name"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_collections_name` ON `${TABLE_NAME}` (`name`)"
+          }
+        ]
+      },
+      {
+        "tableName": "book_collection_cross_ref",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`collectionId` INTEGER NOT NULL, `bookStableId` TEXT NOT NULL, PRIMARY KEY(`collectionId`, `bookStableId`))",
+        "fields": [
+          {
+            "fieldPath": "collectionId",
+            "columnName": "collectionId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bookStableId",
+            "columnName": "bookStableId",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "collectionId",
+            "bookStableId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_book_collection_cross_ref_bookStableId",
+            "unique": false,
+            "columnNames": [
+              "bookStableId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_book_collection_cross_ref_bookStableId` ON `${TABLE_NAME}` (`bookStableId`)"
+          }
+        ]
+      },
+      {
+        "tableName": "reading_sessions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `bookId` TEXT NOT NULL, `startTimeEpochMillis` INTEGER NOT NULL, `endTimeEpochMillis` INTEGER NOT NULL, `activeDurationMillis` INTEGER NOT NULL, `startProgression` REAL, `endProgression` REAL, `startLocatorJson` TEXT, `endLocatorJson` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bookId",
+            "columnName": "bookId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startTimeEpochMillis",
+            "columnName": "startTimeEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "endTimeEpochMillis",
+            "columnName": "endTimeEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "activeDurationMillis",
+            "columnName": "activeDurationMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startProgression",
+            "columnName": "startProgression",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "endProgression",
+            "columnName": "endProgression",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "startLocatorJson",
+            "columnName": "startLocatorJson",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "endLocatorJson",
+            "columnName": "endLocatorJson",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_reading_sessions_bookId",
+            "unique": false,
+            "columnNames": [
+              "bookId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_reading_sessions_bookId` ON `${TABLE_NAME}` (`bookId`)"
+          },
+          {
+            "name": "index_reading_sessions_startTimeEpochMillis",
+            "unique": false,
+            "columnNames": [
+              "startTimeEpochMillis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_reading_sessions_startTimeEpochMillis` ON `${TABLE_NAME}` (`startTimeEpochMillis`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '8d886bdf8f8f6be86418b9c33818afda')"
+    ]
+  }
+}
