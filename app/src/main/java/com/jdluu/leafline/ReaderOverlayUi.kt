@@ -2767,7 +2767,7 @@ internal fun TocItem(
                 onClickLabel = if (isCurrent) "Current section" else "Open section",
                 onClick = onClick
             ),
-        shape = RoundedCornerShape(8.dp),
+        shape = MaterialTheme.shapes.small,
         color = if (isCurrent) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
                 else androidx.compose.ui.graphics.Color.Transparent
     ) {
