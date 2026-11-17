@@ -21,6 +21,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-11-16
+
+### Changed
+- **Credential and catalog forms** now follow the design contract. Fields were
+  Material's default outlined text fields, which carry a 4dp radius and a border
+  against an app whose single container radius is 12dp. They are now paper-toned
+  insets at 12dp with no outline, and grouped fields sit on a quiet mist panel so
+  the block reads as one object.
+- **KOReader Sync** has one emphasized action: Save is filled and Test connection
+  is outlined. The password gained a visibility toggle, the background-sync switch
+  reads as part of the group with its own supporting line, and save/test results
+  now pair an icon with the message instead of relying on colour.
+- **Add Catalog Feed** uses a segmented single-choice control for the
+  authentication method, replacing chips that wrapped onto a second row, and
+  separates feed details from credentials with a hairline divider.
+
 ## [0.4.3] - 2026-11-16
 
 ### Fixed

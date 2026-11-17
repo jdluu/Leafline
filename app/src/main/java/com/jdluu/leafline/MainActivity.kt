@@ -6,6 +6,18 @@ import android.content.Intent
 import android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
 import android.net.Uri
 import android.os.Bundle
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import android.provider.OpenableColumns
 import android.util.Log
@@ -41,7 +53,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -91,6 +102,9 @@ import com.jdluu.leafline.sync.KoreaderSyncConfig
 import com.jdluu.leafline.sync.KoreaderSyncConfigStore
 import com.jdluu.leafline.sync.SyncWorker
 import com.jdluu.leafline.theme.AppearanceStore
+import com.jdluu.leafline.theme.FormPanel
+import com.jdluu.leafline.theme.IconSize
+import com.jdluu.leafline.theme.LeaflineTextField
 import com.jdluu.leafline.theme.LeaflineTheme
 import com.jdluu.leafline.theme.Padding
 import com.jdluu.leafline.theme.Spacing
@@ -621,138 +635,187 @@ private val ThemeMode.description: String
         ThemeMode.E_INK -> "Uses the high-contrast monochrome scheme for e-ink displays."
     }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** Outcome of a save or connection test, shown beside an icon so it never relies on colour. */
+private data class SyncStatus(val message: String, val success: Boolean)
+
 @Composable
 internal fun KoreaderSyncSection(modifier: Modifier = Modifier) {
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    // Read through the container once so saved settings are restored before the fields
-    // initialise; otherwise the section shows empty fields on a fresh process.
-    val appContext = LocalContext.current
-    remember { appContext.appContainer.koreaderSyncConfigStore }
-    var serverUrl by remember { mutableStateOf(KoreaderSyncConfigStore.config?.serverUrl ?: "") }
-    var syncUsername by remember { mutableStateOf(KoreaderSyncConfigStore.config?.username ?: "") }
-    var syncPassword by remember { mutableStateOf(KoreaderSyncConfigStore.config?.password ?: "") }
-    var enabled by remember { mutableStateOf(KoreaderSyncConfigStore.config?.enabled ?: false) }
-    var testResult by remember { mutableStateOf<String?>(null) }
+    // Touch the container once so saved settings land in the store before the fields
+    // initialise; otherwise a fresh process shows empty fields.
+    remember { context.appContainer.koreaderSyncConfigStore }
+    val stored = KoreaderSyncConfigStore.config
+    var serverUrl by remember { mutableStateOf(stored?.serverUrl.orEmpty()) }
+    var syncUsername by remember { mutableStateOf(stored?.username.orEmpty()) }
+    var syncPassword by remember { mutableStateOf(stored?.password.orEmpty()) }
+    var enabled by remember { mutableStateOf(stored?.enabled ?: false) }
+    var passwordVisible by remember { mutableStateOf(false) }
     var testing by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf<SyncStatus?>(null) }
+
+    fun currentConfig() = KoreaderSyncConfig(
+        serverUrl = serverUrl.trim(),
+        username = syncUsername.trim(),
+        password = syncPassword,
+        enabled = enabled
+    )
+
+    fun applySyncConfig(config: KoreaderSyncConfig) {
+        KoreaderSyncConfigStore.config = config
+        context.appContainer.koreaderSyncConfigStore.save(config)
+        if (config.enabled) SyncWorker.schedule(context) else SyncWorker.cancel(context)
+    }
+
+    fun testConnection() {
+        testing = true
+        status = null
+        scope.launch {
+            status = try {
+                val authorized = context.appContainer.koreaderSyncApi
+                    .auth(serverUrl.trim(), syncUsername.trim(), syncPassword)
+                if (authorized) {
+                    SyncStatus("Connection OK", success = true)
+                } else {
+                    SyncStatus("Authentication failed", success = false)
+                }
+            } catch (e: Exception) {
+                SyncStatus("Could not reach the server: ${e.message}", success = false)
+            }
+            testing = false
+        }
+    }
 
     Column(modifier = modifier.fillMaxWidth()) {
+        Text("KOReader Sync", style = MaterialTheme.typography.titleMedium)
         Text(
-            "KOReader Sync",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(bottom = Spacing.sm)
-        )
-        OutlinedTextField(
-            value = serverUrl,
-            onValueChange = { serverUrl = it; testResult = null },
-            label = { Text("Server URL") },
-            placeholder = { Text("http://server:6061/api/koreader") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
-        )
-        OutlinedTextField(
-            value = syncUsername,
-            onValueChange = { syncUsername = it; testResult = null },
-            label = { Text("Username") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(top = Padding.compact)
-        )
-        OutlinedTextField(
-            value = syncPassword,
-            onValueChange = { syncPassword = it; testResult = null },
-            label = { Text("Password") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(top = Padding.compact)
-        )
-        Row(
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = Spacing.xs)
-                .toggleable(
-                    value = enabled,
-                    role = Role.Switch,
-                    onValueChange = { checked ->
-                        enabled = checked
-                        val base = KoreaderSyncConfigStore.config ?: KoreaderSyncConfig(
-                            serverUrl = serverUrl.trim(),
-                            username = syncUsername.trim(),
-                            password = syncPassword,
-                            enabled = false
-                        )
-                        KoreaderSyncConfigStore.config = base.copy(enabled = checked)
-                        if (checked) {
-                            SyncWorker.schedule(context)
-                        } else {
-                            SyncWorker.cancel(context)
-                        }
-                    }
-                )
-        ) {
-            Text(
-                "Enable progress sync",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.weight(1f)
-            )
-            Switch(
-                checked = enabled,
-                onCheckedChange = null
-            )
-        }
-        Row(modifier = Modifier.padding(top = Spacing.sm)) {
-            Button(
-                onClick = {
-                    val config = KoreaderSyncConfig(
-                        serverUrl = serverUrl.trim(),
-                        username = syncUsername.trim(),
-                        password = syncPassword,
-                        enabled = enabled
-                    )
-                    KoreaderSyncConfigStore.config = config
-                    // Persist so sync survives a restart; the password is encrypted with a
-                    // Keystore key rather than written in the clear.
-                    context.appContainer.koreaderSyncConfigStore.save(config)
-                    testResult = "Saved."
-                }
-            ) { Text("Save") }
-            Button(
-                onClick = {
-                    testing = true
-                    testResult = null
-                    scope.launch {
-                        testResult = try {
-                            val ok = context.appContainer.koreaderSyncApi
-                                .auth(serverUrl.trim(), syncUsername.trim(), syncPassword)
-                            if (ok) "Connection OK" else "Authentication failed"
-                        } catch (e: Exception) {
-                            "Connection failed: ${e.message}"
-                        }
-                        testing = false
-                    }
-                },
-                enabled = !testing,
-                modifier = Modifier.padding(start = Padding.compact)
-            ) { Text(if (testing) "Testing..." else "Test connection") }
-        }
-        testResult?.let { message ->
-            Text(
-                message,
-                style = MaterialTheme.typography.bodySmall,
-                color = when {
-                    message.startsWith("Connection OK") -> MaterialTheme.colorScheme.primary
-                    message == "Saved." -> MaterialTheme.colorScheme.onSurfaceVariant
-                    else -> MaterialTheme.colorScheme.error
-                },
-                modifier = Modifier
-                    .padding(top = Spacing.xs)
-                    .semantics { liveRegion = LiveRegionMode.Polite }
-            )
-        }
-        Text(
-            "Syncs reading positions with a KOReader-compatible server using the book content hash. Credentials stay on this device; the password is encrypted before it is stored.",
+            "Keep your place across devices with a KOReader-compatible server.",
             style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(top = Spacing.sm)
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = Spacing.xs, bottom = Spacing.sm)
+        )
+        FormPanel {
+            LeaflineTextField(
+                value = serverUrl,
+                onValueChange = { serverUrl = it; status = null },
+                label = "Server URL",
+                placeholder = "http://server:6061/api/koreader",
+                keyboardType = KeyboardType.Uri
+            )
+            LeaflineTextField(
+                value = syncUsername,
+                onValueChange = { syncUsername = it; status = null },
+                label = "Username"
+            )
+            LeaflineTextField(
+                value = syncPassword,
+                onValueChange = { syncPassword = it; status = null },
+                label = "Password",
+                keyboardType = KeyboardType.Password,
+                visualTransformation = if (passwordVisible) {
+                    VisualTransformation.None
+                } else {
+                    PasswordVisualTransformation()
+                },
+                trailingIcon = {
+                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                        Icon(
+                            imageVector = if (passwordVisible) {
+                                Icons.Default.VisibilityOff
+                            } else {
+                                Icons.Default.Visibility
+                            },
+                            contentDescription = if (passwordVisible) {
+                                "Hide password"
+                            } else {
+                                "Show password"
+                            }
+                        )
+                    }
+                }
+            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .toggleable(
+                        value = enabled,
+                        role = Role.Switch,
+                        onValueChange = { checked ->
+                            enabled = checked
+                            applySyncConfig(currentConfig().copy(enabled = checked))
+                            status = null
+                        }
+                    )
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Sync in the background", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "Checks for newer positions automatically.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(checked = enabled, onCheckedChange = null)
+            }
+            status?.let { current ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics { liveRegion = LiveRegionMode.Polite }
+                ) {
+                    Icon(
+                        imageVector = if (current.success) {
+                            Icons.Default.CheckCircle
+                        } else {
+                            Icons.Default.ErrorOutline
+                        },
+                        contentDescription = null,
+                        tint = if (current.success) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.error
+                        },
+                        modifier = Modifier.size(IconSize.small) // touch-target-ok: status glyph
+                    )
+                    Text(
+                        current.message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (current.success) {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.error
+                        }
+                    )
+                }
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(top = Spacing.xs)
+            ) {
+                OutlinedButton(
+                    onClick = { testConnection() },
+                    enabled = !testing,
+                    modifier = Modifier.heightIn(min = 48.dp)
+                ) { Text(if (testing) "Testing…" else "Test connection") }
+                Spacer(Modifier.weight(1f))
+                Button(
+                    onClick = {
+                        applySyncConfig(currentConfig())
+                        status = SyncStatus("Saved", success = true)
+                    },
+                    modifier = Modifier.heightIn(min = 48.dp)
+                ) { Text("Save") }
+            }
+        }
+        Text(
+            "Credentials stay on this device; the password is encrypted before it is stored.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = Spacing.xs)
         )
     }
 }
