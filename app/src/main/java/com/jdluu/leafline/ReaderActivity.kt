@@ -1142,7 +1142,17 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             isDrawerOpen.value
         }
         val composeView = ComposeView(this).apply {
+            // Reader chrome (drawer, sheets, dialogs) has to use the same Leafline scheme as
+            // the rest of the app. Without this wrapper the overlays fell back to Material's
+            // baseline palette: lilac drawer surfaces and purple tab and row accents.
             setContent {
+                val appearanceMode = remember {
+                    com.jdluu.leafline.theme.AppearanceStore.fromContext(this@ReaderActivity).load()
+                }
+                com.jdluu.leafline.theme.LeaflineTheme(
+                    mode = appearanceMode,
+                    darkSystem = androidx.compose.foundation.isSystemInDarkTheme()
+                ) {
                 val isLoading by isLoadingPublication
                 Crossfade(
                     targetState = !isLoading && this@ReaderActivity::bookSearcher.isInitialized,
@@ -1349,6 +1359,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     }
                 }
             }
+                }
         }
         val layoutParams = android.view.ViewGroup.LayoutParams(
             android.view.ViewGroup.LayoutParams.MATCH_PARENT,

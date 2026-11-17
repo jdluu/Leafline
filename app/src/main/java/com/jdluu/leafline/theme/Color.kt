@@ -47,6 +47,19 @@ object LeaflineColors {
     val LightOutline = Color(0xFF717974)
     val LightOutlineVariant = Color(0xFFC0C9C3)
 
+    // Surface container ramp. Material 3 components (navigation bar, sheets,
+    // dialogs, menus) read these roles; leaving them unset falls back to the
+    // baseline palette, which is a lilac neutral this design does not use.
+    val LightSurfaceDim = Color(0xFFDFDFD8)
+    val LightSurfaceBright = Color(0xFFFCFBF7)
+    val LightSurfaceContainerLowest = Color(0xFFFFFFFF)
+    val LightSurfaceContainerLow = Color(0xFFF4F4EE)
+    val LightSurfaceContainer = Color(0xFFEFEFE8)
+    val LightSurfaceContainerHigh = Color(0xFFE9EAE2)
+    val LightSurfaceContainerHighest = Color(0xFFE4E5DC)
+    val LightInverseSurface = Color(0xFF2E312E)
+    val LightInverseOnSurface = Color(0xFFF1F1EB)
+
     // ========================================================================
     // Dark theme (standard, dark gray background)
     // ========================================================================
@@ -79,6 +92,16 @@ object LeaflineColors {
     val DarkOutline = Color(0xFF8B938D)
     val DarkOutlineVariant = Color(0xFF414944)
 
+    val DarkSurfaceDim = Color(0xFF111412)
+    val DarkSurfaceBright = Color(0xFF373A38)
+    val DarkSurfaceContainerLowest = Color(0xFF0C0F0D)
+    val DarkSurfaceContainerLow = Color(0xFF1D201E)
+    val DarkSurfaceContainer = Color(0xFF212422)
+    val DarkSurfaceContainerHigh = Color(0xFF2B2E2C)
+    val DarkSurfaceContainerHighest = Color(0xFF363937)
+    val DarkInverseSurface = Color(0xFFE1E3DF)
+    val DarkInverseOnSurface = Color(0xFF2E312E)
+
     // ========================================================================
     // OLED / Pure-black theme
     //
@@ -95,6 +118,17 @@ object LeaflineColors {
     val OledOnSurface = Color(0xFFE1E3DF)
     val OledSurfaceVariant = Color(0xFF292E2B)
     val OledOnSurfaceVariant = Color(0xFFC0C9C3)
+
+    // Containers stay near black so OLED panels keep most pixels off.
+    val OledSurfaceDim = TrueBlack
+    val OledSurfaceBright = Color(0xFF2A2B2A)
+    val OledSurfaceContainerLowest = TrueBlack
+    val OledSurfaceContainerLow = Color(0xFF0C0D0C)
+    val OledSurfaceContainer = Color(0xFF121312)
+    val OledSurfaceContainerHigh = Color(0xFF1B1C1B)
+    val OledSurfaceContainerHighest = Color(0xFF242524)
+    val OledInverseSurface = Color(0xFFE1E3DF)
+    val OledInverseOnSurface = Color(0xFF2E312E)
 
     // ========================================================================
     // E-ink high-contrast theme
@@ -131,4 +165,14 @@ object LeaflineColors {
     val EinkOnSurfaceVariant = Color(0xFF333333)
     val EinkOutline = Color(0xFF666666)
     val EinkOutlineVariant = Color(0xFFCCCCCC)
+
+    val EinkSurfaceDim = Color(0xFFE8E8E8)
+    val EinkSurfaceBright = Color(0xFFFFFFFF)
+    val EinkSurfaceContainerLowest = Color(0xFFFFFFFF)
+    val EinkSurfaceContainerLow = Color(0xFFF7F7F7)
+    val EinkSurfaceContainer = Color(0xFFEFEFEF)
+    val EinkSurfaceContainerHigh = Color(0xFFE6E6E6)
+    val EinkSurfaceContainerHighest = Color(0xFFDDDDDD)
+    val EinkInverseSurface = Color(0xFF1A1A1A)
+    val EinkInverseOnSurface = Color(0xFFFFFFFF)
 }

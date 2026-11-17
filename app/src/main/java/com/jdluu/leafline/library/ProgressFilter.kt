@@ -5,12 +5,19 @@ import com.jdluu.leafline.sync.ReadingProgressMath
 /**
  * Filter options for book reading progress ranges in the library view.
  */
-enum class ProgressFilter(val displayName: String) {
-    ALL("All progress"),
-    UNREAD("Not started (0%)"),
-    IN_PROGRESS("In progress (1–99%)"),
-    NEAR_FINISH("Almost done (≥75%)"),
-    FINISHED("Finished (100%)");
+/**
+ * Progress ranges offered by the library filter bar.
+ *
+ * [displayName] stays short because five chips share one row and the parenthesised
+ * ranges pushed the last one off the edge; [description] carries the full meaning for
+ * screen readers and the accessibility tree.
+ */
+enum class ProgressFilter(val displayName: String, val description: String) {
+    ALL("All progress", "All progress"),
+    UNREAD("Not started", "Not started, 0 percent"),
+    IN_PROGRESS("In progress", "In progress, 1 to 99 percent"),
+    NEAR_FINISH("Almost done", "Almost done, 75 percent or more"),
+    FINISHED("Finished", "Finished, 100 percent");
 
     fun matches(book: LibraryBook): Boolean {
         if (this == ALL) return true

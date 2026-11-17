@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -154,6 +155,9 @@ fun NotesExportSheet(
                     .fillMaxWidth()
                     .padding(paddingValues)
                     .padding(Spacing.md)
+                    // Without this the preview runs under the gesture bar on gesture-nav
+                    // devices and the action row can sit below the reachable area.
+                    .navigationBarsPadding()
                     .verticalScroll(rememberScrollState())
             ) {
                 // Header Row
@@ -202,6 +206,7 @@ fun NotesExportSheet(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .padding(end = Spacing.sm)
                         .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
                 ) {
@@ -258,9 +263,8 @@ fun NotesExportSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 140.dp, max = 220.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(MaterialTheme.shapes.small)
                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
                         .padding(Spacing.sm)
                         .verticalScroll(rememberScrollState())
                 ) {

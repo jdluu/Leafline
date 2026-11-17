@@ -2762,7 +2762,7 @@ internal fun TocItem(
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 2.dp)
             .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(MaterialTheme.shapes.small)
             .clickable(
                 onClickLabel = if (isCurrent) "Current section" else "Open section",
                 onClick = onClick
@@ -3018,10 +3018,9 @@ internal fun JumpNoticeBanner(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        shape = RoundedCornerShape(24.dp),
+        shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.inverseSurface,
         contentColor = MaterialTheme.colorScheme.inverseOnSurface,
-        shadowElevation = 6.dp,
         modifier = modifier
             .padding(
                 horizontal = 16.dp,

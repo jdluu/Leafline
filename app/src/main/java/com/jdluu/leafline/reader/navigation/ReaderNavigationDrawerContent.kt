@@ -48,7 +48,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Tab
-import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberSwipeToDismissBoxState
@@ -114,8 +114,11 @@ fun ReaderNavigationDrawerContent(
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxSize()) {
-        PrimaryTabRow(
+        // Scrollable rather than fixed: a fixed row splits the width three ways and
+        // ellipsises the longest label ("Bookma…"). Tabs now size to their text.
+        PrimaryScrollableTabRow(
             selectedTabIndex = selectedTab.ordinal,
+            edgePadding = 0.dp,
             modifier = Modifier.fillMaxWidth()
         ) {
             ReaderNavigationTab.entries.forEach { tab ->
@@ -123,8 +126,8 @@ fun ReaderNavigationDrawerContent(
                     selected = selectedTab == tab,
                     onClick = { onTabSelected(tab) },
                     text = {
-                        // Counts live inside each pane; appending them here widens the
-                        // labels until PrimaryTabRow ellipsises them ("Content…").
+                        // Counts live inside each pane; appending them to the title only
+                        // widened the labels.
                         Text(
                             text = tab.title,
                             maxLines = 1,
