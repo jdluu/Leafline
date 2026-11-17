@@ -21,6 +21,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.8] - 2026-11-16
+
+### Fixed
+- **First-run library showed three competing signals.** Two rows of filter chips
+  applied to zero books, an import FAB duplicating the empty state's import
+  button, and copy promising "add a local folder" while only offering Import
+  EPUB. Filters and the FAB now appear once there is something to act on, and the
+  copy matches the single action offered while still pointing at the menu for
+  folder scanning.
+
+### Changed
+- The empty library is treated as the designed moment the contract describes: one
+  leaf mark, one heading, one line, one action.
+
+
 ## [0.4.7] - 2026-11-16
 
 ### Fixed
