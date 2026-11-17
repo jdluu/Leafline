@@ -160,6 +160,10 @@ fun LibraryScreen(
     onOpenBook: (LibraryBook) -> Unit
 ) {
     val books by viewModel.sortedBooks.collectAsStateWithLifecycle()
+    // Unfiltered count: filters over an empty library are noise, and the empty state
+    // already carries the import action.
+    val allBooks by viewModel.books.collectAsStateWithLifecycle()
+    val libraryIsEmpty = allBooks.isEmpty()
     val isLibraryLoaded by viewModel.isLibraryLoaded.collectAsStateWithLifecycle()
     val currentSort by viewModel.sort.collectAsStateWithLifecycle()
     val currentSortAscending by viewModel.sortAscending.collectAsStateWithLifecycle()
@@ -432,6 +436,7 @@ fun LibraryScreen(
             else -> "All books"
         }
 
+        if (!libraryIsEmpty) {
         LibraryFilterBar(
             searchActive = searchActive,
             query = query,
@@ -454,6 +459,7 @@ fun LibraryScreen(
             onSelectTag = { viewModel.selectTag(it) }
         )
 
+        }
         if (books.isEmpty()) {
             when {
                 !isLibraryLoaded -> LibraryLoadingState()
@@ -475,7 +481,7 @@ fun LibraryScreen(
                 )
                 else -> LibraryEmptyState(
                     title = "Your library awaits",
-                    body = "Import an EPUB or add a local folder to start reading",
+                    body = "Import an EPUB to start reading. Folder scanning lives in the menu.",
                     actionLabel = "Import EPUB",
                     onAction = onImportEpub
                 )
@@ -619,14 +625,17 @@ fun LibraryScreen(
         }
     }
 
-    // Import FAB — always in reach, never blocks content
-    FloatingActionButton(
-        onClick = onImportEpub,
-        modifier = Modifier
-            .align(Alignment.BottomEnd)
-            .padding(Padding.screen)
-    ) {
-        Icon(Icons.Default.Add, contentDescription = "Import EPUB")
+    // Import FAB — always in reach, never blocks content. Hidden on an empty library:
+    // the empty state already offers the same action, and two add controls compete.
+    if (!libraryIsEmpty) {
+        FloatingActionButton(
+            onClick = onImportEpub,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(Padding.screen)
+        ) {
+            Icon(Icons.Default.Add, contentDescription = "Import EPUB")
+        }
     }
     }
 
