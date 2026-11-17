@@ -21,6 +21,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-11-16
+
+### Fixed
+- **KOReader sync**: Server, username, and password were held in memory only, so
+  progress sync could not survive an app restart and background sync had no
+  settings to work with. They are now stored on device.
+
+### Security
+- The sync password is encrypted with an AES/GCM key held in the Android Keystore
+  before it is written, so the preference file alone does not expose it. The
+  Settings caption now states this instead of claiming the credentials are
+  session-only.
+
 ## [0.4.2] - 2026-11-16
 
 ### Fixed

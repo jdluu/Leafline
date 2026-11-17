@@ -39,7 +39,8 @@ and paragraph indents, with reading chrome out of the way:
 - **Navigation history & quick return** — History back/forward navigation stack and floating return capsule when jumping between chapters, footnotes, links, search results, and bookmarks
 - **On-device library & OPDS catalogs** — Import local EPUB files, scan folders, or browse and download directly from OPDS 1.x/2.0 catalogs and compatible servers (such as Calibre-web or Kavita)
 - **Progress sync** — Sync reading progress between your devices using any
-  KOReader-compatible sync server you host yourself
+  KOReader-compatible sync server you host yourself; credentials stay on device
+  and the password is encrypted before it is stored
 - **Reading statistics & insights** — On-device reading time tracking, daily and
   weekly insights, reading streak counter, interactive 7-day activity chart, and estimated time remaining
 - **Bookmarks, annotations & dictionary** — Multi-color highlights, color filtering, notes

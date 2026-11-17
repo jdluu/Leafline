@@ -18,8 +18,11 @@ import com.jdluu.leafline.library.data.local.LeaflineDatabase
 import com.jdluu.leafline.library.data.local.RoomBookDataSource
 import com.jdluu.leafline.opds.OpdsClient
 import com.jdluu.leafline.opds.OpdsFeedStore
+import com.jdluu.leafline.storage.KoreaderSyncConfigStorage
 import com.jdluu.leafline.sync.KoreaderSyncApi
 import com.jdluu.leafline.sync.KoreaderSyncClient
+import com.jdluu.leafline.sync.KoreaderSyncConfigPersistence
+import com.jdluu.leafline.sync.KoreaderSyncConfigStore
 
 /**
  * Application-wide dependency graph, built eagerly at construction. Room
@@ -51,6 +54,17 @@ class AppContainer(private val context: Context) {
     val epubImporter: EpubImporter by lazy { ReadiumEpubImporter(context) }
 
     val koreaderSyncApi: KoreaderSyncApi by lazy { KoreaderSyncClient() }
+
+    /**
+     * Restores saved KOReader sync settings into [KoreaderSyncConfigStore] when the
+     * container is built, so sync and background sync work after a restart instead of
+     * needing the server and password re-entered every launch.
+     */
+    val koreaderSyncConfigStore: KoreaderSyncConfigPersistence by lazy {
+        KoreaderSyncConfigStorage(context).also { storage ->
+            runCatching { KoreaderSyncConfigStore.config = storage.load() }
+        }
+    }
 
     val backupManager: LibraryBackupManager by lazy {
         LibraryBackupManager(

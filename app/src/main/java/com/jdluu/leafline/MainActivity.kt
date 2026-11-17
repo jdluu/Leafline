@@ -626,6 +626,10 @@ private val ThemeMode.description: String
 internal fun KoreaderSyncSection(modifier: Modifier = Modifier) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
+    // Read through the container once so saved settings are restored before the fields
+    // initialise; otherwise the section shows empty fields on a fresh process.
+    val appContext = LocalContext.current
+    remember { appContext.appContainer.koreaderSyncConfigStore }
     var serverUrl by remember { mutableStateOf(KoreaderSyncConfigStore.config?.serverUrl ?: "") }
     var syncUsername by remember { mutableStateOf(KoreaderSyncConfigStore.config?.username ?: "") }
     var syncPassword by remember { mutableStateOf(KoreaderSyncConfigStore.config?.password ?: "") }
@@ -706,6 +710,9 @@ internal fun KoreaderSyncSection(modifier: Modifier = Modifier) {
                         enabled = enabled
                     )
                     KoreaderSyncConfigStore.config = config
+                    // Persist so sync survives a restart; the password is encrypted with a
+                    // Keystore key rather than written in the clear.
+                    context.appContainer.koreaderSyncConfigStore.save(config)
                     testResult = "Saved."
                 }
             ) { Text("Save") }
@@ -743,7 +750,7 @@ internal fun KoreaderSyncSection(modifier: Modifier = Modifier) {
             )
         }
         Text(
-            "Syncs reading positions with a KOReader-compatible server using the book content hash. Credentials are stored only in memory for this session.",
+            "Syncs reading positions with a KOReader-compatible server using the book content hash. Credentials stay on this device; the password is encrypted before it is stored.",
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(top = Spacing.sm)
         )
