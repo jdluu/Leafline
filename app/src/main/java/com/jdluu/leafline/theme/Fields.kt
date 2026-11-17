@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -14,6 +15,7 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.VisualTransformation
 
@@ -26,32 +28,38 @@ import androidx.compose.ui.text.input.VisualTransformation
 internal fun LeaflineTextField(
     value: String,
     onValueChange: (String) -> Unit,
-    label: String,
+    label: String? = null,
     modifier: Modifier = Modifier,
     placeholder: String? = null,
     keyboardType: KeyboardType = KeyboardType.Text,
+    imeAction: ImeAction = ImeAction.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
     visualTransformation: VisualTransformation = VisualTransformation.None,
     isError: Boolean = false,
     supportingText: String? = null,
-    trailingIcon: @Composable (() -> Unit)? = null
+    trailingIcon: @Composable (() -> Unit)? = null,
+    // Fields normally sit on a mist panel, where paper reads as an inset. On a paper
+    // surface (a toolbar, say) callers pass the mist tone so the field stays visible.
+    containerColor: Color? = null
 ) {
     TextField(
         value = value,
         onValueChange = onValueChange,
         modifier = modifier.fillMaxWidth(),
-        label = { Text(label) },
+        label = label?.let { { Text(it) } },
         placeholder = placeholder?.let { { Text(it) } },
         singleLine = true,
         shape = MaterialTheme.shapes.small,
         isError = isError,
         supportingText = supportingText?.let { { Text(it) } },
-        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = imeAction),
+        keyboardActions = keyboardActions,
         visualTransformation = visualTransformation,
         trailingIcon = trailingIcon,
         colors = TextFieldDefaults.colors(
-            focusedContainerColor = MaterialTheme.colorScheme.surface,
-            unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-            errorContainerColor = MaterialTheme.colorScheme.surface,
+            focusedContainerColor = containerColor ?: MaterialTheme.colorScheme.surface,
+            unfocusedContainerColor = containerColor ?: MaterialTheme.colorScheme.surface,
+            errorContainerColor = containerColor ?: MaterialTheme.colorScheme.surface,
             focusedIndicatorColor = Color.Transparent,
             unfocusedIndicatorColor = Color.Transparent,
             disabledIndicatorColor = Color.Transparent,

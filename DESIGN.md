@@ -130,6 +130,13 @@ wash.
 - Use primary for actions, selection, and focus. Use surface and on-surface
   for the bulk of interface text. Use on-surface-variant for secondary text
   and captions.
+- Define the surface container ramp, not just `surface`. Material 3 components
+  (navigation bar, menus, dialogs, sheets, cards) read `surfaceContainerLowest`
+  through `surfaceContainerHighest`, `surfaceDim`, `surfaceBright`,
+  `inverseSurface`, and `surfaceTint`. Any of those left unset falls back to the
+  baseline Material palette, which is a lilac neutral this design does not use.
+  Every scheme (light, dark, OLED, e-ink) must set the whole ramp, tinted toward
+  the accent the same way the neutral surfaces are.
 - Do not introduce a second accent color. Tertiary exists only where the
   component system requires a third role and must stay desaturated.
 - Do not use gradients, glows, or shadows with color. Elevation is implied by
@@ -220,7 +227,10 @@ These are non-negotiable, same as the quality bar for the app:
   grouping or an action.
 - Sheets and dialogs. Modal surfaces rest on the paper container tone. Keep
   the title heading consistent, space the content on the 8dp rhythm, and
-  scroll content instead of clipping it when type sizes grow.
+  scroll content instead of clipping it when type sizes grow. Pin the primary
+  action below the scrolling content so it is reachable without scrolling, and
+  open a bottom sheet expanded when its content includes actions; a partially
+  expanded sheet clips the action row off-screen.
 - Empty states. A first-run library, an empty collection, and a search with
   no results are designed moments, not afterthoughts. Each uses the leaf
   mark on the container tone with a short heading, a one-line explanation,

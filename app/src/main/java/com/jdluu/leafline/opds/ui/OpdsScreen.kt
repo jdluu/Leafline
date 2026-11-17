@@ -312,13 +312,13 @@ private fun OpdsTopBar(
     if (isSearchActive) {
         TopAppBar(
             title = {
-                OutlinedTextField(
+                LeaflineTextField(
                     value = searchQuery,
                     onValueChange = onSearchQueryChange,
-                    placeholder = { Text("Search catalog...") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    placeholder = "Search catalog…",
+                    imeAction = ImeAction.Search,
                     keyboardActions = KeyboardActions(onSearch = { keyboardController?.hide() }),
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
                     modifier = Modifier.fillMaxWidth()
                 )
             },
