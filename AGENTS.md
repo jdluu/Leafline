@@ -97,7 +97,7 @@ app/src/main/java/com/jdluu/leafline/
   library/               library screen, view models, sorting, folders, covers, backup/restore
     data/                repository interfaces and models, free of Room and Android types
       local/             Room entities, DAOs, migrations, TypeConverters
-  sync/                  KOReader progress sync, pure Kotlin, no Android dependencies
+  sync/                  KOReader sync logic (pure Kotlin) plus SyncWorker.kt (WorkManager)
   opds/                  OPDS catalog client, feeds, download manager, and UI
   export/                notes and highlights export (Markdown, Obsidian vault zip)
   di/AppContainer.kt     application-scoped wiring, the single construction site
