@@ -21,6 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.6] - 2026-11-16
+
+### Fixed
+- Contents list rows drew an 8dp surface inside a 12dp clipped ripple, so the
+  selected chapter's corners did not match the rest of the app. Both now use the
+  single container shape.
+
+
 ## [0.4.5] - 2026-11-16
 
 An app-wide pass checking the UI against the design contract. Most findings were
