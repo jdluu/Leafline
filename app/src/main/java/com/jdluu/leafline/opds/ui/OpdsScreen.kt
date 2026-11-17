@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -52,7 +53,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -60,6 +61,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -96,6 +100,7 @@ import com.jdluu.leafline.opds.model.OpdsFeedResult
 import com.jdluu.leafline.opds.model.OpdsFeedSource
 import com.jdluu.leafline.opds.model.OpdsNavigationLink
 import com.jdluu.leafline.opds.rememberOpdsCoverBitmap
+import com.jdluu.leafline.theme.LeaflineTextField
 import com.jdluu.leafline.theme.Padding
 import com.jdluu.leafline.theme.Spacing
 
@@ -934,10 +939,11 @@ private fun OpdsBookDetailDialog(
 
 private enum class OpdsAuthType(val label: String) {
     NONE("None"),
-    BASIC("Basic Auth"),
-    BEARER("API Token")
+    BASIC("Basic"),
+    BEARER("Token")
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddOpdsFeedDialog(
     onDismiss: () -> Unit,
@@ -967,89 +973,92 @@ private fun AddOpdsFeedDialog(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                OutlinedTextField(
+                LeaflineTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Feed Name") },
-                    placeholder = { Text("My Calibre Library") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    label = "Feed Name",
+                    placeholder = "My Calibre Library"
                 )
-                OutlinedTextField(
+                LeaflineTextField(
                     value = url,
-                    onValueChange = {
-                        url = it
-                        isError = false
-                    },
-                    label = { Text("OPDS URL") },
-                    placeholder = { Text("http://192.168.1.10:8080/opds") },
-                    singleLine = true,
+                    onValueChange = { url = it; isError = false },
+                    label = "OPDS URL",
+                    placeholder = "http://192.168.1.10:8080/opds",
+                    keyboardType = KeyboardType.Uri,
                     isError = isError,
-                    supportingText = if (isError) {
-                        { Text("URL must start with http:// or https://") }
-                    } else null,
-                    modifier = Modifier.fillMaxWidth()
+                    supportingText = if (isError) "URL must start with http:// or https://" else null
                 )
+
+                HorizontalDivider()
 
                 Text(
                     text = "Authentication",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(top = Spacing.xs)
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                androidx.compose.foundation.layout.FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.xs)
-                ) {
-                    OpdsAuthType.entries.forEach { type ->
-                        FilterChip(
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    OpdsAuthType.entries.forEachIndexed { index, type ->
+                        SegmentedButton(
                             selected = authType == type,
                             onClick = { authType = type },
-                            label = { Text(type.label) }
-                        )
+                            shape = SegmentedButtonDefaults.itemShape(
+                                index = index,
+                                count = OpdsAuthType.entries.size
+                            ),
+                            // No leading icon: the default check glyph reserves width and
+                            // forces these three labels to wrap.
+                            icon = {},
+                            modifier = Modifier.heightIn(min = 48.dp)
+                        ) {
+                            Text(type.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
                     }
                 }
 
                 when (authType) {
-                    OpdsAuthType.NONE -> { /* No additional fields */ }
+                    OpdsAuthType.NONE -> { /* Open catalog: nothing more to ask for. */ }
                     OpdsAuthType.BASIC -> {
-                        OutlinedTextField(
+                        LeaflineTextField(
                             value = username,
                             onValueChange = { username = it },
-                            label = { Text("Username") },
-                            placeholder = { Text("admin") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
+                            label = "Username",
+                            placeholder = "admin"
                         )
-                        OutlinedTextField(
+                        LeaflineTextField(
                             value = password,
                             onValueChange = { password = it },
-                            label = { Text("Password") },
-                            singleLine = true,
-                            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                            label = "Password",
+                            keyboardType = KeyboardType.Password,
+                            visualTransformation = if (passwordVisible) {
+                                VisualTransformation.None
+                            } else {
+                                PasswordVisualTransformation()
+                            },
                             trailingIcon = {
                                 IconButton(onClick = { passwordVisible = !passwordVisible }) {
                                     Icon(
-                                        imageVector = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                        contentDescription = if (passwordVisible) "Hide password" else "Show password"
+                                        imageVector = if (passwordVisible) {
+                                            Icons.Default.VisibilityOff
+                                        } else {
+                                            Icons.Default.Visibility
+                                        },
+                                        contentDescription = if (passwordVisible) {
+                                            "Hide password"
+                                        } else {
+                                            "Show password"
+                                        }
                                     )
                                 }
-                            },
-                            modifier = Modifier.fillMaxWidth()
+                            }
                         )
                     }
                     OpdsAuthType.BEARER -> {
-                        OutlinedTextField(
+                        LeaflineTextField(
                             value = token,
                             onValueChange = { token = it },
-                            label = { Text("API / Bearer Token") },
-                            placeholder = { Text("kavita-api-key") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
+                            label = "API / Bearer Token",
+                            placeholder = "kavita-api-key"
                         )
                     }
                 }
@@ -1060,15 +1069,12 @@ private fun AddOpdsFeedDialog(
                 onClick = {
                     val trimmed = url.trim()
                     if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-                        val finalUsername = if (authType == OpdsAuthType.BASIC) username.trim().ifBlank { null } else null
-                        val finalPassword = if (authType == OpdsAuthType.BASIC) password.ifBlank { null } else null
-                        val finalToken = if (authType == OpdsAuthType.BEARER) token.trim().ifBlank { null } else null
                         onAdd(
                             title.trim().ifEmpty { "Custom Catalog" },
                             trimmed,
-                            finalUsername,
-                            finalPassword,
-                            finalToken
+                            if (authType == OpdsAuthType.BASIC) username.trim().ifBlank { null } else null,
+                            if (authType == OpdsAuthType.BASIC) password.ifBlank { null } else null,
+                            if (authType == OpdsAuthType.BEARER) token.trim().ifBlank { null } else null
                         )
                     } else {
                         isError = true
