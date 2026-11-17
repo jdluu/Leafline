@@ -15,9 +15,9 @@ android {
         // current platform. Revisit only with a concrete device requirement.
         minSdk = 26
         targetSdk = 36
-        versionCode = 11
+        versionCode = 12
         // Pre-release: 0.y.z; MINOR bumps (0.1.0+) per the CHANGELOG versioning policy.
-        versionName = "0.4.6"
+        versionName = "0.4.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }

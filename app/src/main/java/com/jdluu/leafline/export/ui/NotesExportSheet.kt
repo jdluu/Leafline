@@ -40,6 +40,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -142,8 +143,12 @@ fun NotesExportSheet(
         }
     }
 
+    // Expand on open: a partially expanded sheet clips its content slot, which hid the
+    // action row below the fold no matter how the content was laid out.
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = sheetState,
         dragHandle = null
     ) {
         Scaffold(
@@ -158,8 +163,16 @@ fun NotesExportSheet(
                     // Without this the preview runs under the gesture bar on gesture-nav
                     // devices and the action row can sit below the reachable area.
                     .navigationBarsPadding()
-                    .verticalScroll(rememberScrollState())
             ) {
+                // Only the content scrolls. The action row stays pinned below it so the
+                // primary action is reachable without scrolling past a long preview;
+                // `fill = false` keeps the sheet short when the content already fits.
+                Column(
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                ) {
                 // Header Row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -280,8 +293,9 @@ fun NotesExportSheet(
                     Spacer(Modifier.height(Spacing.sm))
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
+                }
 
-                Spacer(Modifier.height(Spacing.lg))
+                Spacer(Modifier.height(Spacing.sm))
 
                 // Action Buttons
                 Row(

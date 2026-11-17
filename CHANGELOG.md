@@ -21,6 +21,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.7] - 2026-11-16
+
+### Fixed
+- **Export sheet actions were off-screen.** The sheet opened partially expanded, so
+  its content slot clipped the action row no matter how the layout was arranged.
+  It now opens expanded, only the content scrolls, and Share (outlined) and Save
+  (filled) stay pinned and reachable.
+- **Catalog search field was invisible.** The search field in the Explore top bar
+  drew a paper container on a paper toolbar. It now uses the mist tone so the
+  input reads as an inset.
+
+### Changed
+- Text fields accept an optional container tone and a nullable label, so the same
+  component serves grouped forms and bare toolbar inputs.
+- `DESIGN.md` now documents the surface container ramp and the rule that sheets
+  pin their primary action and open expanded.
+
+
 ## [0.4.6] - 2026-11-16
 
 ### Fixed
