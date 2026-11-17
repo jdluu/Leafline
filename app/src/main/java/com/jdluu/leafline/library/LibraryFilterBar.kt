@@ -2,6 +2,8 @@ package com.jdluu.leafline.library
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -164,20 +166,25 @@ fun LibraryFilterBar(
             }
         }
 
+        // One scrollable row per filter axis. Wrapping these five chips stacked the
+        // header three rows deep and pushed the grid down, which is heavier than a
+        // single row whose last chip runs to the edge.
         LazyRow(
-            modifier = Modifier.padding(horizontal = Padding.screen, vertical = 4.dp),
+            modifier = Modifier.padding(vertical = 4.dp),
+            contentPadding = PaddingValues(horizontal = Padding.screen),
             horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
         ) {
-            ProgressFilter.entries.forEach { filter ->
-                item(key = filter.name) {
-                    FilterChip(
-                        selected = progressFilter == filter,
-                        onClick = {
-                            onSelectProgressFilter(if (progressFilter == filter) ProgressFilter.ALL else filter)
-                        },
-                        label = { Text(filter.displayName) }
-                    )
-                }
+            items(ProgressFilter.entries, key = { it.name }) { filter ->
+                FilterChip(
+                    selected = progressFilter == filter,
+                    onClick = {
+                        onSelectProgressFilter(if (progressFilter == filter) ProgressFilter.ALL else filter)
+                    },
+                    label = { Text(filter.displayName) },
+                    modifier = Modifier.semantics {
+                        contentDescription = "Filter by progress: ${filter.description}"
+                    }
+                )
             }
         }
 

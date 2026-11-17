@@ -49,7 +49,17 @@ private val LightColorScheme = lightColorScheme(
     surfaceVariant = LeaflineColors.LightSurfaceVariant,
     onSurfaceVariant = LeaflineColors.LightOnSurfaceVariant,
     outline = LeaflineColors.LightOutline,
-    outlineVariant = LeaflineColors.LightOutlineVariant
+    outlineVariant = LeaflineColors.LightOutlineVariant,
+    surfaceDim = LeaflineColors.LightSurfaceDim,
+    surfaceBright = LeaflineColors.LightSurfaceBright,
+    surfaceContainerLowest = LeaflineColors.LightSurfaceContainerLowest,
+    surfaceContainerLow = LeaflineColors.LightSurfaceContainerLow,
+    surfaceContainer = LeaflineColors.LightSurfaceContainer,
+    surfaceContainerHigh = LeaflineColors.LightSurfaceContainerHigh,
+    surfaceContainerHighest = LeaflineColors.LightSurfaceContainerHighest,
+    inverseSurface = LeaflineColors.LightInverseSurface,
+    inverseOnSurface = LeaflineColors.LightInverseOnSurface,
+    surfaceTint = LeaflineColors.LightPrimary
 )
 
 // -- Standard dark scheme --
@@ -77,7 +87,17 @@ private val DarkColorScheme = darkColorScheme(
     surfaceVariant = LeaflineColors.DarkSurfaceVariant,
     onSurfaceVariant = LeaflineColors.DarkOnSurfaceVariant,
     outline = LeaflineColors.DarkOutline,
-    outlineVariant = LeaflineColors.DarkOutlineVariant
+    outlineVariant = LeaflineColors.DarkOutlineVariant,
+    surfaceDim = LeaflineColors.DarkSurfaceDim,
+    surfaceBright = LeaflineColors.DarkSurfaceBright,
+    surfaceContainerLowest = LeaflineColors.DarkSurfaceContainerLowest,
+    surfaceContainerLow = LeaflineColors.DarkSurfaceContainerLow,
+    surfaceContainer = LeaflineColors.DarkSurfaceContainer,
+    surfaceContainerHigh = LeaflineColors.DarkSurfaceContainerHigh,
+    surfaceContainerHighest = LeaflineColors.DarkSurfaceContainerHighest,
+    inverseSurface = LeaflineColors.DarkInverseSurface,
+    inverseOnSurface = LeaflineColors.DarkInverseOnSurface,
+    surfaceTint = LeaflineColors.DarkPrimary
 )
 
 // -- OLED (pure black) scheme -- same as dark but with true black surfaces
@@ -105,7 +125,17 @@ private val OledColorScheme = darkColorScheme(
     surfaceVariant = LeaflineColors.OledSurfaceVariant,
     onSurfaceVariant = LeaflineColors.OledOnSurfaceVariant,
     outline = LeaflineColors.DarkOutline,
-    outlineVariant = LeaflineColors.DarkOutlineVariant
+    outlineVariant = LeaflineColors.DarkOutlineVariant,
+    surfaceDim = LeaflineColors.OledSurfaceDim,
+    surfaceBright = LeaflineColors.OledSurfaceBright,
+    surfaceContainerLowest = LeaflineColors.OledSurfaceContainerLowest,
+    surfaceContainerLow = LeaflineColors.OledSurfaceContainerLow,
+    surfaceContainer = LeaflineColors.OledSurfaceContainer,
+    surfaceContainerHigh = LeaflineColors.OledSurfaceContainerHigh,
+    surfaceContainerHighest = LeaflineColors.OledSurfaceContainerHighest,
+    inverseSurface = LeaflineColors.OledInverseSurface,
+    inverseOnSurface = LeaflineColors.OledInverseOnSurface,
+    surfaceTint = LeaflineColors.DarkPrimary
 )
 
 // -- E-ink high-contrast scheme (light mode, monochrome) --
@@ -133,7 +163,17 @@ private val EinkColorScheme = lightColorScheme(
     surfaceVariant = LeaflineColors.EinkSurfaceVariant,
     onSurfaceVariant = LeaflineColors.EinkOnSurfaceVariant,
     outline = LeaflineColors.EinkOutline,
-    outlineVariant = LeaflineColors.EinkOutlineVariant
+    outlineVariant = LeaflineColors.EinkOutlineVariant,
+    surfaceDim = LeaflineColors.EinkSurfaceDim,
+    surfaceBright = LeaflineColors.EinkSurfaceBright,
+    surfaceContainerLowest = LeaflineColors.EinkSurfaceContainerLowest,
+    surfaceContainerLow = LeaflineColors.EinkSurfaceContainerLow,
+    surfaceContainer = LeaflineColors.EinkSurfaceContainer,
+    surfaceContainerHigh = LeaflineColors.EinkSurfaceContainerHigh,
+    surfaceContainerHighest = LeaflineColors.EinkSurfaceContainerHighest,
+    inverseSurface = LeaflineColors.EinkInverseSurface,
+    inverseOnSurface = LeaflineColors.EinkInverseOnSurface,
+    surfaceTint = LeaflineColors.EinkPrimary
 )
 
 /**

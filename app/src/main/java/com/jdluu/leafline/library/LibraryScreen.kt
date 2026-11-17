@@ -2942,7 +2942,7 @@ private fun BatchTagDialog(
                     ) {
                         allTags.forEach { tag ->
                             Surface(
-                                shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                                shape = MaterialTheme.shapes.small,
                                 color = MaterialTheme.colorScheme.surfaceVariant,
                                 modifier = Modifier.padding(vertical = 2.dp)
                             ) {

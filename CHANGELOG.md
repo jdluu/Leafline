@@ -21,6 +21,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.5] - 2026-11-16
+
+An app-wide pass checking the UI against the design contract. Most findings were
+one root cause: two places where the theme was not applied, so Material's
+baseline palette leaked through.
+
+### Fixed
+- **Reader chrome used the wrong palette.** `ReaderActivity` never wrapped its
+  Compose tree in `LeaflineTheme`, so the drawer, sheets, dialogs and toolbar all
+  rendered with Material's baseline scheme: lilac drawer surfaces and purple tab
+  indicators and selected rows. Reader chrome now follows the app scheme.
+- **Missing surface-container roles.** The light, dark, OLED and e-ink schemes
+  never set `surfaceContainer*`, `surfaceDim`, `surfaceBright`, `inverseSurface`
+  or `surfaceTint`, so every component reading those roles (navigation bar,
+  menus, dialogs, sheets) fell back to baseline lilac neutrals. A green-tinted
+  container ramp is now defined for all four schemes.
+- **Radii off the 12dp contract.** Tag chips, the export preview panel and
+  contents rows used 8dp, and the jump notice used 24dp with a drop shadow. All
+  now share the single container radius, and the shadow is gone.
+- **Contents tabs were ellipsised** ("Bookma…"). The fixed tab row split the
+  width three ways; it is now scrollable and sizes to its labels.
+- **Progress filters clipped mid-word.** Five long labels in one row ran off the
+  edge and the last chip read "In progres". Labels are now short ("Not started",
+  "In progress", "Almost done", "Finished") with the ranges carried by the
+  accessibility label.
+- **Export sheet** content could run under the gesture bar.
+
 ## [0.4.4] - 2026-11-16
 
 ### Changed
