@@ -1554,7 +1554,9 @@ fun BookGridTile(
                 Text(
                     text = book.authors.joinToString(", "),
                     style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
+                    // Two lines, like the title: at a large system font scale a single
+                    // line clipped real names to initials plus an ellipsis.
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 2.dp)
                 )
