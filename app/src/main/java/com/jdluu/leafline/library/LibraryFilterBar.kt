@@ -3,7 +3,6 @@ package com.jdluu.leafline.library
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -32,7 +31,10 @@ import com.jdluu.leafline.theme.Spacing
 
 /**
  * Reusable filter and search header for the library view.
- * Encapsulates search bar, collection filters, reading status chips, progress range chips, and tag chips.
+ * Encapsulates search bar, collection filters, reading status chips, and tag chips.
+ * The progress filter lives in the sort and filter menu instead: it filtered the same
+ * reading state as the status chips, so showing both rows asked the reader to tell
+ * "Unread" from "Not started".
  */
 @Composable
 fun LibraryFilterBar(
@@ -46,8 +48,6 @@ fun LibraryFilterBar(
     onSelectCollection: (Long?) -> Unit,
     readingStatusFilter: ReadingStatus?,
     onSelectReadingStatus: (ReadingStatus?) -> Unit,
-    progressFilter: ProgressFilter = ProgressFilter.ALL,
-    onSelectProgressFilter: (ProgressFilter) -> Unit = {},
     allTags: List<String>,
     selectedTag: String?,
     tagCounts: Map<String, Int> = emptyMap(),
@@ -163,28 +163,6 @@ fun LibraryFilterBar(
                         }
                     )
                 }
-            }
-        }
-
-        // One scrollable row per filter axis. Wrapping these five chips stacked the
-        // header three rows deep and pushed the grid down, which is heavier than a
-        // single row whose last chip runs to the edge.
-        LazyRow(
-            modifier = Modifier.padding(vertical = 4.dp),
-            contentPadding = PaddingValues(horizontal = Padding.screen),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
-        ) {
-            items(ProgressFilter.entries, key = { it.name }) { filter ->
-                FilterChip(
-                    selected = progressFilter == filter,
-                    onClick = {
-                        onSelectProgressFilter(if (progressFilter == filter) ProgressFilter.ALL else filter)
-                    },
-                    label = { Text(filter.displayName) },
-                    modifier = Modifier.semantics {
-                        contentDescription = "Filter by progress: ${filter.description}"
-                    }
-                )
             }
         }
 

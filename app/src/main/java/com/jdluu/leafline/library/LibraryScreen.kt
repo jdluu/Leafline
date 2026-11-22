@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.border
 import com.jdluu.leafline.library.insights.ReadingStreakHelper
-
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import com.jdluu.leafline.library.cover.BitmapMemoryCache
@@ -99,6 +98,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -145,6 +145,11 @@ import com.jdluu.leafline.theme.Spacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.ui.semantics.Role
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -180,6 +185,7 @@ fun LibraryScreen(
     val selectedTag by viewModel.selectedTag.collectAsStateWithLifecycle()
     val continueReadingBooks by viewModel.continueReadingBooks.collectAsStateWithLifecycle()
     var searchActive by remember { mutableStateOf(false) }
+    var showSortSheet by remember { mutableStateOf(false) }
     var showCollectionSheet by remember { mutableStateOf(false) }
     var showCreateDialog by remember { mutableStateOf(false) }
     var newCollectionName by remember { mutableStateOf("") }
@@ -344,23 +350,23 @@ fun LibraryScreen(
                 ) {
                     Icon(Icons.Default.Search, contentDescription = "Search library")
                 }
-                Box {
-                    var menuExpanded by remember { mutableStateOf(false) }
-                    IconButton(onClick = { menuExpanded = true }) {
-                        Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort library")
-                    }
-                    LibrarySortMenu(
-                        expanded = menuExpanded,
-                        selected = currentSort,
-                        ascending = currentSortAscending,
-                        onSelect = { sort ->
-                            viewModel.setSort(sort)
-                            menuExpanded = false
+                // A progress filter hides books, and the sheet is the only place it is
+                // shown, so the button itself has to say when one is on: the accent tint
+                // plus the spoken description, never the tint alone.
+                val progressFilterActive = progressFilter != ProgressFilter.ALL
+                IconButton(onClick = { showSortSheet = true }) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.Sort,
+                        contentDescription = if (progressFilterActive) {
+                            "Sort and filter library. Progress filter: ${progressFilter.displayName}"
+                        } else {
+                            "Sort and filter library"
                         },
-                        onToggleDirection = {
-                            viewModel.toggleSortDirection()
-                        },
-                        onDismiss = { menuExpanded = false }
+                        tint = if (progressFilterActive) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            LocalContentColor.current
+                        }
                     )
                 }
                 IconButton(
@@ -451,8 +457,6 @@ fun LibraryScreen(
             onSelectCollection = { viewModel.selectCollection(it) },
             readingStatusFilter = readingStatusFilter,
             onSelectReadingStatus = { viewModel.setReadingStatusFilter(it) },
-            progressFilter = progressFilter,
-            onSelectProgressFilter = { viewModel.setProgressFilter(it) },
             allTags = allTags,
             selectedTag = selectedTag,
             tagCounts = tagCounts,
@@ -460,6 +464,18 @@ fun LibraryScreen(
         )
 
         }
+        if (showSortSheet) {
+            LibrarySortSheet(
+                selected = currentSort,
+                ascending = currentSortAscending,
+                progressFilter = progressFilter,
+                onSelectSort = { viewModel.setSort(it) },
+                onToggleDirection = { viewModel.toggleSortDirection() },
+                onSelectProgress = { viewModel.setProgressFilter(it) },
+                onDismiss = { showSortSheet = false }
+            )
+        }
+
         if (books.isEmpty()) {
             when {
                 !isLibraryLoaded -> LibraryLoadingState()
@@ -474,6 +490,10 @@ fun LibraryScreen(
                 readingStatusFilter != null -> LibraryEmptyState(
                     title = "No books with this status",
                     body = "Try a different filter"
+                )
+                progressFilter != ProgressFilter.ALL -> LibraryEmptyState(
+                    title = "No books in this range",
+                    body = "Progress filter: ${progressFilter.displayName}. Clear it from the sort and filter menu."
                 )
                 selectedTag != null -> LibraryEmptyState(
                     title = "No books with this tag",
@@ -1354,66 +1374,140 @@ internal fun BookCollectionPickerSheet(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun LibrarySortMenu(
-    expanded: Boolean,
+private fun LibrarySortSheet(
     selected: LibrarySort,
     ascending: Boolean,
-    onSelect: (LibrarySort) -> Unit,
+    progressFilter: ProgressFilter,
+    onSelectSort: (LibrarySort) -> Unit,
     onToggleDirection: () -> Unit,
+    onSelectProgress: (ProgressFilter) -> Unit,
     onDismiss: () -> Unit
 ) {
-    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
-        DropdownMenuItem(
-            text = {
-                Text(
-                    if (ascending) "Order: Ascending" else "Order: Descending",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            },
-            onClick = onToggleDirection,
-            leadingIcon = {
-                Icon(
-                    if (ascending) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
-        )
-        HorizontalDivider()
-        LibrarySort.entries.forEachIndexed { index, option ->
-            val isSelected = option == selected
-            DropdownMenuItem(
-                text = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
-                    ) {
-                        Text(option.label)
-                        if (isSelected) {
-                            Text(
-                                if (ascending) "A-Z / 1st" else "Z-A / latest",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                },
-                onClick = { onSelect(option) },
-                leadingIcon = {
-                    if (isSelected) {
-                        Icon(
-                            if (ascending) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        dragHandle = null
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = Spacing.md, vertical = Spacing.sm)
+        ) {
+            Text("Sort and filter", style = MaterialTheme.typography.titleLarge)
+            Spacer(Modifier.height(Spacing.sm))
+            // Only the options scroll. Done stays pinned below them, the same shape the
+            // export sheet uses, so the action is reachable without scrolling past 12 rows.
+            Column(
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState())
+            ) {
+
+            Text(
+                "Sort by",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            if (index != LibrarySort.entries.lastIndex) {
-                HorizontalDivider()
+            Column(modifier = Modifier.selectableGroup()) {
+                LibrarySort.entries.forEach { option ->
+                    SheetOptionRow(
+                        label = option.label,
+                        selected = option == selected,
+                        onClick = { onSelectSort(option) }
+                    )
+                }
             }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .clickable(onClick = onToggleDirection)
+                    .padding(vertical = Spacing.xs)
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Order", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        if (ascending) "Ascending" else "Descending",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Icon(
+                    imageVector = if (ascending) {
+                        Icons.Default.ArrowUpward
+                    } else {
+                        Icons.Default.ArrowDownward
+                    },
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = Spacing.xs))
+
+            Text(
+                "Progress filter",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Column(modifier = Modifier.selectableGroup()) {
+                ProgressFilter.entries.forEach { filter ->
+                    SheetOptionRow(
+                        label = filter.displayName,
+                        selected = filter == progressFilter,
+                        onClick = { onSelectProgress(filter) }
+                    )
+                }
+            }
+
+            }
+
+            Button(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .padding(top = Spacing.sm)
+            ) {
+                Text("Done")
+            }
+        }
+    }
+}
+
+/** One single-choice row in the sort and filter sheet. */
+@Composable
+private fun SheetOptionRow(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .semantics(mergeDescendants = true) {}
+            .padding(vertical = Spacing.xs)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f)
+        )
+        if (selected) {
+            Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
         }
     }
 }
