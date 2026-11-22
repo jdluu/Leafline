@@ -21,6 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **One filter row instead of two.** The library showed reading-status chips and a
+  separate progress chip row, which asked the reader to tell "Unread" from "Not
+  started" and pushed the shelf down. Progress filtering now lives in a sort and
+  filter sheet beside the existing sort options, the toolbar icon carries the accent
+  when a filter is hiding books, and an empty result names the filter that caused it.
+
+
 ## [0.4.9] - 2026-11-22
 
 ### Changed
