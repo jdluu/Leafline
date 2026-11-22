@@ -37,11 +37,17 @@ jobs:
 
       - name: Check whether anything needs settling
         id: probe
+        # Parse the count, do not just match the phrase: --dry-run prints
+        # "would settle 0 citation(s)" when there is nothing to do, and a bare
+        # grep for "would settle" matches that too, which then commits a clean tree.
         run: |
-          if bash scripts/changelog_settle.sh --dry-run | grep -q 'would settle'; then
+          count=$(bash scripts/changelog_settle.sh --dry-run | sed -n 's/^would settle \([0-9]\+\) citation(s)$/\1/p')
+          if [ "${count:-0}" -gt 0 ]; then
             echo "needed=true" >> "$GITHUB_OUTPUT"
+            echo "settling $count citation(s)"
           else
             echo "needed=false" >> "$GITHUB_OUTPUT"
+            echo "nothing to settle"
           fi
 
       - name: Settle citations
