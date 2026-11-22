@@ -46,6 +46,13 @@ guess rather than a record.
 
 ## [Unreleased]
 
+### Changed
+- **The agent documentation leads with the workflow.** AGENTS.md opened with a
+  command list, so a new agent met the commands before the loop that decides when
+  to run them. The branch, changelog, pull request, and merge sequence now comes
+  first, and the pull request template states the citation rule where it applies.
+  (PENDING_PR)
+
 ## [0.4.10] - 2026-11-23
 
 ### Changed
