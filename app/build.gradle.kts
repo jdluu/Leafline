@@ -8,6 +8,19 @@ android {
     namespace = "com.jdluu.leafline"
     compileSdk = 36
 
+    testOptions {
+        unitTests.all {
+            // Pin the Robolectric SDK for every JVM test rather than letting each
+            // runner take its default. Unpinned tests resolve a different
+            // android-all jar than the tests that pin 35, and that second artifact
+            // is fetched at test time, which fails the run when the download
+            // times out. This sets the default; it does not filter, so every test
+            // still runs. A class may still override it with @Config(sdk = [...]).
+            it.systemProperty("robolectric.defaultSdk", "35")
+        }
+    }
+
+
     defaultConfig {
         applicationId = "com.jdluu.leafline"
         // SDK pinning decision (#31): min 26 covers Android 8.0+ (the README's
