@@ -21,12 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-- **The export sheet no longer offers actions over an empty file.** With no
-  annotated books it showed format chips, a preview, and Save/Share buttons over
-  a "0 books • 0 highlights" header; it now shows the leaf mark, "Nothing to
-  export yet", and one line saying what would put something there. The vault
-  preview also stops using an emoji as an icon.
+## [0.4.9] - 2026-11-22
 
 ### Changed
 - **Settings is rebuilt as rows that show their current answer** instead of a
@@ -34,6 +29,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a miniature page in each scheme's own colors, the KOReader sync form stays
   collapsed behind a row that reports whether sync is on and to which server,
   and the notes export is a row rather than the loudest button on the page.
+- **Saving a sync server is gated on an address the app can use.** Save and the
+  background switch stay off until the field holds an absolute http or https URL
+  with a host, the field says why, and turning sync off stays available whatever
+  the field holds.
+
+### Fixed
+- **The reader's progress footer is readable on every page.** It painted the app
+  scheme's secondary gray at 45% over the book page, so a dark app with a white
+  page left it nearly invisible; chrome ink now comes from the reading theme and
+  clears 4.5:1 on light, sepia, and dark pages. The surround behind the page
+  follows the same rule, which removes the dark band under an unset theme.
+- **The catalog error state offers a recovery it can perform.** A sign-in error
+  told the reader to edit a catalog the app cannot edit and offered only Retry;
+  it now names adding the catalog again with credentials and carries that action
+  beside Retry, with the raw status code demoted to a caption.
+- **A book tile shows the whole author name** instead of clipping it to an
+  ellipsis at a large system font scale.
+- **The export sheet no longer offers actions over an empty file.** With no
+  annotated books it showed format chips, a preview, and Save/Share buttons over
+  a "0 books • 0 highlights" header; it now shows the leaf mark, "Nothing to
+  export yet", and one line saying what would put something there. The vault
+  preview also stops using an emoji as an icon.
 
 ## [0.4.8] - 2026-11-16
 

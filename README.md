@@ -75,7 +75,7 @@ Download an APK from the [Releases](https://github.com/jdluu/Leafline/releases)
 page and install it. You may need to allow installation from unknown sources.
 
 **Note:** Leafline is in early pre-release (`0.y.z`). The current release is
-`v0.4.0`; the `0.y.z` line signals that the on-device database schema is not yet
+`v0.4.9`; the `0.y.z` line signals that the on-device database schema is not yet
 stable. Building from source is described below.
 
 ## Building from source
