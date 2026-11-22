@@ -1,14 +1,16 @@
 name: Settle changelog citations
 
 # After a pull request lands on main, every changelog entry that cites only a
-# pull request gets the commit that carried it, turning "(#220)" into
-# "(7a77307, #220)". A SHA written on a branch cannot survive a squash or a
-# rebase, so the commit can only be attached here, on main, after the merge.
+# pull request gets the commit that carried it: "(#231)" becomes
+# "(390886b, #231)". A SHA written on a branch cannot survive a squash or rebase,
+# so the commit can only be attached after the merge.
 #
-# This commits directly to main, which is normally forbidden: the rule exists so
-# human changes arrive through review, and this job is the mechanised release
-# bookkeeping that review cannot perform. It touches only CHANGELOG.md, uses the
-# workflow's own token, and succeeds without a change when there is nothing to do.
+# It opens a pull request rather than pushing to main. Main is protected: three
+# required checks must pass before anything lands, and that rule applies to a
+# robot as much as to a person. Publishing the correction through the same gate
+# keeps one path into main, and the PR body explains what changed, so the fix is
+# reviewable like any other. The job succeeds without a PR when there is nothing
+# to settle, and it does not open a second PR while one is already open.
 
 on:
   push:
@@ -17,6 +19,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 concurrency:
   group: settle-changelog
@@ -50,24 +53,43 @@ jobs:
             echo "nothing to settle"
           fi
 
-      - name: Settle citations
+      - name: Stop if a settle pull request is already open
+        id: open
         if: steps.probe.outputs.needed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          existing=$(gh pr list --head chore/settle-changelog --state open --json number --jq 'length')
+          if [ "$existing" -gt 0 ]; then
+            echo "A settle pull request is already open; leaving it to land."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Settle citations
+        if: steps.probe.outputs.needed == 'true' && steps.open.outputs.skip == 'false'
         run: bash scripts/changelog_settle.sh
 
       - name: Verify the result
-        if: steps.probe.outputs.needed == 'true'
+        if: steps.probe.outputs.needed == 'true' && steps.open.outputs.skip == 'false'
         run: bash scripts/check_changelog_refs.sh
 
-      - name: Commit
-        if: steps.probe.outputs.needed == 'true'
+      - name: Open the pull request
+        if: steps.probe.outputs.needed == 'true' && steps.open.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b chore/settle-changelog
           git add CHANGELOG.md
-          git commit -m "docs: settle changelog citations with their merge commits
+          git commit -m "docs: settle changelog citations with their merge commits"
+          git push -u origin chore/settle-changelog
+          gh pr create \
+            --base main \
+            --head chore/settle-changelog \
+            --title "docs: settle changelog citations with their merge commits" \
+            --body "Attaches the commit that carried each merged pull request to the changelog entry citing it, so an entry links both its diff and its review.
 
-          Written by the Settle changelog citations workflow, which attaches the
-          commit that carried each pull request to the entry that cites it. A SHA
-          written on a branch does not survive a squash or rebase merge, so this
-          can only happen here."
-          git push
+          Written by the Settle changelog citations workflow. A SHA written on a branch cannot survive a squash or rebase merge, so this can only be produced after the merge, which is why it arrives as its own pull request rather than as part of the change it describes."
