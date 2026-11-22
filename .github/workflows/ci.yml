@@ -25,6 +25,18 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@017a9effdb900e5b5b2fddfb590a105619dca3c3 # v4.4.2
 
+      # Robolectric downloads its android-all jar from Maven during the test run, and
+      # that download times out often enough to turn a green suite red for reasons
+      # unrelated to the change. Caching the directory makes the download a cache hit;
+      # the key includes the Gradle files so a Robolectric upgrade re-fetches.
+      - name: Cache Robolectric artifacts
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-${{ runner.os }}-${{ hashFiles('**/libs.versions.toml', '**/build.gradle.kts') }}
+          restore-keys: |
+            robolectric-${{ runner.os }}-
+
       - name: Compile debug sources
         run: ./gradlew :app:compileDebugKotlin
 

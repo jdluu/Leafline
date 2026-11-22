@@ -4,6 +4,21 @@ Runtime instructions for coding agents in this repository. Run every command fro
 the repository root. Keep this file under 150 lines: it loads into every agent
 session, so add instructions, not prose.
 
+Read this before your first change. The loop below is not optional, even when the
+task looks small.
+
+## The loop every change follows
+
+1. Branch from `main` (`feat/`, `fix/`, `docs/`, `refactor/`, `chore/`, `test/`).
+2. Commit atomically on that branch.
+3. Add a `CHANGELOG.md` entry ending in `(#<pr>)`, then open the PR: the template
+   at `.github/PULL_REQUEST_TEMPLATE.md` restates the entry.
+4. Let every check pass, squash-merge, delete the branch. The
+   `Settle changelog citations` workflow rewrites the entry to `(<sha>, #<pr>)`.
+
+`main` is protected: the three checks are required, force-push and deletion are
+refused, and nothing lands without review, automation included.
+
 ## Commands
 
 Toolchain: JDK 17 (CI) or 21 (local), Gradle wrapper 9.7.1, AGP 9.3.0,
@@ -33,30 +48,19 @@ bash scripts/check_touch_targets.sh     # fails on controls under 48dp
 git diff --check                        # whitespace and conflict markers
 ```
 
-Release signing lives in `~/.gradle/gradle.properties`, never in the repository:
+Release signing reads `LEAFLINE_STORE_FILE`, `LEAFLINE_STORE_PASSWORD`,
+`LEAFLINE_KEY_ALIAS`, and `LEAFLINE_KEY_PASSWORD` from `~/.gradle/gradle.properties`,
+never the repository. Without them `:app:assembleRelease` emits an unsigned APK, so
+run `apksigner verify --print-certs` before publishing.
 
-```properties
-LEAFLINE_STORE_FILE=/absolute/path/to/leafline-release.jks
-LEAFLINE_STORE_PASSWORD=...
-LEAFLINE_KEY_ALIAS=leafline
-LEAFLINE_KEY_PASSWORD=...
-```
-
-Without those properties `:app:assembleRelease` still succeeds and emits
-`app-release-unsigned.apk`. Verify a built APK before publishing it:
-
-```bash
-"$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs app/build/outputs/apk/release/app-release.apk
-```
-
-Required environment variables: `ANDROID_HOME` (or `local.properties`), plus the
-four `LEAFLINE_*` properties only for a signed release. CI requires none of them.
+Required environment variables: `ANDROID_HOME` (or `local.properties`), and those
+four properties only for a signed release; CI needs none.
 
 ## Boundaries
 
 Always do:
 
-- Before reporting a task done, run `./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`, then `bash scripts/check_dynamic_type.sh`, `bash scripts/check_touch_targets.sh`, `bash scripts/check_changelog_refs.sh`, and `git diff --check`. Paste the real output.
+- Before reporting a task done, run `./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`, then `bash scripts/check_dynamic_type.sh`, `bash scripts/check_touch_targets.sh`, `bash scripts/check_changelog_refs.sh`, and `git diff --check`; paste the real output.
 - Add a JVM unit test for new domain logic; keep domain models and mappers free of Android, Room, and Readium types.
 - Set text through `MaterialTheme.typography`. Never set a text size in dp or px.
 - Keep every interactive control at least 48dp, including icon buttons.
@@ -71,7 +75,7 @@ Ask first:
 
 Never do:
 
-- Commit to `main`. Branch protection requires the three CI checks and blocks force-push; the citation-settling workflow is the one exception and touches only `CHANGELOG.md`.
+- Commit to `main`. Branch protection requires the three CI checks and blocks force-push and deletion; the settle workflow lands through a PR like everything else.
 - Commit credentials, tokens, signing keys, `local.properties`, `.env*`, APKs, or build output.
 - Write a new EPUB parser or renderer. Use the Readium Kotlin Toolkit.
 - Edit anything under `app/build/`, `build/`, or `.gradle/`.
@@ -92,13 +96,12 @@ device at font scale 1.3 in light and dark.
 
 ### Changelog citations
 
-On the branch, cite the pull request: `(#220)`. That is the only stable identifier
-while work is unmerged, because a squash or rebase rewrites commits and their SHAs.
-On merge, the `Settle changelog citations` workflow rewrites it on main to
-`(7a77307, #220)`, commit then review; `scripts/changelog_settle.sh` does the same
-by hand, on main only. Both forms link: GitHub autolinks a bare SHA and `#220`, but
-leaves `#abc1234` plain. `[Unreleased]` entries must cite their PR.
-`check_changelog_refs.sh` enforces all of it.
+The loop above is the flow; this is why it is shaped that way. A squash or rebase
+rewrites your commits, so the SHA of a commit you are writing is not knowable yet,
+and the pull request number is. Both halves of the settled form link, because
+GitHub autolinks a bare SHA and `#220` but leaves `#abc1234` plain. `[Unreleased]`
+entries must cite their PR, or a release promotes them unattributed.
+`check_changelog_refs.sh` enforces every rule here.
 
 ## Project structure
 
@@ -124,26 +127,23 @@ PRODUCT.md               product record: audiences and their precedence, purpose
 - Kotlin, Jetpack Compose, Material 3. Match surrounding style; do not reformat untouched files.
 - Read publication data only through `publication.metadata`. Annotate Readium experimental API with `@OptIn(ExperimentalReadiumApi::class)`.
 - Stable book identity is the trimmed, non-blank `metadata.identifier`, falling back to the SHA-256 file hash. KOReader sync identity is `FileHashUtil.koreaderHash`.
-- For paths under `context.filesDir`, use `absolutePath` for database lookups; `canonicalPath` resolves symlinks and breaks matching. Use `canonicalPath` only for traversal checks.
+- For paths under `context.filesDir`, use `absolutePath` for database lookups; `canonicalPath` resolves symlinks, so use it only for traversal checks.
 - Room: `Migration(n, n + 1)` objects only, never `fallbackToDestructiveMigration`. SQLite types are `TEXT`, `INTEGER`, and `REAL`; there is no `BOOLEAN`.
 - Substitute through the existing seams, never new ones: `KoreaderSyncApi`, `EpubImporter`, `OpdsClient`, `NotesExporter`, all wired in `AppContainer`.
 - Push progress and save state inside `withContext(NonCancellable)` during teardown.
-- Put pure logic behind injected lambdas so it tests without a device; see `ReaderSettingsController` and `ReaderTtsController`.
 
 ## Testing and mocking
 
-- JVM: JUnit4 with Robolectric, Turbine, and kotlinx-coroutines-test. This is the default test layer.
+- JVM: JUnit4 with Robolectric, Turbine, and kotlinx-coroutines-test; the default layer.
 - HTTP: MockWebServer against the real client. Never call a real server.
-- Prefer hand-rolled fakes implementing the seam interfaces over mocking frameworks.
-- Instrumented: Compose UI test plus uiautomator via `ReaderTestHelper`; assert semantics and text, never pixels, because the Readium navigator is a WebView that hides Compose nodes from uiautomator dumps.
+- Prefer hand-rolled fakes over mocking frameworks; put pure logic behind injected lambdas so it tests without a device.
+- Instrumented: Compose UI test plus uiautomator via `ReaderTestHelper`; assert semantics and text, never pixels, because the Readium navigator is a WebView that hides Compose nodes from uiautomator.
 - Run one instrumented class at a time with several devices attached, pinning `adb -s <serial>`.
 - Keep tests deterministic: inject clocks and identifiers, never wall time.
 - No coverage threshold; every new domain behaviour needs a test.
 
 ## Git workflow
 
-- Branch from `main` (`feat/`, `fix/`, `docs/`, `refactor/`, `chore/`, `test/`), commit atomically on it.
 - Conventional commits, imperative, no emoji, no emdash: `feat: add readium tts (#153)`.
 - Work is tracked on the `Leafline Development` board (project 7); move issues to Done on merge.
-- Open a PR for the branch, let every CI check pass, then squash-merge and delete it.
-- The PR body restates each changelog entry with its citation, so the same reference links in the file and on the PR.
+- The loop at the top of this file is the whole workflow; this adds only conventions.
