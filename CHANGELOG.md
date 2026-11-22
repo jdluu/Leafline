@@ -22,12 +22,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Attribution
 
 Every entry under a released version ends with the short SHA of the commit that
-made the change, written as `(#abc1234)` on the entry's last line, after the
-prose and never inside the sentence. `scripts/check_changelog_refs.sh` verifies
-each cited commit exists and is on the branch, and CI fails without it. Entries
-under [Unreleased] carry no reference until the work lands. Sections written
-before this convention (0.0.1 through 0.4.0) are exempt: their text was composed
-in batches, so a per-entry SHA there would be a guess rather than a record.
+made the change, written bare as `(abc1234)` on the entry's last line, after the
+prose and never inside the sentence. GitHub renders a bare SHA as a link to that
+commit, so an entry sits one click from its diff wherever the changelog is read:
+the release notes, the file view, and the pull request. A `#` prefix is not used,
+because that is issue syntax and GitHub leaves `#abc1234` as plain text rather
+than linking it. `scripts/check_changelog_refs.sh` verifies each cited commit
+exists and is on the branch, and CI fails without it. Entries under [Unreleased]
+carry no reference until the work lands. Sections written before this convention
+(0.0.1 through 0.4.0) are exempt: their text was composed in batches, so a
+per-entry SHA there would be a guess rather than a record.
 
 ## [Unreleased]
 
@@ -46,29 +50,29 @@ in batches, so a per-entry SHA there would be a guess rather than a record.
   stack of form blocks separated by rules. The appearance choice is previewed as
   a miniature page in each scheme's own colors, the KOReader sync form stays
   collapsed behind a row that reports whether sync is on and to which server,
-  and the notes export is a row rather than the loudest button on the page. (#7a77307)
+  and the notes export is a row rather than the loudest button on the page. (7a77307)
 - **Saving a sync server is gated on an address the app can use.** Save and the
   background switch stay off until the field holds an absolute http or https URL
   with a host, the field says why, and turning sync off stays available whatever
-  the field holds. (#7a77307)
+  the field holds. (7a77307)
 
 ### Fixed
 - **The reader's progress footer is readable on every page.** It painted the app
   scheme's secondary gray at 45% over the book page, so a dark app with a white
   page left it nearly invisible; chrome ink now comes from the reading theme and
   clears 4.5:1 on light, sepia, and dark pages. The surround behind the page
-  follows the same rule, which removes the dark band under an unset theme. (#e4ea8f0)
+  follows the same rule, which removes the dark band under an unset theme. (e4ea8f0)
 - **The catalog error state offers a recovery it can perform.** A sign-in error
   told the reader to edit a catalog the app cannot edit and offered only Retry;
   it now names adding the catalog again with credentials and carries that action
-  beside Retry, with the raw status code demoted to a caption. (#a765266)
+  beside Retry, with the raw status code demoted to a caption. (a765266)
 - **A book tile shows the whole author name** instead of clipping it to an
-  ellipsis at a large system font scale. (#8b96ecf)
+  ellipsis at a large system font scale. (8b96ecf)
 - **The export sheet no longer offers actions over an empty file.** With no
   annotated books it showed format chips, a preview, and Save/Share buttons over
   a "0 books • 0 highlights" header; it now shows the leaf mark, "Nothing to
   export yet", and one line saying what would put something there. The vault
-  preview also stops using an emoji as an icon. (#7a77307)
+  preview also stops using an emoji as an icon. (7a77307)
 
 ## [0.4.8] - 2026-11-16
 
@@ -78,11 +82,11 @@ in batches, so a per-entry SHA there would be a guess rather than a record.
   button, and copy promising "add a local folder" while only offering Import
   EPUB. Filters and the FAB now appear once there is something to act on, and the
   copy matches the single action offered while still pointing at the menu for
-  folder scanning. (#4e2ba92)
+  folder scanning. (4e2ba92)
 
 ### Changed
 - The empty library is treated as the designed moment the contract describes: one
-  leaf mark, one heading, one line, one action. (#4e2ba92)
+  leaf mark, one heading, one line, one action. (4e2ba92)
 
 
 ## [0.4.7] - 2026-11-16
@@ -91,16 +95,16 @@ in batches, so a per-entry SHA there would be a guess rather than a record.
 - **Export sheet actions were off-screen.** The sheet opened partially expanded, so
   its content slot clipped the action row no matter how the layout was arranged.
   It now opens expanded, only the content scrolls, and Share (outlined) and Save
-  (filled) stay pinned and reachable. (#3e6310e)
+  (filled) stay pinned and reachable. (3e6310e)
 - **Catalog search field was invisible.** The search field in the Explore top bar
   drew a paper container on a paper toolbar. It now uses the mist tone so the
-  input reads as an inset. (#3e6310e)
+  input reads as an inset. (3e6310e)
 
 ### Changed
 - Text fields accept an optional container tone and a nullable label, so the same
-  component serves grouped forms and bare toolbar inputs. (#3e6310e)
+  component serves grouped forms and bare toolbar inputs. (3e6310e)
 - `DESIGN.md` now documents the surface container ramp and the rule that sheets
-  pin their primary action and open expanded. (#3e6310e)
+  pin their primary action and open expanded. (3e6310e)
 
 
 ## [0.4.6] - 2026-11-16
@@ -108,7 +112,7 @@ in batches, so a per-entry SHA there would be a guess rather than a record.
 ### Fixed
 - Contents list rows drew an 8dp surface inside a 12dp clipped ripple, so the
   selected chapter's corners did not match the rest of the app. Both now use the
-  single container shape. (#6fa3904)
+  single container shape. (6fa3904)
 
 
 ## [0.4.5] - 2026-11-16
@@ -121,22 +125,22 @@ baseline palette leaked through.
 - **Reader chrome used the wrong palette.** `ReaderActivity` never wrapped its
   Compose tree in `LeaflineTheme`, so the drawer, sheets, dialogs and toolbar all
   rendered with Material's baseline scheme: lilac drawer surfaces and purple tab
-  indicators and selected rows. Reader chrome now follows the app scheme. (#acdf434)
+  indicators and selected rows. Reader chrome now follows the app scheme. (acdf434)
 - **Missing surface-container roles.** The light, dark, OLED and e-ink schemes
   never set `surfaceContainer*`, `surfaceDim`, `surfaceBright`, `inverseSurface`
   or `surfaceTint`, so every component reading those roles (navigation bar,
   menus, dialogs, sheets) fell back to baseline lilac neutrals. A green-tinted
-  container ramp is now defined for all four schemes. (#acdf434)
+  container ramp is now defined for all four schemes. (acdf434)
 - **Radii off the 12dp contract.** Tag chips, the export preview panel and
   contents rows used 8dp, and the jump notice used 24dp with a drop shadow. All
-  now share the single container radius, and the shadow is gone. (#acdf434)
+  now share the single container radius, and the shadow is gone. (acdf434)
 - **Contents tabs were ellipsised** ("Bookma…"). The fixed tab row split the
-  width three ways; it is now scrollable and sizes to its labels. (#acdf434)
+  width three ways; it is now scrollable and sizes to its labels. (acdf434)
 - **Progress filters clipped mid-word.** Five long labels in one row ran off the
   edge and the last chip read "In progres". Labels are now short ("Not started",
   "In progress", "Almost done", "Finished") with the ranges carried by the
-  accessibility label. (#acdf434)
-- **Export sheet** content could run under the gesture bar. (#acdf434)
+  accessibility label. (acdf434)
+- **Export sheet** content could run under the gesture bar. (acdf434)
 
 ## [0.4.4] - 2026-11-16
 
@@ -145,45 +149,45 @@ baseline palette leaked through.
   Material's default outlined text fields, which carry a 4dp radius and a border
   against an app whose single container radius is 12dp. They are now paper-toned
   insets at 12dp with no outline, and grouped fields sit on a quiet mist panel so
-  the block reads as one object. (#9e8e0ce)
+  the block reads as one object. (9e8e0ce)
 - **KOReader Sync** has one emphasized action: Save is filled and Test connection
   is outlined. The password gained a visibility toggle, the background-sync switch
   reads as part of the group with its own supporting line, and save/test results
-  now pair an icon with the message instead of relying on colour. (#9e8e0ce)
+  now pair an icon with the message instead of relying on colour. (9e8e0ce)
 - **Add Catalog Feed** uses a segmented single-choice control for the
   authentication method, replacing chips that wrapped onto a second row, and
-  separates feed details from credentials with a hairline divider. (#9e8e0ce)
+  separates feed details from credentials with a hairline divider. (9e8e0ce)
 
 ## [0.4.3] - 2026-11-16
 
 ### Fixed
 - **KOReader sync**: Server, username, and password were held in memory only, so
   progress sync could not survive an app restart and background sync had no
-  settings to work with. They are now stored on device. (#0667c9c)
+  settings to work with. They are now stored on device. (0667c9c)
 
 ### Security
 - The sync password is encrypted with an AES/GCM key held in the Android Keystore
   before it is written, so the preference file alone does not expose it. The
   Settings caption now states this instead of claiming the credentials are
-  session-only. (#0667c9c)
+  session-only. (0667c9c)
 
 ## [0.4.2] - 2026-11-16
 
 ### Fixed
 - **Reader**: The reading status footer was drawn over the page with no reserved
   space, so the last line of text ran underneath it. The navigator now reserves
-  the footer's height, keeping page text clear of the label. (#9a78480)
+  the footer's height, keeping page text clear of the label. (9a78480)
 - **TTS**: Playback paused itself about 100 ms after starting or resuming. The app
   and Readium's TTS navigator both requested audio focus, and the navigator's
   request took focus back, delivering `AUDIOFOCUS_LOSS` to the app's listener. The
   app no longer claims audio focus for TTS and defers to the navigator, which
   already handles interruption and resume. Headphone-disconnect pausing is
-  unchanged. (#9a78480)
+  unchanged. (9a78480)
 - **Reader**: Highlight excerpts truncated mid-word; context is now cut on word
-  boundaries. (#9a78480)
+  boundaries. (9a78480)
 
 ### Removed
-- `TtsAudioFocusManager`, superseded by the navigator's own audio focus handling. (#9a78480)
+- `TtsAudioFocusManager`, superseded by the navigator's own audio focus handling. (9a78480)
 
 ## [0.4.1] - 2026-11-16
 
@@ -193,47 +197,47 @@ the unit tests or lint.
 
 ### Added
 - **Reader text size control**: Stepper in Reader Settings from 80% to 160% in 10%
-  steps, persisted per reading preferences and clamped on restore. (#aa5fb65)
+  steps, persisted per reading preferences and clamped on restore. (aa5fb65)
 - **Settings version block**: "Leafline <version>" with the on-device privacy
   statement at the foot of Settings, so support reports can name the installed
-  build. (#aa5fb65)
+  build. (aa5fb65)
 - **Batch action overflow menu**: Remaining bulk actions (edit tags, export notes,
-  delete) moved into an overflow menu when the selection bar runs out of room. (#aa5fb65)
+  delete) moved into an overflow menu when the selection bar runs out of room. (aa5fb65)
 - **Restore result summary**: Backup restore now reports matched books,
-  collections, bookmarks, and highlights with correct singular/plural wording. (#aa5fb65)
+  collections, bookmarks, and highlights with correct singular/plural wording. (aa5fb65)
 
 ### Fixed
 - **Reader**: Programmatic jumps (contents, search, bookmarks) were labelled
   "Footnote / Link" in the jump notice; each source now supplies its own
-  description. (#aa5fb65)
+  description. (aa5fb65)
 - **Reader**: Text-to-speech sentence following pushed a navigation-history entry
-  and showed a jump banner on every utterance. (#aa5fb65)
+  and showed a jump banner on every utterance. (aa5fb65)
 - **Reader**: Bookmarks created in a chapter were stored with no label and listed
-  by resource file name; they now capture the chapter title. (#aa5fb65)
+  by resource file name; they now capture the chapter title. (aa5fb65)
 - **Reader**: Highlights without a Readium `text.exact` locator field were listed
-  by their XHTML file name; they now quote the highlighted passage with context. (#aa5fb65)
+  by their XHTML file name; they now quote the highlighted passage with context. (aa5fb65)
 - **Reader**: Contents tab labels were ellipsised ("Content…") because counts were
-  appended to each tab title; counts now live inside each pane. (#aa5fb65)
-- **Library**: The active collection chip's close glyph did not clear the filter. (#aa5fb65)
-- **Library**: The sort menu clipped "A-Z" / "Z-A" option spacing. (#aa5fb65)
-- **Library**: The reading goals editor squeezed its value field vertically. (#aa5fb65)
-- **Library**: Reading Insights metrics and tag rows could overflow their columns. (#aa5fb65)
+  appended to each tab title; counts now live inside each pane. (aa5fb65)
+- **Library**: The active collection chip's close glyph did not clear the filter. (aa5fb65)
+- **Library**: The sort menu clipped "A-Z" / "Z-A" option spacing. (aa5fb65)
+- **Library**: The reading goals editor squeezed its value field vertically. (aa5fb65)
+- **Library**: Reading Insights metrics and tag rows could overflow their columns. (aa5fb65)
 - **Library**: The selection bar title overflowed instead of ellipsising, and its
-  action row was truncated on narrow screens. (#aa5fb65)
+  action row was truncated on narrow screens. (aa5fb65)
 - **Library**: Backup restore buttons sat under the gesture bar on gesture-nav
-  devices; the sheet now reserves navigation bar insets. (#aa5fb65)
+  devices; the sheet now reserves navigation bar insets. (aa5fb65)
 - **Backup**: Exported backups recorded `appVersion` as the literal `1.0`; the
-  real installed version is now written. (#aa5fb65)
+  real installed version is now written. (aa5fb65)
 - **Explore**: Catalog failures read "HTTP 401:" with no guidance; 401/403, 404,
-  and 5xx now explain what the reader can do. (#aa5fb65)
+  and 5xx now explain what the reader can do. (aa5fb65)
 - **Explore**: Catalogs exposing a "Home" link that points at the feed itself
-  suppressed the empty state and looped; self-links are filtered as noise. (#aa5fb65)
+  suppressed the empty state and looped; self-links are filtered as noise. (aa5fb65)
 - **Explore**: The selected catalog was forgotten on every restart; it is now
-  persisted. (#aa5fb65)
+  persisted. (aa5fb65)
 - **Explore**: The API token field in the Add Catalog dialog was compressed
-  vertically. (#aa5fb65)
+  vertically. (aa5fb65)
 - **Explore**: Requests now send an accurate `User-Agent` with the app version, so
-  catalog servers can tell builds apart. (#aa5fb65)
+  catalog servers can tell builds apart. (aa5fb65)
 
 ## [0.4.0] - 2026-11-16
 

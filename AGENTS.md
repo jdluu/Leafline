@@ -94,8 +94,8 @@ same PR; none is a log. Read both before changing a surface, and check the resul
 on a device at font scale 1.3 in light and dark.
 
 Every released `CHANGELOG.md` entry ends with the short SHA of the commit that
-made it, as `(#abc1234)` on its last line, never inside the sentence;
-`scripts/check_changelog_refs.sh` enforces it and CI fails without it.
+made it, bare as `(abc1234)` on its last line, never inside the sentence, so
+GitHub links it to the commit; `check_changelog_refs.sh` enforces it in CI.
 
 ## Project structure
 

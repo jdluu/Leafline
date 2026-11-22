@@ -2,9 +2,12 @@
 # Fails when a CHANGELOG entry is missing or carries a dangling commit reference.
 #
 # Every bullet under a released version must end with a short commit SHA in the
-# form " (#abc1234)", and that commit must still exist on the branch being
-# checked. A reader can then go from "this shipped" to "here is the diff"
-# without guessing which commit did it.
+# form " (abc1234)", and that commit must still exist on the branch being
+# checked. GitHub turns a bare SHA into a link to the commit, so the entry is
+# clickable wherever the changelog renders: the release notes, the file view, and
+# the diff. A leading "#" is deliberately rejected: "#abc1234" is how an issue or
+# PR is written, and GitHub leaves a hash-prefixed SHA as plain text instead of
+# linking it.
 #
 # The reference goes at the END of the entry, on its last line, never inside the
 # sentence: wrapped bullets are common, and a ref mid-prose stops the text
@@ -39,7 +42,7 @@ bullet_head=""
 bullet_last=""
 
 check_bullet() {
-    if [[ $bullet_last =~ \(#([0-9a-f]{7})\)[[:space:]]*$ ]]; then
+    if [[ $bullet_last =~ \(([0-9a-f]{7,40})\)[[:space:]]*$ ]]; then
         local sha="${BASH_REMATCH[1]}"
         attributed=$((attributed + 1))
         if ! git cat-file -e "${sha}^{commit}" 2>/dev/null; then
