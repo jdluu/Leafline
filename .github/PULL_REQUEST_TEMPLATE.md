@@ -2,23 +2,17 @@
 
 <!-- One paragraph. Name the user-visible effect, not the diff. -->
 
-## Changelog
+## What a reader gets
 
 <!--
-Every user-visible change needs an entry in CHANGELOG.md, and every entry ends
-with a citation on its own last line:
+This is the audience for the whole change. The release notes are generated from
+merged pull requests: tagging vX.Y.Z runs gh release create --generate-notes,
+which lists every PR title between the previous tag and this one, linked, with its
+author. There is no changelog file to update and nothing to cite by hand.
 
-  on this branch   (#<this PR number>)
-  after merge      (<sha>, #<this PR number>)   written by the settle workflow
-
-Cite the pull request here, not a commit: a squash or rebase rewrites your
-commits, so a SHA written now would point at nothing after the merge. The
-"Settle changelog citations" workflow attaches the merge commit on main.
-
-Copy each entry below so the same reference links here and in the file.
+That makes the PR *title* a release-note line, so it has to stand on its own:
+"fix: the catalog error offers a recovery it can perform", not "fix: OpdsScreen".
 -->
-
-- 
 
 ## Verification
 
@@ -28,7 +22,6 @@ Copy each entry below so the same reference links here and in the file.
 ./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 bash scripts/check_dynamic_type.sh
 bash scripts/check_touch_targets.sh
-bash scripts/check_changelog_refs.sh
 ```
 
 Device checks, if the change is visual: state the device, the font scale, and the
@@ -36,7 +29,7 @@ themes you looked at. "Looks fine" is not a check.
 
 ## Checklist
 
-- [ ] `scripts/check_changelog_refs.sh` passes (entry present, cites this PR)
+- [ ] Title reads as a release-note line, not as a file name
 - [ ] Unit tests and lint pass, and both contract guards pass
 - [ ] Visual changes checked on a device at font scale 1.3, light and dark
 - [ ] `DESIGN.md` updated if the visual contract changed

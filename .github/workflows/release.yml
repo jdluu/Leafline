@@ -1,0 +1,81 @@
+name: Release
+
+# Publishing a tag is the whole release. GitHub builds the notes from the pull
+# requests between the previous tag and this one, so every line in the notes is a
+# real link to the PR that caused it and carries its author. Nothing is
+# hand-written and nothing can drift: a merged PR cannot be missing, because the
+# notes are derived from the commits rather than maintained beside them.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  release:
+    name: Publish release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the tag
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          # generate-notes walks history back to the previous tag.
+          fetch-depth: 0
+          fetch-tags: true
+
+      # The APK is what a reader installs, so a release without one is not a
+      # release. Signed only when the four signing properties are configured;
+      # otherwise this fails rather than publishing an unsigned artifact.
+      - name: Set up JDK 17
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@017a9effdb900e5b5b2fddfb590a105619dca3c3 # v4.4.2
+
+      - name: Build release APK
+        env:
+          LEAFLINE_STORE_FILE: ${{ secrets.LEAFLINE_STORE_FILE }}
+          LEAFLINE_STORE_PASSWORD: ${{ secrets.LEAFLINE_STORE_PASSWORD }}
+          LEAFLINE_KEY_ALIAS: ${{ secrets.LEAFLINE_KEY_ALIAS }}
+          LEAFLINE_KEY_PASSWORD: ${{ secrets.LEAFLINE_KEY_PASSWORD }}
+        run: |
+          if [ -z "$LEAFLINE_STORE_FILE" ]; then
+            echo "FAIL: no signing key in secrets, refusing to publish an unsigned APK"
+            exit 1
+          fi
+          printf 'LEAFLINE_STORE_FILE=%s\nLEAFLINE_STORE_PASSWORD=%s\nLEAFLINE_KEY_ALIAS=%s\nLEAFLINE_KEY_PASSWORD=%s\n' \
+            "$LEAFLINE_STORE_FILE" "$LEAFLINE_STORE_PASSWORD" "$LEAFLINE_KEY_ALIAS" "$LEAFLINE_KEY_PASSWORD" \
+            >> ~/.gradle/gradle.properties
+          ./gradlew :app:assembleRelease
+
+      - name: Verify the APK is signed
+        run: |
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs \
+            app/build/outputs/apk/release/app-release.apk
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # The tag flows into a shell command, so constrain it to a release
+          # shape rather than trusting an arbitrary ref name.
+          case "$TAG" in
+            v[0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "FAIL: unexpected tag name: $TAG"; exit 1 ;;
+          esac
+          previous=$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || true)
+          # --verify-tag refuses to invent a release for a tag that does not exist.
+          gh release create "$TAG" \
+            --verify-tag \
+            --title "Leafline $TAG" \
+            --generate-notes \
+            ${previous:+--notes-start-tag "$previous"} \
+            app/build/outputs/apk/release/app-release.apk
