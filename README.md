@@ -4,91 +4,91 @@
 ![Android](https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)
 ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white)
-![EPUB](https://img.shields.io/badge/EPUB-8B4513?style=for-the-badge&logo=bookreader&logoColor=white)
 
-Leafline is a free, open-source EPUB reader for Android built on a local-first
-philosophy: every core feature—reading, in-book search, annotations, reading
-statistics, and library management—works fully offline without requiring an
-account or internet connection. Users can bring their own EPUBs or connect to
-OPDS catalogs and compatible servers (such as Calibre-web or Kavita) to browse
-and download books directly to their devices. For connected setups, reading
-progress can optionally sync across your devices using any KOReader-compatible
-sync server you configure.
+A local-first EPUB reader for Android. Reading, search, annotations, statistics,
+and the library all work offline, with no account and no telemetry. Bring your own
+books, or browse OPDS 1.x/2.0 catalogs (Calibre-web, Kavita) over your own network.
+Progress sync is optional and goes to a KOReader-compatible server you host.
 
-Leafline collects no analytics, crash reports, or telemetry. Everything stays
-on your device except the progress sync and OPDS feeds you choose to configure
-against your own servers.
+<img src="screenshots/library.png" alt="Leafline library in list layout: four books with covers, authors, reading-status tags, and progress" width="300" /> <img src="screenshots/reader.png" alt="Leafline reader showing the Chapter 2 heading above justified serif prose, with progress in the footer" width="300" />
 
-## Screenshots
+## What it does
 
-**Your library** — imported EPUBs with cover thumbnails, reading-status filters,
-and collections:
+**Reading.** EPUB 2 and EPUB 3, paginated or scrolled. Curated typography and
+accessibility presets including OpenDyslexic and Accessible DfA; adjustable size,
+line height, margins, and five color schemes. Edge taps and volume keys turn pages,
+with per-book brightness and a footer reporting progress and time remaining.
 
-<img src="screenshots/library.png" alt="Leafline library showing imported books with cover thumbnails and reading-status filters" width="320" />
+**Finding your way back.** Footnotes and endnotes preview in a sheet without losing
+your place. A history stack moves back and forward across chapters, links, search
+hits, and bookmarks, with a floating return capsule after a jump.
 
-**The reader** — paginated text with real typography: chapter headings, italics,
-and paragraph indents, with reading chrome out of the way:
+**Notes and marks.** Multi-color highlights and notes with color filtering, an
+offline dictionary lookup, and full-text search with match case, whole word, regex,
+and per-chapter filtering.
 
-<img src="screenshots/reader.png" alt="Leafline reader showing the chapter opening of Frankenstein with justified serif text" width="320" />
+**Your library.** Grid and list layouts, multi-select batch actions, collections,
+reading-status filters, 1–5 star ratings, custom tags, and sorting by recency,
+title, author, or rating.
 
-## Features
+**Reading time.** On-device tracking with daily and weekly insights, a streak
+counter, a 7-day activity chart, and a daily goal.
 
-- **Local-first & fully offline** — Every core feature works completely offline; bring your own books with no accounts, logins, or cloud lock-in required
-- **EPUB reading** — Read EPUB 2 and EPUB 3 books in a paginated or scrolled view
-- **Footnote & note previews** — Non-disruptive popup bottom sheet previews for footnotes, endnotes, and internal note citations without losing reading position, with optional jump-to-note action
-- **Navigation history & quick return** — History back/forward navigation stack and floating return capsule when jumping between chapters, footnotes, links, search results, and bookmarks
-- **On-device library & OPDS catalogs** — Import local EPUB files, scan folders, or browse and download directly from OPDS 1.x/2.0 catalogs and compatible servers (such as Calibre-web or Kavita)
-- **Progress sync** — Sync reading progress between your devices using any
-  KOReader-compatible sync server you host yourself; credentials stay on device
-  and the password is encrypted before it is stored
-- **Reading statistics & insights** — On-device reading time tracking, daily and
-  weekly insights, reading streak counter, interactive 7-day activity chart, and estimated time remaining
-- **Bookmarks, annotations & dictionary** — Multi-color highlights, color filtering, notes
-  search, advanced full-text in-book search (match case, whole word, regex, chapter filtering, and recent search history), offline dictionary lookup (ColorDict/GoldenDict/system Define), text sharing, and system text actions
-- **Notes & highlights export** — Export annotations, notes, and highlights to Markdown, Obsidian-compatible vault ZIP archives, Readwise CSV, and Anki flashcard TSV decks
-- **100% on-device backup & restore** — Export and restore complete library metadata, collections, bookmarks, and annotations via JSON
-- **Customizable reading & style presets** — Curated typography and accessibility presets (including OpenDyslexic and Accessible DfA), adjustable fonts, text size,
-  themes (including sepia), margins, line height, interactive scrubber, edge tap zones, volume key page turning, reading progress HUD
-  with estimated time left, page-turn animation, and per-book brightness
-- **Text-to-speech & sleep timer** — Optional on-device reading aloud with configurable playback
-  speed, sentence-by-sentence skip navigation, countdown sleep timer (5 to 60 min or End of Chapter) with audio volume fade-out and auto-pause, synchronized page turning, and spoken utterance highlighting
-- **Library management** — Grid and list layout toggle, multi-selection batch actions (mark status, assign
-  collections, delete, tag), collections, reading status filters, 1–5 star ratings, custom tags, tag filtering, and sorting (recent, title, author, rating)
-- **Settings that show their answers** — Appearance, progress sync, and notes export each state their current value, so the scheme in use and the sync server are visible without opening a form; the five schemes are previewed as miniature pages drawn in their own colors
-- **No telemetry** — No analytics, crash reports, or usage data collected
+**Everything leaves cleanly.** Export annotations to Markdown, an Obsidian vault
+ZIP, Readwise CSV, or Anki TSV. Back up and restore the whole library as JSON.
 
-**Requirements:** Android 8.0 (API 26) or newer.
+**Reading aloud.** On-device text-to-speech with adjustable speed, sentence skip,
+and a sleep timer (5–60 minutes or end of chapter) that fades the audio out.
 
-## Installation
+## Loading books
 
-### Obtainium
+Two ways in, and they compose:
+
+- **Import a file.** The import action opens the system picker: choose one EPUB to
+  read right away, or several at once.
+- **Point at folders, as many as you organize by.** In the app menu, *Manage folders*
+  → *Add* grants a folder and imports every EPUB beneath it, **recursively at any
+  depth**. Each saved folder lists its own *Rescan*, so a scan repeats only where
+  something changed. A `Calibre/<Author>/<Title (id)>/book.epub` export imports
+  correctly from its single top-level folder.
+
+  Android will not grant a whole storage root, so pick a folder such as `Calibre`,
+  `Books`, or `Download/Leafline` rather than the root of internal storage. The
+  picker says so if the location is refused.
+
+Removing a folder releases the read access granted with it, and re-adding a folder
+replaces the stale entry rather than stacking a second grant on the same location.
+
+The same book stored twice — a re-download, another edition of the file, a
+duplicated Calibre copy — imports once. The library keeps one row and adopts the
+newer file, so reading position is never split across two entries.
+
+**Requires Android 8.0 (API 26) or newer.**
+
+## Install
 
 [![Get it on Obtainium](https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png)](https://apps.obtainium.imranr.dev/redirect?r=obtainium%3A%2F%2Fadd%2Fhttps%3A%2F%2Fgithub.com%2Fjdluu%2FLeafline)
 
-Tap the badge to add Leafline to
-[Obtainium](https://github.com/ImranR98/Obtainium), which installs it straight
-from this repository's releases and keeps it up to date automatically.
+Tap the badge to add Leafline to [Obtainium](https://github.com/ImranR98/Obtainium),
+which installs from this repository's releases and keeps it updated. Or download an
+APK from [Releases](https://github.com/jdluu/Leafline/releases) directly; you may
+need to allow installs from unknown sources.
 
-### Manual APK
+Releases are pre-1.0 (`0.y.z`): the on-device database schema is not yet stable, so
+a major bump can still require a reinstall.
 
-Download an APK from the [Releases](https://github.com/jdluu/Leafline/releases)
-page and install it. You may need to allow installation from unknown sources.
+## Build
 
-**Note:** Leafline is in early pre-release (`0.y.z`). The current release is
-`v0.4.10`; the `0.y.z` line signals that the on-device database schema is not yet
-stable. Building from source is described below.
-
-## Building from source
-
-Requirements: JDK 17+ and the Android SDK.
+JDK 17 and the Android SDK.
 
 ```bash
-./gradlew assembleDebug        # build debug APK
-./gradlew testDebugUnitTest    # run unit tests
-./gradlew lintDebug            # run lint checks
+./gradlew assembleDebug        # debug APK
+./gradlew testDebugUnitTest    # unit tests
+./gradlew lintDebug            # lint
 ```
 
-Continuous integration runs on every pull request.
+`AGENTS.md` records the conventions this repository is built to, including the loop
+every change follows. Pull requests run the same checks in CI.
 
 ## License
 
