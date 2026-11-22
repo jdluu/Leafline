@@ -22,7 +22,7 @@ internal fun opdsHttpErrorMessage(
 ): String {
     val detail = when {
         code == 401 || code == 403 ->
-            "This catalog needs a sign-in. Edit the catalog and add your credentials."
+            "This catalog needs a sign-in. Add it again with your username and password."
         code == 404 -> "Catalog not found. The feed address may have moved."
         code in 500..599 -> "The catalog server had a problem. Try again later."
         serverMessage.isNotBlank() -> serverMessage
@@ -31,6 +31,20 @@ internal fun opdsHttpErrorMessage(
     val prefix = if (action != null) "${action.replaceFirstChar { it.uppercase() }}: " else ""
     return "$prefix$detail (HTTP $code)"
 }
+
+/**
+ * Splits the trailing "(HTTP nnn)" off a message. The code is real information for a
+ * bug report, but it is not the sentence a reader needs first, so the UI shows the
+ * detail as the message and the code as a caption under the actions.
+ */
+internal fun splitHttpStatus(message: String): Pair<String, String?> {
+    val match = HTTP_SUFFIX.find(message.trim())
+        ?: return message.trim() to null
+    val detail = message.trim().removeRange(match.range).trim()
+    return detail to "HTTP ${match.groupValues[1]}"
+}
+
+private val HTTP_SUFFIX = Regex("""\s*\(HTTP (\d{3})\)$""")
 
 /**
  * HTTP client for fetching OPDS catalog feeds, searching feeds, and downloading EPUB publications.
