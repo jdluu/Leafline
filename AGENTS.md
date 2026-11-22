@@ -56,7 +56,7 @@ four `LEAFLINE_*` properties only for a signed release. CI requires none of them
 
 Always do:
 
-- Before reporting a task done, run `./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`, then `bash scripts/check_dynamic_type.sh`, `bash scripts/check_touch_targets.sh`, and `git diff --check`. Paste the real output.
+- Before reporting a task done, run `./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`, then `bash scripts/check_dynamic_type.sh`, `bash scripts/check_touch_targets.sh`, `bash scripts/check_changelog_refs.sh`, and `git diff --check`. Paste the real output.
 - Add a JVM unit test for new domain logic.
 - Keep domain models and mappers free of Android, Room, and Readium types.
 - Set text through `MaterialTheme.typography`. Never set a text size in dp or px.
@@ -82,7 +82,7 @@ Never do:
 - Add a `docs/` tree or planning documents. Those four files are the documentation; `.impeccable/` working material stays local.
 - Name agent identities, model names, model providers, or session details in commits, PRs, code comments, or documentation.
 
-Done when: those four commands exit 0 and the tree is clean. A build, test, or
+Done when: those commands exit 0 and the tree is clean. A build, test, or
 device run is not verified until the command has actually run; never report one
 you did not execute.
 
@@ -91,6 +91,10 @@ you did not execute.
 `PRODUCT.md` owns product truth, `DESIGN.md` the visual contract, `README.md`
 what ships today, and this file how to work. Update whichever changed in the
 same PR; none is a log.
+
+Every released `CHANGELOG.md` entry ends with the short SHA of the commit that
+made it, as `(#abc1234)` on the entry's last line, never inside the sentence.
+`scripts/check_changelog_refs.sh` enforces it; CI fails without it.
 
 Read both before changing how a surface looks or is structured, and check the result
 on a device at font scale 1.3 in light and dark. A build that compiles is not a look.

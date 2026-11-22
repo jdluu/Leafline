@@ -74,10 +74,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
+        # Full history and tags: the changelog guard resolves cited commits with
+        # git, and a shallow clone would report every reference as dangling.
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Dynamic type guard
         run: bash scripts/check_dynamic_type.sh
 
       - name: Touch target guard
         run: bash scripts/check_touch_targets.sh
+
+      # Needs history and tags, so it can prove a cited commit exists and is on
+      # the branch; a shallow clone would report every reference as dangling.
+      - name: Changelog attribution guard
+        run: bash scripts/check_changelog_refs.sh
