@@ -479,25 +479,41 @@ fun LibraryScreen(
         if (books.isEmpty()) {
             when {
                 !isLibraryLoaded -> LibraryLoadingState()
+                // Each filtered-empty state clears its own filter: once the last book is
+                // gone the filter bar hides, so without an action here the reader is left
+                // staring at a reason with no way out of it.
                 query.isNotBlank() -> LibraryEmptyState(
                     title = "No books match",
-                    body = "Try a different search term"
+                    body = "Try a different search term",
+                    actionLabel = "Clear search",
+                    onAction = {
+                        viewModel.setQuery("")
+                        searchActive = false
+                    }
                 )
                 selectedCollection != null -> LibraryEmptyState(
                     title = "Collection is empty",
-                    body = "Books added to this collection will appear here"
+                    body = "Books added to this collection will appear here",
+                    actionLabel = "Show all books",
+                    onAction = { viewModel.selectCollection(null) }
                 )
                 readingStatusFilter != null -> LibraryEmptyState(
                     title = "No books with this status",
-                    body = "Try a different filter"
+                    body = "Status filter: ${readingStatusFilter!!.displayName}",
+                    actionLabel = "Clear filter",
+                    onAction = { viewModel.setReadingStatusFilter(null) }
                 )
                 progressFilter != ProgressFilter.ALL -> LibraryEmptyState(
                     title = "No books in this range",
-                    body = "Progress filter: ${progressFilter.displayName}. Clear it from the sort and filter menu."
+                    body = "Progress filter: ${progressFilter.displayName}",
+                    actionLabel = "Clear filter",
+                    onAction = { viewModel.setProgressFilter(ProgressFilter.ALL) }
                 )
                 selectedTag != null -> LibraryEmptyState(
                     title = "No books with this tag",
-                    body = "Try selecting a different tag or clear the filter"
+                    body = "Tag filter: $selectedTag",
+                    actionLabel = "Clear filter",
+                    onAction = { viewModel.selectTag(null) }
                 )
                 else -> LibraryEmptyState(
                     title = "Your library awaits",
