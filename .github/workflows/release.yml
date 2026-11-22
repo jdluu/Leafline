@@ -10,6 +10,14 @@ on:
   push:
     tags:
       - "v*.*.*"
+  # Dry run: build and verify the APK, skip publishing. Lets the signing path be
+  # exercised without creating a release or burning a version number.
+  workflow_dispatch:
+    inputs:
+      build_only:
+        description: "Build and verify the APK without publishing a release"
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -41,19 +49,37 @@ jobs:
 
       - name: Build release APK
         env:
-          LEAFLINE_STORE_FILE: ${{ secrets.LEAFLINE_STORE_FILE }}
+          # The keystore travels as base64 and is materialised here: an absolute
+          # path from a developer machine means nothing on a runner. Everything
+          # that writes a credential stays in this environment block, so the
+          # values never reach the runner's log.
+          LEAFLINE_KEYSTORE_BASE64: ${{ secrets.LEAFLINE_KEYSTORE_BASE64 }}
           LEAFLINE_STORE_PASSWORD: ${{ secrets.LEAFLINE_STORE_PASSWORD }}
           LEAFLINE_KEY_ALIAS: ${{ secrets.LEAFLINE_KEY_ALIAS }}
           LEAFLINE_KEY_PASSWORD: ${{ secrets.LEAFLINE_KEY_PASSWORD }}
         run: |
-          if [ -z "$LEAFLINE_STORE_FILE" ]; then
-            echo "FAIL: no signing key in secrets, refusing to publish an unsigned APK"
-            exit 1
-          fi
-          printf 'LEAFLINE_STORE_FILE=%s\nLEAFLINE_STORE_PASSWORD=%s\nLEAFLINE_KEY_ALIAS=%s\nLEAFLINE_KEY_PASSWORD=%s\n' \
-            "$LEAFLINE_STORE_FILE" "$LEAFLINE_STORE_PASSWORD" "$LEAFLINE_KEY_ALIAS" "$LEAFLINE_KEY_PASSWORD" \
-            >> ~/.gradle/gradle.properties
+          missing=0
+          for v in LEAFLINE_KEYSTORE_BASE64 LEAFLINE_STORE_PASSWORD LEAFLINE_KEY_ALIAS LEAFLINE_KEY_PASSWORD; do
+            [ -n "${!v}" ] || { echo "FAIL: secret $v is not set"; missing=1; }
+          done
+          [ "$missing" -eq 0 ] || exit 1
+
+          mkdir -p "$RUNNER_TEMP/keys"
+          printf '%s' "$LEAFLINE_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/keys/leafline-release.jks"
+          chmod 600 "$RUNNER_TEMP/keys/leafline-release.jks"
+          ls -l "$RUNNER_TEMP/keys/leafline-release.jks" | awk '{print "keystore:", $5, "bytes"}'
+
+          {
+            printf 'LEAFLINE_STORE_FILE=%s\n' "$RUNNER_TEMP/keys/leafline-release.jks"
+            printf 'LEAFLINE_STORE_PASSWORD=%s\n' "$LEAFLINE_STORE_PASSWORD"
+            printf 'LEAFLINE_KEY_ALIAS=%s\n' "$LEAFLINE_KEY_ALIAS"
+            printf 'LEAFLINE_KEY_PASSWORD=%s\n' "$LEAFLINE_KEY_PASSWORD"
+          } >> ~/.gradle/gradle.properties
           ./gradlew :app:assembleRelease
+
+      - name: Remove the keystore
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/keys"
 
       - name: Verify the APK is signed
         run: |
@@ -61,6 +87,8 @@ jobs:
             app/build/outputs/apk/release/app-release.apk
 
       - name: Publish
+        # A tag push publishes; a manual run with build_only does not.
+        if: ${{ github.event_name == 'push' || inputs.build_only == false }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
