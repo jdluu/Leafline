@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **The export sheet no longer offers actions over an empty file.** With no
+  annotated books it showed format chips, a preview, and Save/Share buttons over
+  a "0 books • 0 highlights" header; it now shows the leaf mark, "Nothing to
+  export yet", and one line saying what would put something there. The vault
+  preview also stops using an emoji as an icon.
+
 ### Changed
 - **Settings is rebuilt as rows that show their current answer** instead of a
   stack of form blocks separated by rules. The appearance choice is previewed as
