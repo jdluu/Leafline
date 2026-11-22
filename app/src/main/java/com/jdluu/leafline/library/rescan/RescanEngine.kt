@@ -1,5 +1,6 @@
 package com.jdluu.leafline.library.rescan
 
+import com.jdluu.leafline.library.BookIdentity
 import com.jdluu.leafline.library.ImportedBookReconciler
 import com.jdluu.leafline.library.LibraryBook
 
@@ -21,7 +22,8 @@ class RescanEngine(
     private val loadExisting: suspend (fileHash: String) -> LibraryBook?,
     private val persistAdded: suspend (book: LibraryBook) -> Unit,
     private val persistUpdated: suspend (book: LibraryBook) -> Unit,
-    private val lookupByStableId: (suspend (stableId: String) -> LibraryBook?)? = null
+    private val lookupByStableId: (suspend (stableId: String) -> LibraryBook?)? = null,
+    private val lookupByPublication: (suspend (publication: String) -> LibraryBook?)? = null
 ) {
 
     /**
@@ -110,6 +112,32 @@ class RescanEngine(
                     readingStatus = prior.readingStatus
                 )
                 return MergeOutcome.ExistingRecord(updated)
+            }
+        }
+
+        // Nothing matched by hash or by exact identity. The same publication
+        // still may sit in the library as a second file: a re-download, another
+        // edition of the EPUB, or the same book exported twice from Calibre.
+        // Those bytes hash differently, so only the publication identifier links
+        // them. Adopting the existing record keeps one row (and one reading
+        // position) per book instead of splitting it in two.
+        val byPublication = lookupByPublication
+        if (byPublication != null) {
+            val publication = BookIdentity.publicationOf(imported.stableId)
+            if (publication != null) {
+                val prior = byPublication(publication)
+                if (prior != null) {
+                    val updated = imported.copy(
+                        stableId = prior.stableId,
+                        addedAtEpochMillis = prior.addedAtEpochMillis,
+                        lastLocatorJson = prior.lastLocatorJson,
+                        coverPath = prior.coverPath ?: imported.coverPath,
+                        koreaderHash = prior.koreaderHash ?: imported.koreaderHash,
+                        lastReadAtEpochMillis = prior.lastReadAtEpochMillis,
+                        readingStatus = prior.readingStatus
+                    )
+                    return MergeOutcome.ExistingRecord(updated)
+                }
             }
         }
 

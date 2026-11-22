@@ -5,6 +5,7 @@ import android.content.Context
 import android.net.Uri
 import com.jdluu.leafline.EpubImporter
 import com.jdluu.leafline.FileHashUtil
+import com.jdluu.leafline.library.BookIdentity
 import com.jdluu.leafline.library.LibraryBook
 import com.jdluu.leafline.library.LocalEpubDocumentScanner
 import com.jdluu.leafline.library.data.LibraryRepository
@@ -45,7 +46,12 @@ class SaFFolderRescanRunner(
             loadExisting = repository::getBookByFileHash,
             persistAdded = { book -> repository.addBook(book) },
             persistUpdated = { book -> repository.updateBook(book) },
-            lookupByStableId = repository::getBookByStableId
+            lookupByStableId = repository::getBookByStableId,
+            lookupByPublication = { publication ->
+                repository.getAllBooks().first().firstOrNull { book ->
+                    BookIdentity.publicationOf(book.stableId) == publication
+                }
+            }
         ),
         scanFolder = ::scanFolder
     )

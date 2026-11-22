@@ -258,16 +258,84 @@ class RescanEngineTest {
         assertEquals(emptyList<LibraryBook>(), updated)
     }
 
+    @Test
+    fun `a second file of the same publication updates one record instead of adding a row`() =
+        runBlocking {
+            val added = mutableListOf<LibraryBook>()
+            val updated = mutableListOf<LibraryBook>()
+            val existing = book(
+                stableId = "identifier:urn:isbn:84:hash:first-hash",
+                filePath = "/old/84.epub",
+                fileHash = "first-hash",
+                lastLocatorJson = "{saved-locator}",
+                readingStatus = ReadingStatus.READING
+            )
+            val engine = engine(
+                loadExisting = { null },
+                persistAdded = { added += it },
+                persistUpdated = { updated += it },
+                lookupByStableId = { null },
+                lookupByPublication = { pub ->
+                    existing.takeIf { pub == "urn:isbn:84" }
+                }
+            )
+
+            val counts = engine.reconcile(
+                listOf(
+                    ScannedFile.Imported(
+                        book(
+                            stableId = "identifier:urn:isbn:84:hash:second-hash",
+                            filePath = "/calibre/84-copy.epub",
+                            fileHash = "second-hash"
+                        )
+                    )
+                )
+            )
+
+            assertEquals(RescanCounts(updated = 1), counts)
+            assertEquals(0, added.size)
+            val kept = updated.single()
+            assertEquals(existing.stableId, kept.stableId)
+            assertEquals("/calibre/84-copy.epub", kept.filePath)
+            assertEquals("second-hash", kept.fileHash)
+            assertEquals("{saved-locator}", kept.lastLocatorJson)
+            assertEquals(ReadingStatus.READING, kept.readingStatus)
+        }
+
+    @Test
+    fun `a different publication is still added`() = runBlocking {
+        val added = mutableListOf<LibraryBook>()
+        val engine = engine(
+            loadExisting = { null },
+            persistAdded = { added += it },
+            lookupByStableId = { null },
+            lookupByPublication = { null }
+        )
+
+        val counts = engine.reconcile(
+            listOf(
+                ScannedFile.Imported(
+                    book(stableId = "identifier:urn:isbn:99:hash:new-hash", fileHash = "new-hash")
+                )
+            )
+        )
+
+        assertEquals(RescanCounts(added = 1), counts)
+        assertEquals(1, added.size)
+    }
+
     private fun engine(
         loadExisting: suspend (String) -> LibraryBook?,
         persistAdded: suspend (LibraryBook) -> Unit,
         persistUpdated: suspend (LibraryBook) -> Unit = {},
-        lookupByStableId: (suspend (String) -> LibraryBook?)? = null
+        lookupByStableId: (suspend (String) -> LibraryBook?)? = null,
+        lookupByPublication: (suspend (String) -> LibraryBook?)? = null
     ) = RescanEngine(
         loadExisting = loadExisting,
         persistAdded = persistAdded,
         persistUpdated = persistUpdated,
-        lookupByStableId = lookupByStableId
+        lookupByStableId = lookupByStableId,
+        lookupByPublication = lookupByPublication
     )
 
     private fun book(
