@@ -7,6 +7,24 @@ import android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
 import android.net.Uri
 import android.os.Bundle
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ColorScheme
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextOverflow
+import com.jdluu.leafline.theme.themeScheme
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ErrorOutline
@@ -28,7 +46,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.rememberScrollState
@@ -47,8 +64,6 @@ import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -101,6 +116,8 @@ import com.jdluu.leafline.opds.ui.OpdsScreen
 import com.jdluu.leafline.sync.KoreaderSyncConfig
 import com.jdluu.leafline.sync.KoreaderSyncConfigStore
 import com.jdluu.leafline.sync.SyncWorker
+import com.jdluu.leafline.sync.isKoreaderServerUrlValid
+import com.jdluu.leafline.sync.koreaderSyncSummary
 import com.jdluu.leafline.theme.AppearanceStore
 import com.jdluu.leafline.theme.FormPanel
 import com.jdluu.leafline.theme.IconSize
@@ -109,6 +126,7 @@ import com.jdluu.leafline.theme.LeaflineTheme
 import com.jdluu.leafline.theme.Padding
 import com.jdluu.leafline.theme.Spacing
 import com.jdluu.leafline.theme.ThemeMode
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -472,150 +490,87 @@ fun SettingsTab(
         )
         Column(
             modifier = Modifier
-                .padding(Spacing.md)
+                .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
+                .padding(horizontal = Spacing.md)
         ) {
+            Spacer(Modifier.height(Spacing.xs))
             AppearanceSection(
                 appearance = appearance,
-                onAppearanceChange = onAppearanceChange,
-                modifier = Modifier.fillMaxWidth()
+                onAppearanceChange = onAppearanceChange
             )
-            HorizontalDivider(modifier = Modifier.padding(vertical = Spacing.md))
-            NotesExportSection(
-                notesExporter = notesExporter,
-                modifier = Modifier.fillMaxWidth()
-            )
-            HorizontalDivider(modifier = Modifier.padding(vertical = Spacing.md))
-            KoreaderSyncSection(modifier = Modifier.fillMaxWidth())
-            HorizontalDivider(modifier = Modifier.padding(vertical = Spacing.md))
-            AboutFooter()
-        }
-    }
-}
-
-/**
- * Version and privacy footer. Support and bug reports need the installed build, and the
- * on-device promise is worth restating where the sync fields live.
- */
-@Composable
-private fun AboutFooter() {
-    val context = LocalContext.current
-    val versionName = remember {
-        runCatching {
-            context.packageManager.getPackageInfo(context.packageName, 0).versionName
-        }.getOrNull() ?: "unknown"
-    }
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = "Leafline $versionName",
-            style = MaterialTheme.typography.titleSmall
-        )
-        Text(
-            text = "All reading data stays on this device. No analytics, crash reporting, or telemetry.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = Spacing.xs)
-        )
-    }
-}
-
-@Composable
-private fun NotesExportSection(
-    notesExporter: NotesExporter?,
-    modifier: Modifier = Modifier
-) {
-    if (notesExporter == null) return
-    val scope = rememberCoroutineScope()
-    var batchData by remember { mutableStateOf<List<BookExportData>?>(null) }
-    var isLoading by remember { mutableStateOf(false) }
-    var showExportSheet by remember { mutableStateOf(false) }
-
-    Column(modifier = modifier.fillMaxWidth()) {
-        Text(
-            "Notes & Data Portability",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(bottom = Spacing.xs)
-        )
-        Text(
-            "Export highlights, notes, and reading metadata to Obsidian Markdown, structured JSON, or an Obsidian Vault archive (.zip).",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = Spacing.sm)
-        )
-        Button(
-            onClick = {
-                isLoading = true
-                scope.launch {
-                    try {
-                        batchData = notesExporter.getAllExportData(includeEmptyBooks = false)
-                        showExportSheet = true
-                    } finally {
-                        isLoading = false
-                    }
-                }
-            },
-            enabled = !isLoading,
-            modifier = Modifier.heightIn(min = 48.dp)
-        ) {
-            Icon(
-                Icons.Default.Download,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp) // touch-target-ok: button decorative icon
-            )
-            Spacer(Modifier.width(Spacing.xs))
-            Text(if (isLoading) "Loading notes…" else "Export all notes & highlights")
-        }
-    }
-
-    if (showExportSheet && batchData != null) {
-        NotesExportSheet(
-            notesExporter = notesExporter,
-            batchBooksData = batchData,
-            onDismiss = {
-                showExportSheet = false
-                batchData = null
+            Spacer(Modifier.height(Spacing.lg))
+            SyncSection()
+            Spacer(Modifier.height(Spacing.lg))
+            if (notesExporter != null) {
+                ExportSection(notesExporter = notesExporter)
+                Spacer(Modifier.height(Spacing.lg))
             }
-        )
+            AboutSection()
+            Spacer(Modifier.height(Spacing.xl))
+        }
     }
 }
 
+/** Section heading on the 8dp rhythm: more air above the heading than below it. */
+@Composable
+private fun SettingsSectionHeading(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.padding(bottom = Spacing.xs)
+    )
+}
+
 /**
- * App appearance selector: System follows the OS dark/light setting with the
- * fixed Leafline palette, Light and Dark pick the Leafline schemes directly,
- * OLED uses the pure-black dark scheme, and E-ink uses the high-contrast
- * monochrome scheme. Selections are applied immediately and persisted by
- * [AppearanceStore].
+ * One decision on the settings screen: a label, its current value, and the
+ * control that changes it. The whole row is the target, so the reader aims at
+ * a name instead of a chip buried in a wall of controls.
  */
 @Composable
-private fun AppearanceSection(
-    appearance: ThemeMode,
-    onAppearanceChange: (ThemeMode) -> Unit,
-    modifier: Modifier = Modifier
+private fun SettingsRow(
+    title: String,
+    summary: String?,
+    onClick: (() -> Unit)? = null,
+    trailing: @Composable () -> Unit = {}
 ) {
-    Column(modifier = modifier.fillMaxWidth()) {
-        Text(
-            "Appearance",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(bottom = Spacing.sm)
-        )
-        FlowRow(modifier = Modifier.fillMaxWidth()) {
-            ThemeMode.entries.forEach { mode ->
-                FilterChip(
-                    selected = appearance == mode,
-                    onClick = { onAppearanceChange(mode) },
-                    label = { Text(mode.label) },
-                    modifier = Modifier.padding(end = Spacing.xs, bottom = Spacing.xs)
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable(role = Role.Button, onClick = onClick)
+                } else {
+                    Modifier
+                }
+            )
+            .padding(vertical = Spacing.xs)
+            .semantics(mergeDescendants = true) {}
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            if (summary != null) {
+                Text(
+                    text = summary,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
-        Text(
-            text = appearance.description,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = Spacing.xs)
-        )
+        Spacer(Modifier.width(Spacing.xs))
+        trailing()
     }
 }
+
+/** The four fixed schemes, in the order the app offers them. */
+private val FIXED_THEME_MODES = listOf(
+    ThemeMode.LIGHT,
+    ThemeMode.DARK,
+    ThemeMode.OLED,
+    ThemeMode.E_INK
+)
 
 private val ThemeMode.label: String
     get() = when (this) {
@@ -635,11 +590,337 @@ private val ThemeMode.description: String
         ThemeMode.E_INK -> "Uses the high-contrast monochrome scheme for e-ink displays."
     }
 
+/** The one-line subtitle a fixed tile carries under its name. */
+private val ThemeMode.shortSummary: String
+    get() = when (this) {
+        ThemeMode.SYSTEM -> "Follows your device setting"
+        ThemeMode.LIGHT -> "Leafline light"
+        ThemeMode.DARK -> "Leafline dark"
+        ThemeMode.OLED -> "True black surfaces"
+        ThemeMode.E_INK -> "Monochrome, high contrast"
+    }
+
+/**
+ * App-wide scheme choice. Every option is previewed as a miniature page drawn
+ * in that scheme's own colors, so the choice is made by looking at it rather
+ * than by reading five names and hoping. Following the system is a different
+ * kind of choice from picking one of the four fixed schemes, so it reads as
+ * its own full-width row above the 2x2 grid.
+ */
+@Composable
+private fun AppearanceSection(
+    appearance: ThemeMode,
+    onAppearanceChange: (ThemeMode) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        SettingsSectionHeading("Appearance")
+        // One radio group across the full-width row and the 2x2 grid, so TalkBack
+        // announces a position in the set instead of five unrelated buttons.
+        Column(modifier = Modifier.selectableGroup()) {
+            ThemePreviewTile(
+                mode = ThemeMode.SYSTEM,
+                selected = appearance == ThemeMode.SYSTEM,
+                onClick = { onAppearanceChange(ThemeMode.SYSTEM) },
+                horizontal = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Column(
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                modifier = Modifier.padding(top = Spacing.xs)
+            ) {
+                FIXED_THEME_MODES.chunked(2).forEach { pair ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                        pair.forEach { mode ->
+                            ThemePreviewTile(
+                                mode = mode,
+                                selected = appearance == mode,
+                                onClick = { onAppearanceChange(mode) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        Text(
+            text = "Active: ${appearance.label}. ${appearance.description}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = Spacing.sm)
+        )
+    }
+}
+
+@Composable
+private fun ThemePreviewTile(
+    mode: ThemeMode,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    horizontal: Boolean = false
+) {
+    // System previews the scheme applied right now; the others preview their
+    // own fixed scheme.
+    val preview = if (mode == ThemeMode.SYSTEM) {
+        MaterialTheme.colorScheme
+    } else {
+        themeScheme(mode, darkSystem = false)
+    }
+    val tileModifier = modifier
+        .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+        .semantics(mergeDescendants = true) {}
+        .padding(vertical = Spacing.xs)
+    if (horizontal) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = tileModifier
+        ) {
+            ThemePreviewCanvas(
+                preview = preview,
+                selected = selected,
+                modifier = Modifier.width(72.dp)
+            )
+            Spacer(Modifier.width(Spacing.sm))
+            Column(modifier = Modifier.weight(1f)) {
+                ThemeTileName(mode = mode, selected = selected)
+                Text(
+                    text = mode.shortSummary,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    } else {
+        Column(modifier = tileModifier) {
+            ThemePreviewCanvas(
+                preview = preview,
+                selected = selected,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(Spacing.xs))
+            ThemeTileName(mode = mode, selected = selected)
+        }
+    }
+}
+
+/** Name plus the selection mark, so selection never rests on color alone. */
+@Composable
+private fun ThemeTileName(mode: ThemeMode, selected: Boolean) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = mode.label,
+            style = MaterialTheme.typography.bodyLarge,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false)
+        )
+        if (selected) {
+            Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .padding(start = Spacing.xs)
+                    .size(16.dp) // touch-target-ok: selection glyph inside the selectable tile
+            )
+        }
+    }
+}
+
+/**
+ * A miniature page: three text lines and one accent mark drawn in the scheme's
+ * own tokens. Geometry only, no type, so a large system font scale cannot
+ * distort or clip the preview.
+ */
+@Composable
+private fun ThemePreviewCanvas(
+    preview: ColorScheme,
+    selected: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .height(64.dp)
+            .clip(MaterialTheme.shapes.medium)
+            .background(preview.surface)
+            .border(
+                border = BorderStroke(
+                    width = if (selected) 2.dp else 1.dp,
+                    color = if (selected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.outline
+                    }
+                ),
+                shape = MaterialTheme.shapes.medium
+            )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(Padding.compact),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth(0.72f)
+                    .height(4.dp)
+                    .clip(CircleShape)
+                    .background(preview.onSurface.copy(alpha = 0.85f))
+            )
+            Box(
+                Modifier
+                    .fillMaxWidth(0.9f)
+                    .height(4.dp)
+                    .clip(CircleShape)
+                    .background(preview.onSurface.copy(alpha = 0.45f))
+            )
+            Box(
+                Modifier
+                    .fillMaxWidth(0.62f)
+                    .height(4.dp)
+                    .clip(CircleShape)
+                    .background(preview.onSurface.copy(alpha = 0.45f))
+            )
+            Spacer(Modifier.weight(1f))
+            Box(
+                Modifier
+                    .width(24.dp)
+                    .height(6.dp)
+                    .clip(CircleShape)
+                    .background(preview.primary)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SyncSection() {
+    val context = LocalContext.current
+    // Touch the container once so saved settings land in the store before the
+    // row summary reads it; otherwise a fresh process reports "Not set up".
+    remember { context.appContainer.koreaderSyncConfigStore }
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    var configVersion by remember { mutableIntStateOf(0) }
+    val stored = remember(configVersion) { KoreaderSyncConfigStore.config }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        SettingsSectionHeading("Progress sync")
+        SettingsRow(
+            title = "KOReader-compatible server",
+            summary = koreaderSyncSummary(stored),
+            onClick = { expanded = !expanded },
+            trailing = {
+                Icon(
+                    imageVector = if (expanded) {
+                        Icons.Default.ExpandLess
+                    } else {
+                        Icons.Default.ExpandMore
+                    },
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        )
+        AnimatedVisibility(visible = expanded) {
+            KoreaderSyncForm(onConfigChanged = { configVersion++ })
+        }
+    }
+}
+
+@Composable
+private fun ExportSection(notesExporter: NotesExporter) {
+    val scope = rememberCoroutineScope()
+    var batchData by remember { mutableStateOf<List<BookExportData>?>(null) }
+    var isLoading by remember { mutableStateOf(false) }
+    var showExportSheet by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        SettingsSectionHeading("Your data")
+        SettingsRow(
+            title = "Export notes & highlights",
+            summary = when {
+                isLoading -> "Preparing\u2026"
+                errorMessage != null ->
+                    "Could not read your notes: $errorMessage. Tap to try again."
+                else -> "Markdown, JSON, Obsidian vault, Readwise CSV"
+            },
+            onClick = {
+                if (!isLoading) {
+                    isLoading = true
+                    errorMessage = null
+                    scope.launch {
+                        try {
+                            batchData = notesExporter.getAllExportData(includeEmptyBooks = false)
+                            showExportSheet = true
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (e: Exception) {
+                            errorMessage = e.message ?: "unknown error"
+                        } finally {
+                            isLoading = false
+                        }
+                    }
+                }
+            },
+            trailing = {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp), // touch-target-ok: status indicator inside the row's 56dp target
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Download,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        )
+    }
+
+    if (showExportSheet && batchData != null) {
+        NotesExportSheet(
+            notesExporter = notesExporter,
+            batchBooksData = batchData,
+            onDismiss = {
+                showExportSheet = false
+                batchData = null
+            }
+        )
+    }
+}
+
+@Composable
+private fun AboutSection() {
+    val context = LocalContext.current
+    val versionName = remember {
+        runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName
+        }.getOrNull() ?: "unknown"
+    }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        SettingsSectionHeading("About")
+        Text("Leafline $versionName", style = MaterialTheme.typography.bodyLarge)
+        Text(
+            text = "All reading data stays on this device. No analytics, crash reporting, or telemetry.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = Spacing.xs)
+        )
+    }
+}
+
 /** Outcome of a save or connection test, shown beside an icon so it never relies on colour. */
 private data class SyncStatus(val message: String, val success: Boolean)
 
+/**
+ * The KOReader sync form, collapsed behind its summary row until opened. The
+ * first paragraph of the old standalone section now lives in the row summary.
+ */
 @Composable
-internal fun KoreaderSyncSection(modifier: Modifier = Modifier) {
+private fun KoreaderSyncForm(onConfigChanged: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     // Touch the container once so saved settings land in the store before the fields
@@ -665,7 +946,13 @@ internal fun KoreaderSyncSection(modifier: Modifier = Modifier) {
         KoreaderSyncConfigStore.config = config
         context.appContainer.koreaderSyncConfigStore.save(config)
         if (config.enabled) SyncWorker.schedule(context) else SyncWorker.cancel(context)
+        onConfigChanged()
     }
+
+    // Save writes what the reader typed, so the button stays off until the
+    // address is one this app can actually reach.
+    val urlValid = isKoreaderServerUrlValid(serverUrl)
+    val showUrlError = serverUrl.isNotBlank() && !urlValid
 
     fun testConnection() {
         testing = true
@@ -686,21 +973,24 @@ internal fun KoreaderSyncSection(modifier: Modifier = Modifier) {
         }
     }
 
-    Column(modifier = modifier.fillMaxWidth()) {
-        Text("KOReader Sync", style = MaterialTheme.typography.titleMedium)
-        Text(
-            "Keep your place across devices with a KOReader-compatible server.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = Spacing.xs, bottom = Spacing.sm)
-        )
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = Spacing.xs)
+    ) {
         FormPanel {
             LeaflineTextField(
                 value = serverUrl,
                 onValueChange = { serverUrl = it; status = null },
                 label = "Server URL",
                 placeholder = "http://server:6061/api/koreader",
-                keyboardType = KeyboardType.Uri
+                keyboardType = KeyboardType.Uri,
+                isError = showUrlError,
+                supportingText = if (showUrlError) {
+                    "Enter the full address, starting with http:// or https://"
+                } else {
+                    null
+                }
             )
             LeaflineTextField(
                 value = syncUsername,
@@ -741,6 +1031,9 @@ internal fun KoreaderSyncSection(modifier: Modifier = Modifier) {
                     .heightIn(min = 48.dp)
                     .toggleable(
                         value = enabled,
+                        // An invalid field must not strand a syncing config: turning
+                        // sync off stays available even while the address is broken.
+                        enabled = urlValid || enabled,
                         role = Role.Switch,
                         onValueChange = { checked ->
                             enabled = checked
@@ -752,7 +1045,11 @@ internal fun KoreaderSyncSection(modifier: Modifier = Modifier) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Sync in the background", style = MaterialTheme.typography.bodyMedium)
                     Text(
-                        "Checks for newer positions automatically.",
+                        if (urlValid || enabled) {
+                            "Checks for newer positions automatically."
+                        } else {
+                            "Set a server URL first."
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -800,13 +1097,14 @@ internal fun KoreaderSyncSection(modifier: Modifier = Modifier) {
                     onClick = { testConnection() },
                     enabled = !testing,
                     modifier = Modifier.heightIn(min = 48.dp)
-                ) { Text(if (testing) "Testing…" else "Test connection") }
+                ) { Text(if (testing) "Testing\u2026" else "Test connection") }
                 Spacer(Modifier.weight(1f))
                 Button(
                     onClick = {
                         applySyncConfig(currentConfig())
                         status = SyncStatus("Saved", success = true)
                     },
+                    enabled = urlValid,
                     modifier = Modifier.heightIn(min = 48.dp)
                 ) { Text("Save") }
             }

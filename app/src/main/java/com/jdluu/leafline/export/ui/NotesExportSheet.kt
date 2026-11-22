@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Eco
 import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -53,6 +54,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.jdluu.leafline.export.BatchExportResult
 import com.jdluu.leafline.export.BookExportData
@@ -80,6 +83,9 @@ fun NotesExportSheet(
     val snackbarHostState = remember { SnackbarHostState() }
 
     val isBatch = batchBooksData != null
+    // A batch export with no annotated books has nothing to offer: the format
+    // chips, the preview and the action row would all describe an empty file.
+    val hasNothingToExport = isBatch && batchBooksData.isNullOrEmpty()
     val availableFormats = remember(isBatch) {
         if (isBatch) {
             listOf(
@@ -193,11 +199,13 @@ fun NotesExportSheet(
                             val count = singleBookData?.annotations?.size ?: 0
                             "$title • $count highlights"
                         }
-                        Text(
-                            text = subtitle,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        if (!hasNothingToExport) {
+                            Text(
+                                text = subtitle,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                     IconButton(
                         onClick = onDismiss,
@@ -208,6 +216,13 @@ fun NotesExportSheet(
                 }
 
                 Spacer(Modifier.height(Spacing.sm))
+
+                if (hasNothingToExport) {
+                    // The designed state, not a blank result: the sheet says why it
+                    // is empty instead of offering formats over zero notes.
+                    EmptyExportState()
+                    return@Column
+                }
 
                 // Format Selector Chips
                 Text(
@@ -259,7 +274,7 @@ fun NotesExportSheet(
                             val count = batchBooksData?.size ?: 0
                             val hlCount = batchBooksData?.sumOf { it.annotations.size } ?: 0
                             """
-                            📦 Obsidian Vault Archive (.zip)
+                            Obsidian Vault Archive (.zip)
                             --------------------------------
                             Includes $count individual book markdown notes with rich YAML frontmatter, quote blocks, and ratings.
                             Includes Index.md with Obsidian [[WikiLinks]] connecting all books.
@@ -295,7 +310,12 @@ fun NotesExportSheet(
                 }
                 }
 
-                Spacer(Modifier.height(Spacing.sm))
+                if (hasNothingToExport) {
+                    Spacer(Modifier.height(Spacing.md))
+                    return@Column
+                }
+
+                Spacer(Modifier.height(Spacing.md))
 
                 // Action Buttons
                 Row(
@@ -372,5 +392,51 @@ fun NotesExportSheet(
                 Spacer(Modifier.height(Spacing.md))
             }
         }
+    }
+}
+
+/**
+ * Shown when the batch export has nothing to include. Mirrors the library's
+ * empty state: the leaf mark on the primary container tone, a short heading, and
+ * one line saying what would put something here. No action button, because the
+ * only action is to close the sheet and go read.
+ */
+@Composable
+private fun EmptyExportState() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = Spacing.lg),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .clip(MaterialTheme.shapes.medium)
+                .background(MaterialTheme.colorScheme.primaryContainer)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Eco,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(32.dp) // touch-target-ok: decorative leaf glyph
+            )
+        }
+        Spacer(Modifier.height(Spacing.sm))
+        Text(
+            text = "Nothing to export yet",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(Spacing.xs))
+        Text(
+            text = "Highlights and notes you add while reading show up here.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
     }
 }

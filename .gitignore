@@ -47,3 +47,6 @@ scripts/opencode-bws.local
 
 # Agent-local planning files
 .hermes/
+
+# Design tooling working material (surface briefs, captures, mockups)
+.impeccable/
