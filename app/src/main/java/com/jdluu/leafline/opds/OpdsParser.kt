@@ -62,7 +62,9 @@ object OpdsParser {
     }
 
     private fun convertFeedToResult(feed: Feed, baseUrl: Url, feedUrlString: String, data: ByteArray): OpdsFeedResult {
-        val books = feed.publications.map { convertPublicationToBook(it, baseUrl) }
+        // Readium drops OPDS image links, so recover covers from the raw feed.
+        val covers = OpdsCoverLinks.extract(data, baseUrl)
+        val books = feed.publications.map { convertPublicationToBook(it, baseUrl, covers) }
 
         val navigationCandidateLinks = feed.navigation + feed.links.filter { link ->
             link.rels.contains("subsection") ||
@@ -87,7 +89,7 @@ object OpdsParser {
         val groups = feed.groups.map { group ->
             OpdsGroup(
                 title = group.title,
-                books = group.publications.map { convertPublicationToBook(it, baseUrl) },
+                books = group.publications.map { convertPublicationToBook(it, baseUrl, covers) },
                 navigationLinks = group.links.map { link ->
                     val resolvedUrl = link.href.resolve(baseUrl)?.toString() ?: link.href.toString()
                     OpdsNavigationLink(
@@ -133,7 +135,11 @@ object OpdsParser {
         )
     }
 
-    private fun convertPublicationToBook(pub: Publication, baseUrl: Url): OpdsBook {
+    private fun convertPublicationToBook(
+        pub: Publication,
+        baseUrl: Url,
+        covers: Map<String, String> = emptyMap()
+    ): OpdsBook {
         val title = pub.metadata.title.orEmpty().ifBlank { "Untitled" }
         val id = pub.metadata.identifier?.ifBlank { null }
             ?: title.hashCode().toString()
@@ -159,7 +165,7 @@ object OpdsParser {
                     it.rels.contains("cover")
             } ?: pub.links.firstOrNull { it.mediaType?.isBitmap == true }
 
-        val coverUrl = coverLink?.href?.let { href ->
+        var coverUrl = coverLink?.href?.let { href ->
             href.resolve(baseUrl)?.toString() ?: href.toString()
         }
 
@@ -173,6 +179,10 @@ object OpdsParser {
 
         val downloadUrl = acquisitionLink?.href?.let { href ->
             href.resolve(baseUrl)?.toString() ?: href.toString()
+        }
+
+        if (coverUrl == null && downloadUrl != null) {
+            coverUrl = covers[downloadUrl]
         }
 
         val categories = pub.metadata.subjects.mapNotNull { it.name.ifBlank { null } }
