@@ -57,8 +57,7 @@ four `LEAFLINE_*` properties only for a signed release. CI requires none of them
 Always do:
 
 - Before reporting a task done, run `./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`, then `bash scripts/check_dynamic_type.sh`, `bash scripts/check_touch_targets.sh`, `bash scripts/check_changelog_refs.sh`, and `git diff --check`. Paste the real output.
-- Add a JVM unit test for new domain logic.
-- Keep domain models and mappers free of Android, Room, and Readium types.
+- Add a JVM unit test for new domain logic; keep domain models and mappers free of Android, Room, and Readium types.
 - Set text through `MaterialTheme.typography`. Never set a text size in dp or px.
 - Keep every interactive control at least 48dp, including icon buttons.
 - Keep all user data on device. No analytics, crash reporting, or telemetry.
@@ -66,14 +65,13 @@ Always do:
 Ask first:
 
 - Adding or upgrading a dependency. AGP, Gradle, Kotlin, KSP, Compose, and Readium are a coupled compatibility set.
-- Any Room schema change. It needs an explicit migration, exactly one version bump, registered in `addMigrations`.
-- Renaming a persisted preference key, enum name, or database column. These are stable storage keys.
+- Any Room schema change: an explicit `Migration(n, n + 1)`, one version bump, registered in `addMigrations`. Renaming a persisted key, enum name, or column is the same class of change: stable storage.
 - Changing the application id, `versionCode`, release signing config, or `targetSdk`.
-- Pushing, publishing a release, or changing repository settings.
+- Publishing a release or changing repository settings. Pushing a branch and opening its PR is the normal workflow, not a request.
 
 Never do:
 
-- Commit to `main`. Open a pull request. Branch protection requires the `Build and unit test`, `Android lint`, and `Quality guards` checks and blocks force-push.
+- Commit to `main`. Branch protection requires the three CI checks and blocks force-push; the citation-settling workflow is the one exception and touches only `CHANGELOG.md`.
 - Commit credentials, tokens, signing keys, `local.properties`, `.env*`, APKs, or build output.
 - Write a new EPUB parser or renderer. Use the Readium Kotlin Toolkit.
 - Edit anything under `app/build/`, `build/`, or `.gradle/`.
@@ -82,20 +80,25 @@ Never do:
 - Add a `docs/` tree or planning documents. Those four files are the documentation; `.impeccable/` working material stays local.
 - Name agent identities, model names, model providers, or session details in commits, PRs, code comments, or documentation.
 
-Done when: those commands exit 0 and the tree is clean. A build, test, or
-device run is not verified until the command has actually run; never report one
-you did not execute.
+Done when those commands exit 0 and the tree is clean. Never report a build, test
+or device run you did not actually execute.
 
 ## Design and documentation
 
 `PRODUCT.md` owns product truth, `DESIGN.md` the visual contract, `README.md`
-what ships today, and this file how to work. Update whichever changed in the
-same PR; none is a log. Read both before changing a surface, and check the result
-on a device at font scale 1.3 in light and dark.
+what ships today, and this file how to work; update whichever changed in the same
+PR, none is a log. Read both before changing a surface and check the result on a
+device at font scale 1.3 in light and dark.
 
-Every released `CHANGELOG.md` entry ends with the short SHA of the commit that
-made it, bare as `(abc1234)` on its last line, never inside the sentence, so
-GitHub links it to the commit; `check_changelog_refs.sh` enforces it in CI.
+### Changelog citations
+
+On the branch, cite the pull request: `(#220)`. That is the only stable identifier
+while work is unmerged, because a squash or rebase rewrites commits and their SHAs.
+On merge, the `Settle changelog citations` workflow rewrites it on main to
+`(7a77307, #220)`, commit then review; `scripts/changelog_settle.sh` does the same
+by hand, on main only. Both forms link: GitHub autolinks a bare SHA and `#220`, but
+leaves `#abc1234` plain. `[Unreleased]` entries must cite their PR.
+`check_changelog_refs.sh` enforces all of it.
 
 ## Project structure
 
@@ -103,16 +106,15 @@ GitHub links it to the commit; `check_changelog_refs.sh` enforces it in CI.
 app/src/main/java/com/jdluu/leafline/
   ReaderActivity.kt      reader host: Readium navigator, overlays, bookmarks, highlights, search, TTS
   MainActivity.kt        library, explore (OPDS), and settings shell
-  reader/                reader orchestration: settings, tap zones, bookmarks, annotations, search, tts, sync
+  reader/                orchestration: settings, tap zones, bookmarks, annotations, search, tts, sync
   library/               library screen, view models, sorting, folders, covers, backup/restore
     data/                repository interfaces and models, free of Room and Android types
   sync/                  KOReader sync logic (pure Kotlin) plus SyncWorker.kt (WorkManager)
   opds/                  OPDS catalog client, feeds, download manager, and UI
   export/                notes and highlights export (Markdown, Obsidian vault zip)
   di/AppContainer.kt     application-scoped wiring, the single construction site
-app/src/test/            JVM unit tests
-app/src/androidTest/     instrumented tests; assets/benchmark-books holds EPUB fixtures
-scripts/                 guard scripts and the instrumented runner
+app/src/androidTest/     instrumented tests, EPUB fixtures under assets/benchmark-books
+scripts/                 guard scripts run by CI
 DESIGN.md                visual design contract: tokens, type, shape, motion, components
 PRODUCT.md               product record: audiences and their precedence, purpose, constraints, principles
 ```
@@ -133,15 +135,15 @@ PRODUCT.md               product record: audiences and their precedence, purpose
 - JVM: JUnit4 with Robolectric, Turbine, and kotlinx-coroutines-test. This is the default test layer.
 - HTTP: MockWebServer against the real client. Never call a real server.
 - Prefer hand-rolled fakes implementing the seam interfaces over mocking frameworks.
-- Instrumented: Compose UI test plus uiautomator, driven through `ReaderTestHelper`.
-- Assert accessibility semantics and text, not canvas or WebView pixels; the Readium navigator renders inside a WebView that hides Compose overlay nodes from uiautomator dumps.
-- Run one instrumented class at a time when several devices are attached, and pin `adb -s <serial>` when several are connected.
-- Keep tests deterministic: inject clocks and identifiers instead of reading wall time.
-- No coverage threshold is enforced. Every new domain behaviour needs a test.
+- Instrumented: Compose UI test plus uiautomator via `ReaderTestHelper`; assert semantics and text, never pixels, because the Readium navigator is a WebView that hides Compose nodes from uiautomator dumps.
+- Run one instrumented class at a time with several devices attached, pinning `adb -s <serial>`.
+- Keep tests deterministic: inject clocks and identifiers, never wall time.
+- No coverage threshold; every new domain behaviour needs a test.
 
 ## Git workflow
 
-- Branch from `main`: `feat/...`, `fix/...`, `docs/...`, `refactor/...`, `chore/...`, `test/...`.
-- Conventional commits, imperative, no emoji and no emdash: `feat: add readium tts (#153)`.
-- Work is tracked on the `Leafline Development` board (user project 7); move issues to Done on merge.
-- Open a PR for work. Once all CI/CD checks pass, squash-merge into `main` and delete the branch.
+- Branch from `main` (`feat/`, `fix/`, `docs/`, `refactor/`, `chore/`, `test/`), commit atomically on it.
+- Conventional commits, imperative, no emoji, no emdash: `feat: add readium tts (#153)`.
+- Work is tracked on the `Leafline Development` board (project 7); move issues to Done on merge.
+- Open a PR for the branch, let every CI check pass, then squash-merge and delete it.
+- The PR body restates each changelog entry with its citation, so the same reference links in the file and on the PR.

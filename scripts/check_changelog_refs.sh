@@ -1,13 +1,21 @@
 #!/usr/bin/env bash
 # Fails when a CHANGELOG entry is missing or carries a dangling commit reference.
 #
-# Every bullet under a released version must end with a short commit SHA in the
-# form " (abc1234)", and that commit must still exist on the branch being
-# checked. GitHub turns a bare SHA into a link to the commit, so the entry is
-# clickable wherever the changelog renders: the release notes, the file view, and
-# the diff. A leading "#" is deliberately rejected: "#abc1234" is how an issue or
-# PR is written, and GitHub leaves a hash-prefixed SHA as plain text instead of
-# linking it.
+# Two forms are accepted at the end of an entry, and both render as links:
+#
+#   (7a77307)          work that landed before pull requests were cited
+#   (7a77307, #220)    the commit that carried it and the pull request it came from
+#
+# A bare SHA must be first, because GitHub autolinks it to the commit; the PR
+# reference after it covers the review and the diff of the branch as a whole.
+# "#abc1234" is rejected: a hash is issue syntax, and GitHub leaves a
+# hash-prefixed SHA as plain text instead of linking it.
+#
+# "(#220)" alone is also accepted, because that is the only reference available
+# when the entry is written: the commit does not exist yet. Pull requests must
+# pass this gate, so a release PR that promotes [Unreleased] cannot be blocked on
+# a SHA that the merge will create. scripts/changelog_settle.sh upgrades it to
+# "(sha, #220)" on main after the merge, and this file accepts every stage.
 #
 # The reference goes at the END of the entry, on its last line, never inside the
 # sentence: wrapped bullets are common, and a ref mid-prose stops the text
@@ -34,6 +42,10 @@ fail=0
 checked=0
 attributed=0
 legacy=0
+unsettled=0
+pending=0
+pending_checked=0
+unreleased_phase=0
 declare -A seen
 
 section=""
@@ -42,7 +54,17 @@ bullet_head=""
 bullet_last=""
 
 check_bullet() {
-    if [[ $bullet_last =~ \(([0-9a-f]{7,40})\)[[:space:]]*$ ]]; then
+    if [ "${unreleased_phase:-0}" -eq 1 ]; then
+        unreleased_phase=0
+        if [[ $bullet_last =~ \(#[0-9]+\)[[:space:]]*$ ]]; then
+            pending=$((pending + 1))
+        else
+            echo "FAIL: unreleased entry names no pull request: ${bullet_head:0:66}"
+            fail=1
+        fi
+        return
+    fi
+    if [[ $bullet_last =~ \(([0-9a-f]{7,40})(,[[:space:]]*#[0-9]+)?\)[[:space:]]*$ ]]; then
         local sha="${BASH_REMATCH[1]}"
         attributed=$((attributed + 1))
         if ! git cat-file -e "${sha}^{commit}" 2>/dev/null; then
@@ -54,6 +76,11 @@ check_bullet() {
         else
             seen[$sha]=1
         fi
+    elif [[ $bullet_last =~ \(#[0-9]+\)[[:space:]]*$ ]]; then
+        # Valid but unsettled: the pull request exists, the merge commit does not.
+        # settle upgrades it on main; until then it still links to the review.
+        attributed=$((attributed + 1))
+        unsettled=$((unsettled + 1))
     else
         echo "FAIL: unattributed entry in $section: ${bullet_head:0:72}"
         fail=1
@@ -81,6 +108,15 @@ while IFS= read -r line || [[ -n $line ]]; do
                     bullet_head=$line
                     bullet_last=$line
                 fi
+            elif [ "$section" = "Unreleased" ]; then
+                # Unreleased work still needs its pull request: that is the only
+                # reference that exists before the merge, and it is what makes the
+                # entry traceable in the PR that adds it.
+                pending_checked=$((pending_checked + 1))
+                in_bullet=1
+                bullet_head=$line
+                bullet_last=$line
+                unreleased_phase=1
             fi
             ;;
         *)
@@ -97,6 +133,12 @@ done < "$CHANGELOG"
 [[ $in_bullet -eq 1 ]] && check_bullet
 
 if [ "$fail" -eq 0 ]; then
-    echo "OK: $attributed of $checked entries cite a commit (${#seen[@]} distinct), $legacy legacy entries exempt"
+    echo "OK: $attributed of $checked entries are attributed (${#seen[@]} distinct commits), $legacy legacy entries exempt"
+    if [ "$unsettled" -gt 0 ]; then
+        echo "NOTE: $unsettled cite a pull request only; scripts/changelog_settle.sh adds the merge commit on main"
+    fi
+    if [ "$pending" -gt 0 ]; then
+        echo "OK: $pending unreleased entr(y/ies) name their pull request"
+    fi
 fi
 exit "$fail"
