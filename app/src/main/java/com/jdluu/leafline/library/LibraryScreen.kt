@@ -14,6 +14,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -2310,14 +2311,19 @@ private fun BookDetailSheet(
             initialSeriesIndex = optimisticSeriesIndex,
             initialPublisher = optimisticPublisher,
             initialDescription = optimisticDescription,
+            initialReadingStatus = optimisticStatus,
             onDismiss = { showEditMetadataDialog = false },
-            onSave = { newTitle, newAuthors, newSeries, newSeriesIndex, newPublisher, newDescription ->
+            onSave = { newTitle, newAuthors, newSeries, newSeriesIndex, newPublisher, newDescription, newReadingStatus ->
                 optimisticTitle = newTitle
                 optimisticAuthors = newAuthors
                 optimisticSeries = newSeries
                 optimisticSeriesIndex = newSeriesIndex
                 optimisticPublisher = newPublisher
                 optimisticDescription = newDescription
+                if (newReadingStatus != optimisticStatus) {
+                    optimisticStatus = newReadingStatus
+                    onSetReadingStatus(newReadingStatus)
+                }
                 onUpdateMetadata(newTitle, newAuthors, newSeries, newSeriesIndex, newPublisher, newDescription)
             }
         )
@@ -2332,8 +2338,9 @@ private fun EditBookMetadataDialog(
     initialSeriesIndex: Float?,
     initialPublisher: String?,
     initialDescription: String?,
+    initialReadingStatus: ReadingStatus,
     onDismiss: () -> Unit,
-    onSave: (title: String, authors: List<String>, series: String?, seriesIndex: Float?, publisher: String?, description: String?) -> Unit
+    onSave: (title: String, authors: List<String>, series: String?, seriesIndex: Float?, publisher: String?, description: String?, readingStatus: ReadingStatus) -> Unit
 ) {
     var title by remember { mutableStateOf(initialTitle) }
     var authors by remember { mutableStateOf(initialAuthors.joinToString(", ")) }
@@ -2345,6 +2352,7 @@ private fun EditBookMetadataDialog(
     }
     var publisher by remember { mutableStateOf(initialPublisher.orEmpty()) }
     var description by remember { mutableStateOf(initialDescription.orEmpty()) }
+    var readingStatus by remember { mutableStateOf(initialReadingStatus) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -2356,6 +2364,31 @@ private fun EditBookMetadataDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(Spacing.sm)
             ) {
+                // Status belongs here: it was only settable in bulk, so a book
+                // marked Finished while a few percent in could not be corrected
+                // from the one screen that shows its details. The chips scroll
+                // because three of them plus the label overflow a narrow dialog
+                // and the last status would otherwise be unreachable.
+                Text(
+                    "Status",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    ReadingStatus.entries.forEach { status ->
+                        FilterChip(
+                            selected = readingStatus == status,
+                            onClick = { readingStatus = status },
+                            label = { Text(status.displayName) }
+                        )
+                    }
+                }
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
@@ -2419,7 +2452,8 @@ private fun EditBookMetadataDialog(
                             series.trim().takeIf { it.isNotEmpty() },
                             parsedSeriesIndex,
                             publisher.trim().takeIf { it.isNotEmpty() },
-                            description.trim().takeIf { it.isNotEmpty() }
+                            description.trim().takeIf { it.isNotEmpty() },
+                            readingStatus
                         )
                         onDismiss()
                     }
