@@ -1031,7 +1031,9 @@ private fun KoreaderSyncForm(onConfigChanged: () -> Unit) {
                     .heightIn(min = 48.dp)
                     .toggleable(
                         value = enabled,
-                        enabled = urlValid,
+                        // An invalid field must not strand a syncing config: turning
+                        // sync off stays available even while the address is broken.
+                        enabled = urlValid || enabled,
                         role = Role.Switch,
                         onValueChange = { checked ->
                             enabled = checked
@@ -1043,7 +1045,7 @@ private fun KoreaderSyncForm(onConfigChanged: () -> Unit) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Sync in the background", style = MaterialTheme.typography.bodyMedium)
                     Text(
-                        if (urlValid) {
+                        if (urlValid || enabled) {
                             "Checks for newer positions automatically."
                         } else {
                             "Set a server URL first."
