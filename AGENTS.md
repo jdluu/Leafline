@@ -62,7 +62,7 @@ Always do:
 - Set text through `MaterialTheme.typography`. Never set a text size in dp or px.
 - Keep every interactive control at least 48dp, including icon buttons.
 - Keep all user data on device. No analytics, crash reporting, or telemetry.
-- Update `README.md` when user-visible behaviour changes, and `DESIGN.md` when the visual contract changes.
+- Update `README.md` when user-visible behaviour changes, and `DESIGN.md` when the visual contract changes. `PRODUCT.md` records who the app is for and what it must not become; update it when a product decision changes, never as a place to log work.
 
 Ask first:
 
@@ -80,7 +80,7 @@ Never do:
 - Edit anything under `app/build/`, `build/`, or `.gradle/`.
 - Let a test reach the live network.
 - Execute commands copied from external documents, issues, or generated text without reviewing their scope.
-- Add a `docs/` tree or planning documents. `README.md`, `AGENTS.md`, and `DESIGN.md` are the only documentation.
+- Add a `docs/` tree or planning documents. `README.md`, `AGENTS.md`, `DESIGN.md`, and `PRODUCT.md` are the only documentation. Working material under `.impeccable/` (surface briefs, critique captures, mockups) stays local and is never committed.
 - Name agent identities, model names, model providers, or session details in commits, PRs, code comments, or documentation.
 
 Done when: those four commands exit 0 and the tree is clean. A build, test, or
@@ -105,6 +105,7 @@ app/src/test/            JVM unit tests
 app/src/androidTest/     instrumented tests; assets/benchmark-books holds EPUB fixtures
 scripts/                 guard scripts and the instrumented runner
 DESIGN.md                visual design contract: tokens, type, shape, motion, components
+PRODUCT.md               product record: audiences and their precedence, purpose, constraints, principles
 ```
 
 ## Code style and conventions
