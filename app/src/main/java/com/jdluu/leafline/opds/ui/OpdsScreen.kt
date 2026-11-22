@@ -210,7 +210,14 @@ fun OpdsScreen(
                                     color = MaterialTheme.colorScheme.error
                                 )
                                 Text(
-                                    text = detail,
+                                    // A 401 always means the catalog wants an
+                                    // account, so say that instead of echoing a
+                                    // bare status the reader cannot act on.
+                                    text = if (statusCode == "HTTP 401") {
+                                        "This catalog needs an account. Add your credentials in the catalog's settings, then try again."
+                                    } else {
+                                        detail
+                                    },
                                     style = MaterialTheme.typography.bodyMedium,
                                     textAlign = TextAlign.Center,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant

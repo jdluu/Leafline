@@ -134,7 +134,7 @@ class OpdsViewModelTest {
     @Test
     fun init_loadsRootFeedAndInitializesBreadcrumbs() = runTest(testDispatcher) {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        val feedStore = OpdsFeedStore.fromContext(context)
+        val feedStore = OpdsFeedStore.fromContext(context, TestSecretCipher())
         val opdsClient = FakeOpdsClient()
         val repo = FakeLibraryRepository()
         val downloadManager = OpdsDownloadManager(
@@ -167,7 +167,7 @@ class OpdsViewModelTest {
     @Test
     fun navigateSubfeedAndBack_managesBreadcrumbsCorrectly() = runTest(testDispatcher) {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        val feedStore = OpdsFeedStore.fromContext(context)
+        val feedStore = OpdsFeedStore.fromContext(context, TestSecretCipher())
         val opdsClient = FakeOpdsClient()
         val repo = FakeLibraryRepository()
         val downloadManager = OpdsDownloadManager(
@@ -206,7 +206,7 @@ class OpdsViewModelTest {
     @Test
     fun search_usesDiscoveredSearchTemplate() = runTest(testDispatcher) {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        val feedStore = OpdsFeedStore.fromContext(context)
+        val feedStore = OpdsFeedStore.fromContext(context, TestSecretCipher())
         val opdsClient = FakeOpdsClient()
         val repo = FakeLibraryRepository()
         val downloadManager = OpdsDownloadManager(
@@ -236,7 +236,7 @@ class OpdsViewModelTest {
     @Test
     fun isBookInLibrary_detectsExistingBookTitle() = runTest(testDispatcher) {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        val feedStore = OpdsFeedStore.fromContext(context)
+        val feedStore = OpdsFeedStore.fromContext(context, TestSecretCipher())
         val opdsClient = FakeOpdsClient()
         val repo = FakeLibraryRepository()
         repo.setBooks(
@@ -283,7 +283,7 @@ class OpdsViewModelTest {
     @Test
     fun authenticatedFeed_propagatesAuthHeaderToFetchAndSearch() = runTest {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        val feedStore = OpdsFeedStore.fromContext(context)
+        val feedStore = OpdsFeedStore.fromContext(context, TestSecretCipher())
         val opdsClient = FakeOpdsClient()
         val repo = FakeLibraryRepository()
         val downloadManager = OpdsDownloadManager(
