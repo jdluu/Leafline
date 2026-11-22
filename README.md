@@ -40,6 +40,14 @@ ZIP, Readwise CSV, or Anki TSV. Back up and restore the whole library as JSON.
 **Reading aloud.** On-device text-to-speech with adjustable speed, sentence skip,
 and a sleep timer (5–60 minutes or end of chapter) that fades the audio out.
 
+**Finding books.** Browse OPDS catalogs (your own Calibre-web or Kavita, or the
+built-in public-domain ones) and download straight into the library.
+
+**Optional Hardcover sync.** If you track reading on Hardcover, Leafline can send
+a book's status and page progress there. It is off until you add an API token,
+which is stored encrypted on the device, and nothing is sent without your
+matching book having an ISBN.
+
 ## Loading books
 
 Two ways in, and they compose:

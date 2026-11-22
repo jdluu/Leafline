@@ -5,14 +5,17 @@ import android.content.SharedPreferences
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.jdluu.leafline.opds.model.OpdsFeedSource
+import com.jdluu.leafline.storage.KeystoreSecretCipher
+import com.jdluu.leafline.storage.SecretCipher
 import java.util.UUID
 
 /**
  * Manages default catalog feeds and persistent user-added custom OPDS feeds.
  */
-class OpdsFeedStore(
+class OpdsFeedStore internal constructor(
     private val prefs: SharedPreferences,
-    private val gson: Gson = Gson()
+    private val gson: Gson = Gson(),
+    private val cipher: SecretCipher = KeystoreSecretCipher()
 ) {
 
     companion object {
@@ -20,13 +23,19 @@ class OpdsFeedStore(
         private const val KEY_CUSTOM_FEEDS = "custom_opds_feeds_json"
         private const val KEY_SELECTED_FEED = "opds_selected_feed_id"
 
+        /** Marks a stored credential as encrypted; anything else is legacy plaintext. */
+        private const val ENC_PREFIX = "enc:v1:"
+
         val BUILT_IN_FEEDS = listOf(
             OpdsFeedSource(
                 id = "standard_ebooks",
                 title = "Standard Ebooks",
-                url = "https://standardebooks.org/opds",
+                // Published OPDS path per standardebooks.org/feeds. The previous
+                // /opds path answers 401 for every request, with or without an
+                // OPDS/Atom Accept header.
+                url = "https://standardebooks.org/feeds/opds",
                 isBuiltIn = true,
-                description = "Free, high-quality public domain ebooks formatted to modern standards"
+                description = "Free, high-quality public domain ebooks. Browsing the full catalog needs a Patrons Circle membership."
             ),
             OpdsFeedSource(
                 id = "project_gutenberg",
@@ -34,20 +43,18 @@ class OpdsFeedStore(
                 url = "https://m.gutenberg.org/ebooks.opds/",
                 isBuiltIn = true,
                 description = "Over 60,000 free public domain ebooks and literary classics"
-            ),
-            OpdsFeedSource(
-                id = "feedbooks",
-                title = "Feedbooks",
-                url = "https://catalog.feedbooks.com/publicdomain/browse.atom",
-                isBuiltIn = true,
-                description = "Curated public domain and open-access fiction and non-fiction"
             )
         )
 
-        fun fromContext(context: Context): OpdsFeedStore {
-            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            return OpdsFeedStore(prefs)
-        }
+        fun fromContext(context: Context): OpdsFeedStore =
+            OpdsFeedStore(context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE))
+
+        /** Injects the cipher so storage is testable without an Android Keystore. */
+        internal fun fromContext(context: Context, cipher: SecretCipher): OpdsFeedStore =
+            OpdsFeedStore(
+                prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE),
+                cipher = cipher
+            )
     }
 
     /**
@@ -67,7 +74,7 @@ class OpdsFeedStore(
         return try {
             val type = object : TypeToken<List<OpdsFeedSource>>() {}.type
             val customList: List<OpdsFeedSource> = gson.fromJson(customJson, type) ?: emptyList()
-            BUILT_IN_FEEDS + customList
+            BUILT_IN_FEEDS + customList.map(::withDecryptedCredentials)
         } catch (_: Exception) {
             BUILT_IN_FEEDS
         }
@@ -145,14 +152,45 @@ class OpdsFeedStore(
         val customJson = prefs.getString(KEY_CUSTOM_FEEDS, null) ?: return emptyList()
         return try {
             val type = object : TypeToken<List<OpdsFeedSource>>() {}.type
-            gson.fromJson(customJson, type) ?: emptyList()
+            val parsed: List<OpdsFeedSource> = gson.fromJson(customJson, type) ?: emptyList()
+            parsed.map(::withDecryptedCredentials)
         } catch (_: Exception) {
             emptyList()
         }
     }
 
     private fun saveCustomFeeds(feeds: List<OpdsFeedSource>) {
-        val json = gson.toJson(feeds)
-        prefs.edit().putString(KEY_CUSTOM_FEEDS, json).apply()
+        val sealed = feeds.map { feed ->
+            feed.copy(
+                password = seal(feed.password),
+                authToken = seal(feed.authToken)
+            )
+        }
+        prefs.edit().putString(KEY_CUSTOM_FEEDS, gson.toJson(sealed)).apply()
     }
+
+    /** Encrypts a credential for disk. Blank stays null so Gson omits the field. */
+    private fun seal(value: String?): String? {
+        val plain = value?.trim()?.ifBlank { null } ?: return null
+        return ENC_PREFIX + cipher.encrypt(plain)
+    }
+
+    /**
+     * Reads a credential, accepting values written before encryption existed.
+     * A value without the prefix is legacy plaintext from an older install and is
+     * re-encrypted the next time anything is saved.
+     */
+    private fun unseal(stored: String?): String? {
+        if (stored.isNullOrBlank()) return null
+        return if (stored.startsWith(ENC_PREFIX)) {
+            cipher.decrypt(stored.removePrefix(ENC_PREFIX))
+        } else {
+            stored
+        }
+    }
+
+    private fun withDecryptedCredentials(feed: OpdsFeedSource): OpdsFeedSource = feed.copy(
+        password = unseal(feed.password),
+        authToken = unseal(feed.authToken)
+    )
 }

@@ -12,6 +12,8 @@ import com.jdluu.leafline.library.data.LibraryRepository
 import com.jdluu.leafline.sync.BookRef
 import com.jdluu.leafline.sync.KoreaderSyncApi
 import com.jdluu.leafline.sync.KoreaderSyncConfigStore
+import com.jdluu.leafline.di.appContainer
+import com.jdluu.leafline.library.BookIdentity
 import com.jdluu.leafline.sync.ProgressSyncer
 import com.jdluu.leafline.sync.PullOutcome
 import com.jdluu.leafline.sync.PushOutcome
@@ -126,6 +128,20 @@ class ReaderSyncManager(
                     "Progress sync failed: ${outcome.message}",
                     Toast.LENGTH_SHORT
                 ).show()
+            }
+
+            // Hardcover is a separate destination with its own opt-in; a failure
+            // there must not change what the KOReader path just reported.
+            runCatching {
+                val config = context.appContainer.hardcoverConfigStore
+                if (config.load()?.enabled == true) {
+                    val progress = ReadingProgressMath.percentageFromLocator(locatorJson)
+                    context.appContainer.hardcoverSyncer.push(
+                        identifier = BookIdentity.publicationOf(book.stableId),
+                        status = book.readingStatus,
+                        progression = progress?.div(100.0)
+                    )
+                }
             }
         }
 

@@ -11,13 +11,20 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.jdluu.leafline.di.appContainer
+import com.jdluu.leafline.hardcover.HardcoverConfigStore
+import com.jdluu.leafline.hardcover.HardcoverPushOutcome
+import com.jdluu.leafline.library.BookIdentity
 import kotlinx.coroutines.flow.first
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 /**
- * Background worker that pushes reading positions for books with saved
- * progress to the KOReader-compatible sync server.
+ * Background worker that pushes reading positions to whichever destinations the
+ * reader has turned on.
+ *
+ * KOReader and Hardcover are independent: each is skipped when it is disabled, and
+ * the worker does nothing at all when neither is enabled, so an unconfigured
+ * install makes no network call.
  */
 class SyncWorker(
     appContext: Context,
@@ -25,11 +32,13 @@ class SyncWorker(
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result {
-        val config = KoreaderSyncConfigStore.config
-        if (config == null || !config.enabled) {
-            Log.d(TAG, "Sync config not available or disabled - skipping")
+        val koreader = KoreaderSyncConfigStore.config?.takeIf { it.enabled }
+        val hardcover = HardcoverConfigStore.config?.takeIf { it.enabled }
+        if (koreader == null && hardcover == null) {
+            Log.d(TAG, "No sync destination enabled - skipping")
             return Result.success()
         }
+
         val repository = try {
             applicationContext.appContainer.libraryRepository
         } catch (e: Exception) {
@@ -37,18 +46,38 @@ class SyncWorker(
             return Result.retry()
         }
 
-        val books = try {
+        val allBooks = try {
             repository.getAllBooks().first()
-                .filter { it.lastLocatorJson != null && it.koreaderHash != null }
         } catch (e: Exception) {
             Log.w(TAG, "Failed to read books", e)
             return Result.retry()
         }
 
-        if (books.isEmpty()) {
-            Log.d(TAG, "No books with progress to sync")
-            return Result.success()
+        var pushed = 0
+        var failed = 0
+
+        if (koreader != null) {
+            val koreaderResult = pushKoreader(koreader, allBooks)
+            pushed += koreaderResult.first
+            failed += koreaderResult.second
         }
+
+        if (hardcover != null) {
+            val hardcoverResult = pushHardcover(allBooks)
+            pushed += hardcoverResult.first
+            failed += hardcoverResult.second
+        }
+
+        Log.d(TAG, "Background sync complete: $pushed pushed, $failed failed")
+        return if (failed > 0 && pushed == 0) Result.retry() else Result.success()
+    }
+
+    private suspend fun pushKoreader(
+        config: com.jdluu.leafline.sync.KoreaderSyncConfig,
+        allBooks: List<com.jdluu.leafline.library.LibraryBook>
+    ): Pair<Int, Int> {
+        val books = allBooks.filter { it.lastLocatorJson != null && it.koreaderHash != null }
+        if (books.isEmpty()) return 0 to 0
 
         val api = applicationContext.appContainer.koreaderSyncApi
         val deviceId = getDeviceId(applicationContext)
@@ -80,9 +109,53 @@ class SyncWorker(
                 failed++
             }
         }
+        return pushed to failed
+    }
 
-        Log.d(TAG, "Background sync complete: $pushed pushed, $failed failed")
-        return if (failed > 0 && pushed == 0) Result.retry() else Result.success()
+    /**
+     * Pushes reading state for every book that has progress. Books without an ISBN
+     * cost no request: the syncer rejects them before touching the network.
+     */
+    private suspend fun pushHardcover(
+        allBooks: List<com.jdluu.leafline.library.LibraryBook>
+    ): Pair<Int, Int> {
+        val syncer = applicationContext.appContainer.hardcoverSyncer
+        var pushed = 0
+        var failed = 0
+
+        for (book in allBooks) {
+            val locatorJson = book.lastLocatorJson ?: continue
+            val percentage = ReadingProgressMath.percentageFromLocator(locatorJson) ?: continue
+            val outcome = syncer.push(
+                identifier = BookIdentity.publicationOf(book.stableId),
+                status = book.readingStatus,
+                progression = percentage / 100.0
+            )
+            when (outcome) {
+                HardcoverPushOutcome.Pushed, HardcoverPushOutcome.StatusOnly -> pushed++
+                HardcoverPushOutcome.Unauthorized -> {
+                    // Stop, and do not count this as a retryable failure: a rejected
+                    // token stays rejected until the reader replaces it, so asking
+                    // WorkManager to retry would loop forever. The settings row is
+                    // where they can fix it.
+                    Log.w(TAG, "Hardcover rejected the token - replace it in Settings")
+                    break
+                }
+                HardcoverPushOutcome.RateLimited -> {
+                    // The next scheduled run is an hour away; no backoff storm.
+                    Log.d(TAG, "Hardcover rate limited; resuming next run")
+                    break
+                }
+                is HardcoverPushOutcome.Failure -> {
+                    Log.w(TAG, "Hardcover push failed for ${book.title}: $outcome")
+                    failed++
+                }
+                HardcoverPushOutcome.Disabled,
+                HardcoverPushOutcome.SkippedNoIsbn,
+                HardcoverPushOutcome.NoMatchingEdition -> Unit
+            }
+        }
+        return pushed to failed
     }
 
     private fun getDeviceId(context: Context): String {
