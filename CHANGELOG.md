@@ -53,7 +53,7 @@ guess rather than a record.
   separate progress chip row, which asked the reader to tell "Unread" from "Not
   started" and pushed the shelf down. Progress filtering now lives in a sort and
   filter sheet beside the existing sort options, the toolbar icon carries the accent
-  when a filter is hiding books, and an empty result names the filter that caused it. (#225)
+  when a filter is hiding books, and an empty result names the filter that caused it. (722beb9, #225)
 
 
 ## [0.4.9] - 2026-11-22
