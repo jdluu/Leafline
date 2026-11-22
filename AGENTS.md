@@ -48,10 +48,9 @@ bash scripts/check_touch_targets.sh     # fails on controls under 48dp
 git diff --check                        # whitespace and conflict markers
 ```
 
-Release signing reads `LEAFLINE_STORE_FILE`, `LEAFLINE_STORE_PASSWORD`,
-`LEAFLINE_KEY_ALIAS`, and `LEAFLINE_KEY_PASSWORD` from `~/.gradle/gradle.properties`,
-never the repository. Without them `:app:assembleRelease` emits an unsigned APK, so
-run `apksigner verify --print-certs` before publishing.
+Release signing reads the four `LEAFLINE_*` properties from `~/.gradle/gradle.properties`,
+never the repository. Without them `:app:assembleRelease` emits an unsigned APK, so run
+`apksigner verify --print-certs` before publishing.
 
 Required environment variables: `ANDROID_HOME` (or `local.properties`), and those
 four properties only for a signed release; CI needs none.
@@ -91,16 +90,15 @@ or device run you did not actually execute.
 
 `PRODUCT.md` owns product truth, `DESIGN.md` the visual contract, `README.md`
 what ships today, and this file how to work; update whichever changed in the same
-PR, none is a log. Read both before changing a surface and check the result on a
-device at font scale 1.3 in light and dark.
+PR, none is a log. Check a changed surface on a device at font scale 1.3 in light
+and dark.
 
 ## Releases
 
 There is no changelog file. Tagging `vX.Y.Z` runs `.github/workflows/release.yml`,
 which builds and signs the APK and lets `gh release create --generate-notes` build
-the notes from the pull requests between the previous tag and this one: every line
-is the PR title, linked, with its author. Nothing is written twice, so the notes
-cannot drift from the work, and a hand-written entry cannot be forgotten.
+the notes from the PRs between the previous tag and this one: every line is the PR
+title, linked, with its author. Nothing is written twice, so the notes cannot drift.
 
 The line in the notes is the PR title, which is why it must state what a reader
 gains rather than what the diff touches.
@@ -128,10 +126,11 @@ PRODUCT.md               product record: audiences and their precedence, purpose
 
 - Kotlin, Jetpack Compose, Material 3. Match surrounding style; do not reformat untouched files.
 - Read publication data only through `publication.metadata`. Annotate Readium experimental API with `@OptIn(ExperimentalReadiumApi::class)`.
-- Stable book identity is the trimmed, non-blank `metadata.identifier`, falling back to the SHA-256 file hash. KOReader sync identity is `FileHashUtil.koreaderHash`.
-- For paths under `context.filesDir`, use `absolutePath` for database lookups; `canonicalPath` resolves symlinks, so use it only for traversal checks.
+- Stable book identity is the trimmed, non-blank `metadata.identifier`, falling back to the SHA-256 file hash. KOReader sync uses `FileHashUtil.koreaderHash`.
+- Under `context.filesDir` use `absolutePath` for lookups; `canonicalPath` resolves symlinks, so only use it for traversal checks.
 - Room: `Migration(n, n + 1)` objects only, never `fallbackToDestructiveMigration`. SQLite types are `TEXT`, `INTEGER`, and `REAL`; there is no `BOOLEAN`.
-- Substitute through the existing seams, never new ones: `KoreaderSyncApi`, `EpubImporter`, `OpdsClient`, `NotesExporter`, all wired in `AppContainer`.
+- Substitute through the existing seams, never new ones: `KoreaderSyncApi`, `HardcoverApi`, `EpubImporter`, `OpdsClient`, `NotesExporter`, all wired in `AppContainer`.
+- Credentials go through `SecretCipher` into SharedPreferences, never plaintext JSON, never a log line.
 - Push progress and save state inside `withContext(NonCancellable)` during teardown.
 
 ## Testing and mocking
@@ -139,7 +138,7 @@ PRODUCT.md               product record: audiences and their precedence, purpose
 - JVM: JUnit4 with Robolectric, Turbine, and kotlinx-coroutines-test; the default layer.
 - HTTP: MockWebServer against the real client. Never call a real server.
 - Prefer hand-rolled fakes over mocking frameworks; put pure logic behind injected lambdas so it tests without a device.
-- Instrumented: Compose UI test plus uiautomator via `ReaderTestHelper`; assert semantics and text, never pixels, because the Readium navigator is a WebView that hides Compose nodes from uiautomator.
+- Instrumented: Compose UI test plus uiautomator via `ReaderTestHelper`; assert semantics and text, never pixels, because the Readium navigator is a WebView.
 - Run one instrumented class at a time with several devices attached, pinning `adb -s <serial>`.
 - Keep tests deterministic: inject clocks and identifiers, never wall time.
 - No coverage threshold; every new domain behaviour needs a test.
@@ -148,4 +147,3 @@ PRODUCT.md               product record: audiences and their precedence, purpose
 
 - Conventional commits, imperative, no emoji, no emdash: `feat: add readium tts (#153)`.
 - Work is tracked on the `Leafline Development` board (project 7); move issues to Done on merge.
-- The loop at the top of this file is the whole workflow; this adds only conventions.

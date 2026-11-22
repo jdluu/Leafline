@@ -5,6 +5,12 @@ import com.jdluu.leafline.EpubImporter
 import com.jdluu.leafline.LeaflineApplication
 import com.jdluu.leafline.ReadiumEpubImporter
 import com.jdluu.leafline.export.NotesExporter
+import com.jdluu.leafline.hardcover.HardcoverApi
+import com.jdluu.leafline.hardcover.HardcoverClient
+import com.jdluu.leafline.hardcover.HardcoverConfigStore
+import com.jdluu.leafline.hardcover.HardcoverConfigPersistence
+import com.jdluu.leafline.hardcover.HardcoverConfigStorage
+import com.jdluu.leafline.hardcover.HardcoverSyncer
 import com.jdluu.leafline.library.data.AnnotationRepository
 import com.jdluu.leafline.library.data.AnnotationRepositoryImpl
 import com.jdluu.leafline.library.data.BookmarkRepository
@@ -86,6 +92,30 @@ class AppContainer(private val context: Context) {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName
         }.getOrNull() ?: "unknown"
         OpdsClient(userAgent = "Leafline/$versionName (Android; OPDS Client)")
+    }
+
+    /**
+     * Hardcover sync. [hardcoverConfigStore] restores the saved token when the
+     * container is built, so the integration keeps working across restarts without
+     * the reader re-entering it. It stays inactive until they enable it.
+     */
+    val hardcoverApi: HardcoverApi by lazy {
+        val versionName = runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName
+        }.getOrNull() ?: "unknown"
+        HardcoverClient(userAgent = "Leafline/$versionName")
+    }
+
+    val hardcoverConfigStore: HardcoverConfigPersistence by lazy {
+        HardcoverConfigStorage(context).also { storage ->
+            runCatching { HardcoverConfigStore.config = storage.load() }
+        }
+    }
+
+    val hardcoverSyncer: HardcoverSyncer by lazy {
+        // Touch the storage first so a fresh process has the token before a push.
+        hardcoverConfigStore
+        HardcoverSyncer(api = hardcoverApi, config = { HardcoverConfigStore.config })
     }
 
     val notesExporter: NotesExporter by lazy {

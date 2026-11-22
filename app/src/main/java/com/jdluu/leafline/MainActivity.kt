@@ -71,6 +71,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -84,6 +85,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.lifecycleScope
+import com.jdluu.leafline.hardcover.HardcoverConfig
+import com.jdluu.leafline.hardcover.HardcoverConfigStore
 import com.jdluu.leafline.di.appContainer
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.heightIn
@@ -502,6 +505,8 @@ fun SettingsTab(
             Spacer(Modifier.height(Spacing.lg))
             SyncSection()
             Spacer(Modifier.height(Spacing.lg))
+            HardcoverSection()
+            Spacer(Modifier.height(Spacing.lg))
             if (notesExporter != null) {
                 ExportSection(notesExporter = notesExporter)
                 Spacer(Modifier.height(Spacing.lg))
@@ -919,6 +924,184 @@ private data class SyncStatus(val message: String, val success: Boolean)
  * The KOReader sync form, collapsed behind its summary row until opened. The
  * first paragraph of the old standalone section now lives in the row summary.
  */
+/**
+ * Opt-in Hardcover sync.
+ *
+ * Nothing is sent and no request is made until a token has been verified and the
+ * switch turned on. The token is stored encrypted by [HardcoverConfigStorage].
+ */
+@Composable
+private fun HardcoverSection() {
+    val context = LocalContext.current
+    remember { context.appContainer.hardcoverConfigStore }
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    var configVersion by remember { mutableIntStateOf(0) }
+    val stored = remember(configVersion) { HardcoverConfigStore.config }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        SettingsSectionHeading("Hardcover")
+        SettingsRow(
+            title = "Reading progress",
+            summary = when {
+                stored == null -> "Not set up"
+                !stored.enabled -> "Set up, off"
+                else -> "Sending progress"
+            },
+            onClick = { expanded = !expanded },
+            trailing = {
+                Icon(
+                    imageVector = if (expanded) {
+                        Icons.Default.ExpandLess
+                    } else {
+                        Icons.Default.ExpandMore
+                    },
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        )
+        AnimatedVisibility(visible = expanded) {
+            HardcoverForm(onConfigChanged = { configVersion++ })
+        }
+    }
+}
+
+@Composable
+private fun HardcoverForm(onConfigChanged: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    remember { context.appContainer.hardcoverConfigStore }
+    val stored = HardcoverConfigStore.config
+    var token by remember { mutableStateOf(stored?.token.orEmpty()) }
+    var tokenVisible by remember { mutableStateOf(false) }
+    var enabled by remember { mutableStateOf(stored?.enabled ?: false) }
+    var working by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf<String?>(null) }
+
+    fun persist(next: HardcoverConfig) {
+        HardcoverConfigStore.config = next
+        context.appContainer.hardcoverConfigStore.save(next)
+        // The worker exits immediately when nothing is enabled, so scheduling is
+        // harmless; cancelling here would stop KOReader sync too.
+        SyncWorker.schedule(context)
+        enabled = next.enabled
+        onConfigChanged()
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = Spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+    ) {
+        Text(
+            "Create a token at hardcover.app/account/api with the read:me, read:library " +
+                "and write:library scopes. It is stored encrypted on this device and is " +
+                "only used when you turn sync on.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        LeaflineTextField(
+            value = token,
+            onValueChange = {
+                token = it
+                status = null
+            },
+            label = "API token",
+            modifier = Modifier.fillMaxWidth(),
+            visualTransformation = if (tokenVisible) {
+                VisualTransformation.None
+            } else {
+                PasswordVisualTransformation()
+            },
+            trailingIcon = {
+                IconButton(onClick = { tokenVisible = !tokenVisible }) {
+                    Icon(
+                        imageVector = if (tokenVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                        contentDescription = if (tokenVisible) "Hide token" else "Show token"
+                    )
+                }
+            }
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Button(
+                onClick = {
+                    val clean = token.trim()
+                    if (clean.isEmpty() || working) return@Button
+                    working = true
+                    status = null
+                    scope.launch {
+                        try {
+                            val userId = context.appContainer.hardcoverApi.userId(clean)
+                            // Saving a verified token leaves the switch as it was,
+                            // so the integration still only runs when the reader
+                            // turns it on.
+                            persist(
+                                HardcoverConfig(
+                                    token = clean,
+                                    enabled = enabled,
+                                    userId = userId
+                                )
+                            )
+                            status = "Connected as Hardcover user $userId"
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            status = e.message ?: "Could not reach Hardcover"
+                        } finally {
+                            working = false
+                        }
+                    }
+                },
+                enabled = token.isNotBlank() && !working
+            ) {
+                Text(if (working) "Checking\u2026" else "Test and save")
+            }
+            if (stored != null) {
+                TextButton(
+                    onClick = {
+                        context.appContainer.hardcoverConfigStore.clear()
+                        HardcoverConfigStore.config = null
+                        token = ""
+                        enabled = false
+                        status = "Token removed"
+                        onConfigChanged()
+                    }
+                ) {
+                    Text("Remove token")
+                }
+            }
+        }
+        if (stored != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Send reading progress", style = MaterialTheme.typography.bodyMedium)
+                Switch(
+                    checked = enabled,
+                    onCheckedChange = { next ->
+                        persist(stored.copy(enabled = next))
+                        status = if (next) "Sending progress" else "Paused"
+                    }
+                )
+            }
+        }
+        status?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
 @Composable
 private fun KoreaderSyncForm(onConfigChanged: () -> Unit) {
     val context = LocalContext.current

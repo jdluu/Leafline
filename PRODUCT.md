@@ -32,7 +32,10 @@ Leafline is a free, open-source, local-first EPUB reader for Android 8.0
 (API 26) and newer. It reads EPUB 2 and EPUB 3, manages an on-device library,
 and keeps reading, annotations, statistics, and progress entirely on the
 device with no account. Optional connectivity is limited to servers the user
-configures: OPDS catalogs, and KOReader-compatible progress sync.
+configures: OPDS catalogs, KOReader-compatible progress sync, and, when the
+reader turns it on, pushing progress to their own Hardcover account. Every one
+of those is off until configured, and each credential is encrypted on device
+with a key that never leaves it.
 
 Success means a reader opens a book and stays in it, and a library owner never
 has to think about where their data lives.
