@@ -241,6 +241,26 @@ These are non-negotiable, same as the quality bar for the app:
 - Floating action buttons. Reserved for the primary content action of a
   screen, always reachable without scroll, never stacked or duplicated in
   view. The label, where shown, is the full action name.
+- Settings. One section per thing the reader is changing, titled by the thing
+  (Appearance, Progress sync, Your data, About) and separated by 32dp of air
+  rather than a rule. A section holds rows, not blocks of prose with a button
+  under them.
+- Settings rows. A row names the setting, states its current value underneath,
+  and carries one trailing control: a chevron when it opens in place, an icon
+  when it launches something. The whole row is the touch target, never just the
+  trailing icon. The value answers "is it on, and to what" without opening
+  anything ("On · server", "Not set up", "Markdown, JSON, Obsidian vault"). A
+  setting that needs a form stays collapsed behind its row until opened. Rows do
+  not end in filled buttons: one emphasized button per screen would outrank
+  every other decision sharing the screen.
+- Theme previews. The appearance choice is a miniature page drawn in each
+  scheme's own surface, on-surface, and primary tones: three text rules and one
+  accent mark, geometry only and no lettering, so a large system font scale
+  cannot distort or clip it. The system-following option is a full-width row
+  rather than a tile, because it inherits the device's scheme instead of owning
+  fixed colors. Selection pairs a 2dp primary outline with a check mark beside
+  the name; an unselected tile keeps a 1dp outline edge so a dark preview stays
+  distinguishable from the page behind it.
 
 ## Anti-patterns
 

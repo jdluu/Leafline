@@ -54,6 +54,7 @@ and paragraph indents, with reading chrome out of the way:
   speed, sentence-by-sentence skip navigation, countdown sleep timer (5 to 60 min or End of Chapter) with audio volume fade-out and auto-pause, synchronized page turning, and spoken utterance highlighting
 - **Library management** — Grid and list layout toggle, multi-selection batch actions (mark status, assign
   collections, delete, tag), collections, reading status filters, 1–5 star ratings, custom tags, tag filtering, and sorting (recent, title, author, rating)
+- **Settings that show their answers** — Appearance, progress sync, and notes export each state their current value, so the scheme in use and the sync server are visible without opening a form; the five schemes are previewed as miniature pages drawn in their own colors
 - **No telemetry** — No analytics, crash reports, or usage data collected
 
 **Requirements:** Android 8.0 (API 26) or newer.

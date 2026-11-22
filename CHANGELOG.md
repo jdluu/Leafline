@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Settings is rebuilt as rows that show their current answer** instead of a
+  stack of form blocks separated by rules. The appearance choice is previewed as
+  a miniature page in each scheme's own colors, the KOReader sync form stays
+  collapsed behind a row that reports whether sync is on and to which server,
+  and the notes export is a row rather than the loudest button on the page.
+
 ## [0.4.8] - 2026-11-16
 
 ### Fixed
