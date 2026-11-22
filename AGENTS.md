@@ -11,12 +11,12 @@ task looks small.
 
 1. Branch from `main` (`feat/`, `fix/`, `docs/`, `refactor/`, `chore/`, `test/`).
 2. Commit atomically on that branch.
-3. Add a `CHANGELOG.md` entry ending in `(#<pr>)`, then open the PR: the template
-   at `.github/PULL_REQUEST_TEMPLATE.md` restates the entry.
-4. Let every check pass, squash-merge, delete the branch. The
-   `Settle changelog citations` workflow rewrites the entry to `(<sha>, #<pr>)`.
+3. Open the PR: the title states the change, because that title becomes the line
+   in the release notes. `.github/PULL_REQUEST_TEMPLATE.md` asks what a reader
+   gains, which is the same test the notes apply.
+4. Let every check pass, squash-merge, delete the branch.
 
-`main` is protected: the three checks are required, force-push and deletion are
+`main` is protected: every check is required, force-push and deletion are
 refused, and nothing lands without review, automation included.
 
 ## Commands
@@ -60,7 +60,7 @@ four properties only for a signed release; CI needs none.
 
 Always do:
 
-- Before reporting a task done, run `./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`, then `bash scripts/check_dynamic_type.sh`, `bash scripts/check_touch_targets.sh`, `bash scripts/check_changelog_refs.sh`, and `git diff --check`; paste the real output.
+- Before reporting a task done, run `./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`, then `bash scripts/check_dynamic_type.sh`, `bash scripts/check_touch_targets.sh`, and `git diff --check`; paste the real output.
 - Add a JVM unit test for new domain logic; keep domain models and mappers free of Android, Room, and Readium types.
 - Set text through `MaterialTheme.typography`. Never set a text size in dp or px.
 - Keep every interactive control at least 48dp, including icon buttons.
@@ -94,14 +94,16 @@ what ships today, and this file how to work; update whichever changed in the sam
 PR, none is a log. Read both before changing a surface and check the result on a
 device at font scale 1.3 in light and dark.
 
-### Changelog citations
+## Releases
 
-The loop above is the flow; this is why it is shaped that way. A squash or rebase
-rewrites your commits, so the SHA of a commit you are writing is not knowable yet,
-and the pull request number is. Both halves of the settled form link, because
-GitHub autolinks a bare SHA and `#220` but leaves `#abc1234` plain. `[Unreleased]`
-entries must cite their PR, or a release promotes them unattributed.
-`check_changelog_refs.sh` enforces every rule here.
+There is no changelog file. Tagging `vX.Y.Z` runs `.github/workflows/release.yml`,
+which builds and signs the APK and lets `gh release create --generate-notes` build
+the notes from the pull requests between the previous tag and this one: every line
+is the PR title, linked, with its author. Nothing is written twice, so the notes
+cannot drift from the work, and a hand-written entry cannot be forgotten.
+
+The line in the notes is the PR title, which is why it must state what a reader
+gains rather than what the diff touches.
 
 ## Project structure
 
