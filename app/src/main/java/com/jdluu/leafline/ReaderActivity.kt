@@ -900,10 +900,9 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     private var currentThemeBgColor: Int? = null
 
     private fun applyThemeBackground(theme: ReaderTheme?, animate: Boolean = true) {
-        val isSystemDark = (resources.configuration.uiMode and
-            android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
-            android.content.res.Configuration.UI_MODE_NIGHT_YES
-        val targetColor = theme.backgroundColor(isSystemDark)
+        // The page's own field, not the system side: an unset theme is Readium's
+        // light default, and a dark surround behind it left chrome on a seam.
+        val targetColor = theme.backgroundColor()
         val fromColor = currentThemeBgColor ?: targetColor
         currentThemeBgColor = targetColor
 
