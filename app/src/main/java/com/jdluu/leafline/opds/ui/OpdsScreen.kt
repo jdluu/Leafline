@@ -92,6 +92,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.jdluu.leafline.library.LibraryBook
 import com.jdluu.leafline.opds.OpdsUiState
+import com.jdluu.leafline.opds.splitHttpStatus
 import com.jdluu.leafline.opds.OpdsViewModel
 import com.jdluu.leafline.opds.model.BreadcrumbItem
 import com.jdluu.leafline.opds.model.DownloadStatus
@@ -196,6 +197,9 @@ fun OpdsScreen(
                                 .padding(Padding.screen),
                             contentAlignment = Alignment.Center
                         ) {
+                            val (detail, statusCode) = remember(state.message) {
+                                splitHttpStatus(state.message)
+                            }
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.spacedBy(Spacing.md)
@@ -206,18 +210,41 @@ fun OpdsScreen(
                                     color = MaterialTheme.colorScheme.error
                                 )
                                 Text(
-                                    text = state.message,
+                                    text = detail,
                                     style = MaterialTheme.typography.bodyMedium,
                                     textAlign = TextAlign.Center,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                Button(onClick = { viewModel.refresh() }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Refresh,
-                                        contentDescription = null
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Button(onClick = { viewModel.refresh() }) {
+                                        Icon(
+                                            imageVector = Icons.Default.Refresh,
+                                            contentDescription = null
+                                        )
+                                        Spacer(modifier = Modifier.width(Spacing.xs))
+                                        Text("Retry")
+                                    }
+                                    // A catalog that needs a sign-in cannot be repaired from
+                                    // this screen, so the recovery the app can actually offer
+                                    // is adding it again with credentials, or another catalog.
+                                    OutlinedButton(onClick = { showAddFeedDialog = true }) {
+                                        Icon(
+                                            imageVector = Icons.Default.Add,
+                                            contentDescription = null
+                                        )
+                                        Spacer(modifier = Modifier.width(Spacing.xs))
+                                        Text("Add catalog")
+                                    }
+                                }
+                                if (statusCode != null) {
+                                    Text(
+                                        text = statusCode,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                                     )
-                                    Spacer(modifier = Modifier.width(Spacing.xs))
-                                    Text("Retry")
                                 }
                             }
                         }

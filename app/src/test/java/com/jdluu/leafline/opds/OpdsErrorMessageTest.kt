@@ -50,4 +50,31 @@ class OpdsErrorMessageTest {
         val message = opdsHttpErrorMessage(404, "", "download failed")
         assertTrue(message.startsWith("Download failed: "))
     }
+
+    @Test
+    fun `an auth error names a recovery the app can actually offer`() {
+        val message = opdsHttpErrorMessage(401, "")
+        assertTrue(message.contains("Add it again with your username and password"))
+    }
+
+    @Test
+    fun `the status code splits off the sentence`() {
+        val (detail, code) = splitHttpStatus("This catalog needs a sign-in (HTTP 401)")
+        assertEquals("This catalog needs a sign-in", detail)
+        assertEquals("HTTP 401", code)
+    }
+
+    @Test
+    fun `a message with no status code keeps its text and reports none`() {
+        val (detail, code) = splitHttpStatus("  Gone fishing  ")
+        assertEquals("Gone fishing", detail)
+        assertEquals(null, code)
+    }
+
+    @Test
+    fun `a stale download prefix survives the split`() {
+        val (detail, code) = splitHttpStatus("Download failed: Catalog not found (HTTP 404)")
+        assertEquals("Download failed: Catalog not found", detail)
+        assertEquals("HTTP 404", code)
+    }
 }
