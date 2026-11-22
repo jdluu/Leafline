@@ -158,6 +158,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -229,6 +230,7 @@ import com.jdluu.leafline.reader.search.BookSearchStatus
 import com.jdluu.leafline.reader.search.BookSearcher
 import com.jdluu.leafline.reader.tapZoneAt
 import com.jdluu.leafline.reader.theme.ReaderTheme
+import com.jdluu.leafline.reader.theme.chromeTextColor
 import com.jdluu.leafline.reader.withStyleMode
 import com.jdluu.leafline.sync.BookRef
 import com.jdluu.leafline.sync.KoreaderSyncConfigStore
@@ -625,6 +627,7 @@ internal fun ReaderOverlay(
                     activeDurationMillis = bookActiveDurationMillis,
                     mode = currentSettings.minimalHudMode,
                     onCycleMode = onCycleMinimalHudMode,
+                    pageTextColor = ComposeColor(currentSettings.theme.chromeTextColor()),
                     modifier = Modifier.padding(bottom = 6.dp, start = Spacing.md, end = Spacing.md)
                 )
             }
@@ -3334,6 +3337,7 @@ internal fun MinimalReadingFooter(
     activeDurationMillis: Long = 0L,
     mode: MinimalHudMode = MinimalHudMode.CHAPTER_AND_PERCENT,
     onCycleMode: () -> Unit = {},
+    pageTextColor: ComposeColor,
     modifier: Modifier = Modifier
 ) {
     val percent = remember(currentLocatorJson) {
@@ -3365,7 +3369,9 @@ internal fun MinimalReadingFooter(
             Text(
                 text = displayText,
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+                // The page's own ink, not the app scheme: the app can be dark while
+                // the book page is white, where a 45% light gray disappears.
+                color = pageTextColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center
