@@ -15,6 +15,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ExpandLess
@@ -115,6 +116,7 @@ import com.jdluu.leafline.opds.ui.OpdsScreen
 import com.jdluu.leafline.sync.KoreaderSyncConfig
 import com.jdluu.leafline.sync.KoreaderSyncConfigStore
 import com.jdluu.leafline.sync.SyncWorker
+import com.jdluu.leafline.sync.isKoreaderServerUrlValid
 import com.jdluu.leafline.sync.koreaderSyncSummary
 import com.jdluu.leafline.theme.AppearanceStore
 import com.jdluu.leafline.theme.FormPanel
@@ -124,6 +126,7 @@ import com.jdluu.leafline.theme.LeaflineTheme
 import com.jdluu.leafline.theme.Padding
 import com.jdluu.leafline.theme.Spacing
 import com.jdluu.leafline.theme.ThemeMode
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -611,26 +614,30 @@ private fun AppearanceSection(
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         SettingsSectionHeading("Appearance")
-        ThemePreviewTile(
-            mode = ThemeMode.SYSTEM,
-            selected = appearance == ThemeMode.SYSTEM,
-            onClick = { onAppearanceChange(ThemeMode.SYSTEM) },
-            horizontal = true,
-            modifier = Modifier.fillMaxWidth()
-        )
-        Column(
-            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-            modifier = Modifier.padding(top = Spacing.xs)
-        ) {
-            FIXED_THEME_MODES.chunked(2).forEach { pair ->
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                    pair.forEach { mode ->
-                        ThemePreviewTile(
-                            mode = mode,
-                            selected = appearance == mode,
-                            onClick = { onAppearanceChange(mode) },
-                            modifier = Modifier.weight(1f)
-                        )
+        // One radio group across the full-width row and the 2x2 grid, so TalkBack
+        // announces a position in the set instead of five unrelated buttons.
+        Column(modifier = Modifier.selectableGroup()) {
+            ThemePreviewTile(
+                mode = ThemeMode.SYSTEM,
+                selected = appearance == ThemeMode.SYSTEM,
+                onClick = { onAppearanceChange(ThemeMode.SYSTEM) },
+                horizontal = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Column(
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                modifier = Modifier.padding(top = Spacing.xs)
+            ) {
+                FIXED_THEME_MODES.chunked(2).forEach { pair ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                        pair.forEach { mode ->
+                            ThemePreviewTile(
+                                mode = mode,
+                                selected = appearance == mode,
+                                onClick = { onAppearanceChange(mode) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
                     }
                 }
             }
@@ -826,23 +833,30 @@ private fun ExportSection(notesExporter: NotesExporter) {
     var batchData by remember { mutableStateOf<List<BookExportData>?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var showExportSheet by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     Column(modifier = Modifier.fillMaxWidth()) {
         SettingsSectionHeading("Your data")
         SettingsRow(
             title = "Export notes & highlights",
-            summary = if (isLoading) {
-                "Preparing\u2026"
-            } else {
-                "Markdown, JSON, Obsidian vault, Readwise CSV"
+            summary = when {
+                isLoading -> "Preparing\u2026"
+                errorMessage != null ->
+                    "Could not read your notes: $errorMessage. Tap to try again."
+                else -> "Markdown, JSON, Obsidian vault, Readwise CSV"
             },
             onClick = {
                 if (!isLoading) {
                     isLoading = true
+                    errorMessage = null
                     scope.launch {
                         try {
                             batchData = notesExporter.getAllExportData(includeEmptyBooks = false)
                             showExportSheet = true
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (e: Exception) {
+                            errorMessage = e.message ?: "unknown error"
                         } finally {
                             isLoading = false
                         }
@@ -935,6 +949,11 @@ private fun KoreaderSyncForm(onConfigChanged: () -> Unit) {
         onConfigChanged()
     }
 
+    // Save writes what the reader typed, so the button stays off until the
+    // address is one this app can actually reach.
+    val urlValid = isKoreaderServerUrlValid(serverUrl)
+    val showUrlError = serverUrl.isNotBlank() && !urlValid
+
     fun testConnection() {
         testing = true
         status = null
@@ -965,7 +984,13 @@ private fun KoreaderSyncForm(onConfigChanged: () -> Unit) {
                 onValueChange = { serverUrl = it; status = null },
                 label = "Server URL",
                 placeholder = "http://server:6061/api/koreader",
-                keyboardType = KeyboardType.Uri
+                keyboardType = KeyboardType.Uri,
+                isError = showUrlError,
+                supportingText = if (showUrlError) {
+                    "Enter the full address, starting with http:// or https://"
+                } else {
+                    null
+                }
             )
             LeaflineTextField(
                 value = syncUsername,
@@ -1006,6 +1031,7 @@ private fun KoreaderSyncForm(onConfigChanged: () -> Unit) {
                     .heightIn(min = 48.dp)
                     .toggleable(
                         value = enabled,
+                        enabled = urlValid,
                         role = Role.Switch,
                         onValueChange = { checked ->
                             enabled = checked
@@ -1017,7 +1043,11 @@ private fun KoreaderSyncForm(onConfigChanged: () -> Unit) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Sync in the background", style = MaterialTheme.typography.bodyMedium)
                     Text(
-                        "Checks for newer positions automatically.",
+                        if (urlValid) {
+                            "Checks for newer positions automatically."
+                        } else {
+                            "Set a server URL first."
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1072,6 +1102,7 @@ private fun KoreaderSyncForm(onConfigChanged: () -> Unit) {
                         applySyncConfig(currentConfig())
                         status = SyncStatus("Saved", success = true)
                     },
+                    enabled = urlValid,
                     modifier = Modifier.heightIn(min = 48.dp)
                 ) { Text("Save") }
             }

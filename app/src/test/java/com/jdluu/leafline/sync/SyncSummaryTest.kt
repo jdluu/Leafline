@@ -1,6 +1,8 @@
 package com.jdluu.leafline.sync
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -65,5 +67,32 @@ class SyncSummaryTest {
             "On \u00B7 server",
             koreaderSyncSummary(config(serverUrl = "  http://server:6061/api/koreader "))
         )
+    }
+
+    @Test
+    fun absoluteHttpAndHttpsUrlsAreValid() {
+        assertTrue(isKoreaderServerUrlValid("http://server:6061/api/koreader"))
+        assertTrue(isKoreaderServerUrlValid("https://www.calibre.example.org/api/koreader"))
+        assertTrue(isKoreaderServerUrlValid("  https://server  "))
+    }
+
+    @Test
+    fun blankAndBareValuesAreNotValid() {
+        assertFalse(isKoreaderServerUrlValid(""))
+        assertFalse(isKoreaderServerUrlValid("   "))
+        assertFalse(isKoreaderServerUrlValid("server.local:6061"))
+        assertFalse(isKoreaderServerUrlValid("koreader"))
+    }
+
+    @Test
+    fun nonHttpSchemesAreNotValid() {
+        assertFalse(isKoreaderServerUrlValid("ftp://server/books"))
+        assertFalse(isKoreaderServerUrlValid("file:///sdcard/books"))
+    }
+
+    @Test
+    fun aSchemeWithNoHostIsNotValid() {
+        assertFalse(isKoreaderServerUrlValid("http://"))
+        assertFalse(isKoreaderServerUrlValid("https:///api/koreader"))
     }
 }
