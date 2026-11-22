@@ -3,6 +3,7 @@ package com.jdluu.leafline
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jdluu.leafline.library.ImportedBookReconciler
+import com.jdluu.leafline.library.BookIdentity
 import com.jdluu.leafline.library.LibraryBook
 import com.jdluu.leafline.library.LibrarySort
 import com.jdluu.leafline.library.LibraryLayout
@@ -342,7 +343,26 @@ class LibraryViewModel(
             if (reconciled != null) {
                 repository.updateBook(reconciled)
             } else if (existing == null) {
-                repository.addBook(book)
+                // Hashing only catches the same bytes. The same publication stored
+                // as a second file (another edition of the file, a re-download, a
+                // Calibre copy) hashes differently and would otherwise become a
+                // second row for one book, splitting the reader's progress across
+                // two entries. Keep the record the reader already has and point it
+                // at the newly imported file instead.
+                val samePublication = repository.getAllBooks().first().firstOrNull { candidate ->
+                    val id = BookIdentity.publicationOf(candidate.stableId)
+                    id != null && id == BookIdentity.publicationOf(book.stableId)
+                }
+                if (samePublication != null) {
+                    repository.updateBook(
+                        samePublication.copy(
+                            filePath = book.filePath,
+                            fileHash = book.fileHash,
+                        )
+                    )
+                } else {
+                    repository.addBook(book)
+                }
             }
         }
     }

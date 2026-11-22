@@ -131,6 +131,69 @@ class LibraryViewModelTest {
         }
 
     @Test
+    fun `the same publication imported as a second file updates the existing book`() =
+        runTest(dispatcher) {
+            // Different bytes, so the hash lookup misses; the publication
+            // identifier is what proves these are one book.
+            val existing = testBook(
+                stableId = "identifier:urn:isbn:9780141439471:hash:first-hash",
+                filePath = "/old/pride.epub",
+                fileHash = "first-hash",
+                lastLocatorJson = "{saved-locator}",
+                readingStatus = ReadingStatus.READING
+            )
+            val imported = testBook(
+                stableId = "identifier:urn:isbn:9780141439471:hash:second-hash",
+                filePath = "/calibre/Pride and Prejudice (12)/pride.epub",
+                fileHash = "second-hash"
+            )
+            val repository = FakeLibraryRepository(
+                books = flowOf(listOf(existing)),
+                existingByHash = null
+            )
+            val viewModel = LibraryViewModel(repository)
+
+            viewModel.addBook(imported)
+            advanceUntilIdle()
+
+            assertEquals(0, repository.addedBooks.size)
+            assertEquals(1, repository.updatedBooks.size)
+            val updated = repository.updatedBooks.single()
+            assertEquals(existing.stableId, updated.stableId)
+            assertEquals(imported.filePath, updated.filePath)
+            assertEquals("second-hash", updated.fileHash)
+            // The reader keeps their place in the book they were already reading.
+            assertEquals("{saved-locator}", updated.lastLocatorJson)
+            assertEquals(ReadingStatus.READING, updated.readingStatus)
+        }
+
+    @Test
+    fun `a different publication with a new hash is added separately`() =
+        runTest(dispatcher) {
+            val existing = testBook(
+                stableId = "identifier:urn:isbn:1:hash:first-hash",
+                filePath = "/old/one.epub",
+                fileHash = "first-hash"
+            )
+            val imported = testBook(
+                stableId = "identifier:urn:isbn:2:hash:second-hash",
+                filePath = "/new/two.epub",
+                fileHash = "second-hash"
+            )
+            val repository = FakeLibraryRepository(
+                books = flowOf(listOf(existing)),
+                existingByHash = null
+            )
+            val viewModel = LibraryViewModel(repository)
+
+            viewModel.addBook(imported)
+            advanceUntilIdle()
+
+            assertEquals(1, repository.addedBooks.size)
+            assertEquals(0, repository.updatedBooks.size)
+        }
+
+    @Test
     fun `collectionIdsForBook returns known membership IDs`() =
         runTest(dispatcher) {
             val col1 = Collection(id = 10L, name = "Favorites", createdAtEpochMillis = 1L)
