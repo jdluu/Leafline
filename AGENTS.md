@@ -90,14 +90,12 @@ you did not execute.
 
 `PRODUCT.md` owns product truth, `DESIGN.md` the visual contract, `README.md`
 what ships today, and this file how to work. Update whichever changed in the
-same PR; none is a log.
+same PR; none is a log. Read both before changing a surface, and check the result
+on a device at font scale 1.3 in light and dark.
 
 Every released `CHANGELOG.md` entry ends with the short SHA of the commit that
-made it, as `(#abc1234)` on the entry's last line, never inside the sentence.
-`scripts/check_changelog_refs.sh` enforces it; CI fails without it.
-
-Read both before changing how a surface looks or is structured, and check the result
-on a device at font scale 1.3 in light and dark. A build that compiles is not a look.
+made it, as `(#abc1234)` on its last line, never inside the sentence;
+`scripts/check_changelog_refs.sh` enforces it and CI fails without it.
 
 ## Project structure
 
@@ -108,7 +106,6 @@ app/src/main/java/com/jdluu/leafline/
   reader/                reader orchestration: settings, tap zones, bookmarks, annotations, search, tts, sync
   library/               library screen, view models, sorting, folders, covers, backup/restore
     data/                repository interfaces and models, free of Room and Android types
-      local/             Room entities, DAOs, migrations, TypeConverters
   sync/                  KOReader sync logic (pure Kotlin) plus SyncWorker.kt (WorkManager)
   opds/                  OPDS catalog client, feeds, download manager, and UI
   export/                notes and highlights export (Markdown, Obsidian vault zip)
@@ -130,10 +127,6 @@ PRODUCT.md               product record: audiences and their precedence, purpose
 - Substitute through the existing seams, never new ones: `KoreaderSyncApi`, `EpubImporter`, `OpdsClient`, `NotesExporter`, all wired in `AppContainer`.
 - Push progress and save state inside `withContext(NonCancellable)` during teardown.
 - Put pure logic behind injected lambdas so it tests without a device; see `ReaderSettingsController` and `ReaderTtsController`.
-
-Add a schema change as an incremental `Migration(n, n + 1)`: run the `ALTER TABLE`
-statements in `migrate`, bump the `@Database` version once, and add the migration to
-`addMigrations`. Never `fallbackToDestructiveMigration`.
 
 ## Testing and mocking
 
