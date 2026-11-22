@@ -46,6 +46,8 @@ guess rather than a record.
 
 ## [Unreleased]
 
+## [0.4.10] - 2026-11-23
+
 ### Changed
 - **One filter row instead of two.** The library showed reading-status chips and a
   separate progress chip row, which asked the reader to tell "Unread" from "Not
