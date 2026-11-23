@@ -2,6 +2,7 @@ package com.jdluu.leafline.library.backup
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -103,5 +104,42 @@ class LibraryBackupSerializerTest {
         assertEquals(0, backup.collections.size)
         assertEquals(0, backup.bookmarks.size)
         assertEquals(0, backup.annotations.size)
+    }
+
+    @Test
+    fun `per-book hardcover choices survive a round trip`() {
+        val backup = LibraryBackup(
+            version = 2,
+            books = listOf(BookBackup(stableId = "book-1", title = "T", authors = emptyList())),
+            hardcoverTracking = mapOf(
+                "book-1" to "IGNORE",
+                "urn:isbn:9780141439471" to "TRACK"
+            )
+        )
+
+        val restored = LibraryBackupSerializer.deserialize(LibraryBackupSerializer.serialize(backup))
+
+        assertEquals(
+            mapOf("book-1" to "IGNORE", "urn:isbn:9780141439471" to "TRACK"),
+            restored.hardcoverTracking
+        )
+    }
+
+    @Test
+    fun `a version 1 file with no choices still loads`() {
+        val v1 = """
+            {"version":1,"exportedAt":1700000000000,"appVersion":"1.0",
+             "books":[{"stableId":"book-1","title":"T","authors":[]}],
+             "collections":[],"bookmarks":[],"annotations":[]}
+        """.trimIndent()
+
+        val restored = LibraryBackupSerializer.deserialize(v1)
+
+        assertEquals(1, restored.version)
+        assertEquals(1, restored.books.size)
+        assertTrue(
+            "a v1 file must not invent choices",
+            restored.hardcoverTracking.isEmpty()
+        )
     }
 }

@@ -86,7 +86,8 @@ class AppContainer(private val context: Context) {
             annotationDao = database.annotationDao(),
             appVersion = runCatching {
                 context.packageManager.getPackageInfo(context.packageName, 0).versionName
-            }.getOrNull() ?: "unknown"
+            }.getOrNull() ?: "unknown",
+            hardcoverTracking = hardcoverTracking
         )
     }
 

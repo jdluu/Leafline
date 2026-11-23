@@ -31,13 +31,20 @@ data class AnnotationBackup(
 )
 
 data class LibraryBackup(
-    val version: Int = 1,
+    val version: Int = 2,
     val exportedAt: Long = System.currentTimeMillis(),
     val appVersion: String = "1.0",
     val books: List<BookBackup> = emptyList(),
     val collections: List<CollectionBackup> = emptyList(),
     val bookmarks: List<BookmarkBackup> = emptyList(),
-    val annotations: List<AnnotationBackup> = emptyList()
+    val annotations: List<AnnotationBackup> = emptyList(),
+    /**
+     * Per-book Hardcover choices, keyed by stable id, valued "TRACK" or "IGNORE".
+     *
+     * Added in version 2. A version 1 file simply has no entry here, so restoring an
+     * older backup leaves these decisions alone rather than clearing them.
+     */
+    val hardcoverTracking: Map<String, String> = emptyMap()
 )
 
 data class BackupRestoreSummary(
@@ -45,5 +52,6 @@ data class BackupRestoreSummary(
     val tagsUpdated: Int = 0,
     val collectionsRestored: Int = 0,
     val bookmarksRestored: Int = 0,
-    val annotationsRestored: Int = 0
+    val annotationsRestored: Int = 0,
+    val hardcoverChoicesRestored: Int = 0
 )

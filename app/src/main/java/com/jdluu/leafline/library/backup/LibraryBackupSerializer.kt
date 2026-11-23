@@ -32,6 +32,12 @@ object LibraryBackupSerializer {
         }
         root.put("books", booksArray)
 
+        if (backup.hardcoverTracking.isNotEmpty()) {
+            val tracking = JSONObject()
+            backup.hardcoverTracking.forEach { (stableId, choice) -> tracking.put(stableId, choice) }
+            root.put("hardcoverTracking", tracking)
+        }
+
         val collectionsArray = JSONArray()
         backup.collections.forEach { col ->
             val colObj = JSONObject()
@@ -184,6 +190,9 @@ object LibraryBackupSerializer {
         }
 
         return LibraryBackup(
+            hardcoverTracking = root.optJSONObject("hardcoverTracking")?.let { obj ->
+                obj.keys().asSequence().associateWith { key -> obj.optString(key) }
+            }.orEmpty(),
             version = version,
             exportedAt = exportedAt,
             appVersion = appVersion,

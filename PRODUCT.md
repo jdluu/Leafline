@@ -74,7 +74,7 @@ KOReader-compatible progress sync with encrypted stored credentials;
 on-device reading statistics and a 7-day chart; multi-color
 highlights, notes, bookmarks, offline dictionary lookup, and full-text in-book
 search; notes and highlights export to Markdown, Obsidian vault ZIP, Readwise
-CSV, and Anki TSV; JSON backup and restore of library metadata and
+CSV, and Anki TSV; JSON backup and restore of library metadata, reading positions, and
 annotations; typography and accessibility presets, themes including sepia,
 margins, line height, per-book brightness, edge tap zones, volume-key page
 turning, and page-turn animation; text-to-speech with a sleep timer.

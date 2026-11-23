@@ -75,7 +75,9 @@ object HardcoverTrackingPolicy {
  * Callers ask this before pushing instead of the syncer asking, so the syncer keeps
  * its single responsibility: given a book that should be tracked, send it.
  */
-class HardcoverTrackingResolver(private val store: HardcoverTrackingStore) {
+class HardcoverTrackingResolver(
+    private val store: HardcoverTrackingStore
+) : HardcoverTrackingStore by store {
 
     fun decide(stableId: String, identifier: String?): HardcoverTrackingDecision =
         HardcoverTrackingPolicy.decide(
@@ -84,11 +86,7 @@ class HardcoverTrackingResolver(private val store: HardcoverTrackingStore) {
             hasIsbn = HardcoverIsbn.isbn13From(identifier) != null
         )
 
-    fun mode(): HardcoverTrackingMode = store.mode()
 
-    fun setMode(mode: HardcoverTrackingMode) {
-        store.setMode(mode)
-    }
 
     /** Records the reader's answer for one book. */
     fun remember(stableId: String, preference: HardcoverBookPreference) {
