@@ -71,7 +71,7 @@ footnote and note previews; navigation history with a return capsule; on-device
 library with folders, collections, reading status, ratings, tags, sorting,
 grid and list layouts, and batch actions; OPDS 1.x/2.0 browsing and download;
 KOReader-compatible progress sync with encrypted stored credentials;
-on-device reading statistics, streaks, and a 7-day chart; multi-color
+on-device reading statistics and a 7-day chart; multi-color
 highlights, notes, bookmarks, offline dictionary lookup, and full-text in-book
 search; notes and highlights export to Markdown, Obsidian vault ZIP, Readwise
 CSV, and Anki TSV; JSON backup and restore of library metadata and
@@ -133,6 +133,10 @@ Technical constraints that bind any design work:
    decoration or motion.
 5. Say the true state. Loading, empty, error, and disabled states are designed
    and never implied by a misleading blank surface.
+6. Statistics inform, they do not nag. Reading history is shown as fact, never as
+   a run to protect: no streaks, no broken-chain warnings, no nudges to keep a
+   number alive. Someone who reads ten pages in a month should not be made to feel
+   behind.
 
 ## Accessibility & Inclusion
 

@@ -3,7 +3,6 @@ package com.jdluu.leafline.library
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.border
-import com.jdluu.leafline.library.insights.ReadingStreakHelper
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import com.jdluu.leafline.library.cover.BitmapMemoryCache
@@ -2556,9 +2555,6 @@ private fun ReadingInsightsSheet(
     var todayStats by remember { mutableStateOf(ReadingAggregate.EMPTY) }
     var weeklyStats by remember { mutableStateOf(ReadingAggregate.EMPTY) }
     var recentDailyStats by remember { mutableStateOf<List<Pair<LocalDate, ReadingAggregate>>>(emptyList()) }
-    val currentStreak = remember(recentDailyStats) {
-        ReadingStreakHelper.calculateCurrentStreak(recentDailyStats)
-    }
     var selectedDayIndex by remember { mutableStateOf<Int?>(null) }
 
     LaunchedEffect(Unit) {
@@ -2625,9 +2621,14 @@ private fun ReadingInsightsSheet(
                                 modifier = Modifier.weight(1f)
                             )
                             InsightMetric(
-                                value = if (currentStreak > 0) "$currentStreak d" else "0 d",
-                                label = "Streak",
-                                emphasised = currentStreak > 0,
+                                value = formatReadingDuration(
+                                    if (todayStats.sessionCount > 0) {
+                                        todayStats.activeDurationMillis / todayStats.sessionCount
+                                    } else {
+                                        0L
+                                    }
+                                ),
+                                label = "Avg session",
                                 modifier = Modifier.weight(1f)
                             )
                         }
