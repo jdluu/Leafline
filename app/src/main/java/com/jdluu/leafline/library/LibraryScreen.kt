@@ -89,7 +89,13 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import com.jdluu.leafline.library.BookIdentity
+import com.jdluu.leafline.hardcover.HardcoverBookPreference
+import com.jdluu.leafline.hardcover.HardcoverIsbn
+import com.jdluu.leafline.hardcover.HardcoverTrackingDecision
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -1883,12 +1889,68 @@ private fun BookDetailSheet(
     var optimisticDescription by remember(book.description) { mutableStateOf(book.description) }
     var showEditMetadataDialog by remember { mutableStateOf(false) }
 
+    // Hardcover tracking for this one book. Read straight from the container rather
+    // than threading two more parameters through this sheet: it is a single switch, and
+    // the surrounding callbacks chain is already long.
+    val trackingContext = LocalContext.current
+    val container = remember(trackingContext) {
+        (trackingContext.applicationContext as com.jdluu.leafline.LeaflineApplication).appContainer
+    }
+    val tracker = container.hardcoverTracking
+    val hardcoverEnabled = remember(tracker) {
+        container.hardcoverConfigStore.load()?.enabled == true
+    }
+    val tracksThisBook = remember(book.stableId) {
+        tracker.decide(book.stableId, BookIdentity.publicationOf(book.stableId)) ==
+            HardcoverTrackingDecision.Track
+    }
+    var sendToHardcover by remember(book.stableId) { mutableStateOf(tracksThisBook) }
+
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
                 .padding(Spacing.md)
                 .verticalScroll(rememberScrollState())
         ) {
+            if (hardcoverEnabled &&
+                HardcoverIsbn.isbn13From(BookIdentity.publicationOf(book.stableId)) != null
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = Spacing.sm),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Send to Hardcover", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            if (sendToHardcover) {
+                                "Progress is synced for this book."
+                            } else {
+                                "Not synced. Turn on to start sending it."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = sendToHardcover,
+                        onCheckedChange = { on ->
+                            sendToHardcover = on
+                            tracker.remember(
+                                book.stableId,
+                                if (on) {
+                                    HardcoverBookPreference.TRACK
+                                } else {
+                                    HardcoverBookPreference.IGNORE
+                                }
+                            )
+                        }
+                    )
+                }
+            }
+
             // Cover + title
             Row(
                 modifier = Modifier.fillMaxWidth(),

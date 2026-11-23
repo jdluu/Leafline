@@ -134,7 +134,14 @@ class ReaderSyncManager(
             // there must not change what the KOReader path just reported.
             runCatching {
                 val config = context.appContainer.hardcoverConfigStore
-                if (config.load()?.enabled == true) {
+                val tracking = context.appContainer.hardcoverTracking
+                val decision = tracking.decide(
+                    book.stableId,
+                    BookIdentity.publicationOf(book.stableId)
+                )
+                if (config.load()?.enabled == true &&
+                    decision == com.jdluu.leafline.hardcover.HardcoverTrackingDecision.Track
+                ) {
                     val progress = ReadingProgressMath.percentageFromLocator(locatorJson)
                     context.appContainer.hardcoverSyncer.push(
                         identifier = BookIdentity.publicationOf(book.stableId),
