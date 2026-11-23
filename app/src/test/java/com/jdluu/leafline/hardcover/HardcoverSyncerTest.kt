@@ -55,7 +55,7 @@ class HardcoverSyncerTest {
     private val enabled = HardcoverConfig(token = "tok", enabled = true, userId = 42)
 
     private fun syncer(api: HardcoverApi, config: HardcoverConfig? = enabled) =
-        HardcoverSyncer(api = api, config = { config })
+        HardcoverSyncer(api = api, config = { config }, accessToken = { config?.token })
 
     @Test
     fun `nothing is sent when the integration is off`() = runBlocking {
@@ -76,6 +76,41 @@ class HardcoverSyncerTest {
 
         assertEquals(HardcoverPushOutcome.Disabled, outcome)
         assertTrue(api.calls.isEmpty())
+    }
+
+    @Test
+    fun `an enabled connection with no token sends nothing`() = runBlocking {
+        val api = FakeHardcoverApi()
+        val noToken = HardcoverConfig(enabled = true, authMethod = HardcoverAuthMethod.OAUTH)
+
+        val outcome = HardcoverSyncer(
+            api = api,
+            config = { noToken },
+            accessToken = { null }
+        ).push("urn:isbn:9780141439471", ReadingStatus.READING, 0.5)
+
+        assertEquals(HardcoverPushOutcome.Disabled, outcome)
+        assertTrue("a token-less connection caused traffic: ${api.calls}", api.calls.isEmpty())
+    }
+
+    @Test
+    fun `a refreshed token is used instead of the stored one`() = runBlocking {
+        val api = FakeHardcoverApi()
+        val stale = HardcoverConfig(
+            token = "stale",
+            enabled = true,
+            authMethod = HardcoverAuthMethod.OAUTH,
+            refreshToken = "rt",
+            accessExpiresAtEpochMillis = 1L
+        )
+
+        val outcome = HardcoverSyncer(
+            api = api,
+            config = { stale },
+            accessToken = { "fresh" }
+        ).push("urn:isbn:9780141439471", ReadingStatus.READING, 0.5)
+
+        assertEquals(HardcoverPushOutcome.Pushed, outcome)
     }
 
     @Test

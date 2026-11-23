@@ -8,7 +8,11 @@ import com.jdluu.leafline.export.NotesExporter
 import com.jdluu.leafline.hardcover.HardcoverApi
 import com.jdluu.leafline.hardcover.HardcoverClient
 import com.jdluu.leafline.hardcover.HardcoverConfigStore
+import com.jdluu.leafline.BuildConfig
 import com.jdluu.leafline.hardcover.HardcoverConfigPersistence
+import com.jdluu.leafline.hardcover.HardcoverOAuthClient
+import com.jdluu.leafline.hardcover.HardcoverOAuthCoordinator
+import com.jdluu.leafline.hardcover.HardcoverTokenProvider
 import com.jdluu.leafline.hardcover.HardcoverConfigStorage
 import com.jdluu.leafline.hardcover.HardcoverSyncer
 import com.jdluu.leafline.library.data.AnnotationRepository
@@ -100,11 +104,12 @@ class AppContainer(private val context: Context) {
      * the reader re-entering it. It stays inactive until they enable it.
      */
     val hardcoverApi: HardcoverApi by lazy {
-        val versionName = runCatching {
-            context.packageManager.getPackageInfo(context.packageName, 0).versionName
-        }.getOrNull() ?: "unknown"
-        HardcoverClient(userAgent = "Leafline/$versionName")
+        HardcoverClient(userAgent = "Leafline/${appVersionName()}")
     }
+
+    private fun appVersionName(): String = runCatching {
+        context.packageManager.getPackageInfo(context.packageName, 0).versionName
+    }.getOrNull() ?: "unknown"
 
     val hardcoverConfigStore: HardcoverConfigPersistence by lazy {
         HardcoverConfigStorage(context).also { storage ->
@@ -112,10 +117,44 @@ class AppContainer(private val context: Context) {
         }
     }
 
+    /** Blank when this build has no Hardcover OAuth app registered. */
+    val hardcoverClientId: String
+        get() = BuildConfig.HARDCOVER_CLIENT_ID
+
+    /** Null when there is no client id: nothing can be authorized, so nothing is built. */
+    val hardcoverOAuthClient: HardcoverOAuthClient? by lazy {
+        val clientId = hardcoverClientId
+        if (clientId.isBlank()) {
+            null
+        } else {
+            HardcoverOAuthClient(
+                clientId = clientId,
+                userAgent = "Leafline/${appVersionName()}"
+            )
+        }
+    }
+
+    val hardcoverTokenProvider: HardcoverTokenProvider by lazy {
+        HardcoverTokenProvider(store = hardcoverConfigStore, oauth = hardcoverOAuthClient)
+    }
+
+    val hardcoverOAuth: HardcoverOAuthCoordinator by lazy {
+        HardcoverOAuthCoordinator(
+            store = hardcoverConfigStore,
+            oauth = hardcoverOAuthClient,
+            api = hardcoverApi,
+            clientId = hardcoverClientId
+        )
+    }
+
     val hardcoverSyncer: HardcoverSyncer by lazy {
         // Touch the storage first so a fresh process has the token before a push.
         hardcoverConfigStore
-        HardcoverSyncer(api = hardcoverApi, config = { HardcoverConfigStore.config })
+        HardcoverSyncer(
+            api = hardcoverApi,
+            config = { HardcoverConfigStore.config },
+            accessToken = { hardcoverTokenProvider.accessToken() }
+        )
     }
 
     val notesExporter: NotesExporter by lazy {

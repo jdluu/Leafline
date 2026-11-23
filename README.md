@@ -44,9 +44,10 @@ and a sleep timer (5–60 minutes or end of chapter) that fades the audio out.
 built-in public-domain ones) and download straight into the library.
 
 **Optional Hardcover sync.** If you track reading on Hardcover, Leafline can send
-a book's status and page progress there. It is off until you add an API token,
-which is stored encrypted on the device, and nothing is sent without your
-matching book having an ISBN.
+a book's status and page progress there. You sign in once and the connection
+refreshes itself, so nothing expires mid-read; a pasted API token works too. It
+stays off until you switch it on, the credentials are encrypted on the device,
+and nothing is sent for a book with no ISBN.
 
 ## Loading books
 

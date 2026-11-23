@@ -59,11 +59,10 @@ four properties only for a signed release; CI needs none.
 
 Always do:
 
-- Before reporting a task done, run `./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`, then `bash scripts/check_dynamic_type.sh`, `bash scripts/check_touch_targets.sh`, and `git diff --check`; paste the real output.
+- Before reporting done, run `:app:testDebugUnitTest :app:lintDebug :app:assembleDebug`, both `scripts/check_*` guards, and `git diff --check`; paste the real output.
 - Add a JVM unit test for new domain logic; keep domain models and mappers free of Android, Room, and Readium types.
 - Set text through `MaterialTheme.typography`. Never set a text size in dp or px.
-- Keep every interactive control at least 48dp, including icon buttons.
-- Keep all user data on device. No analytics, crash reporting, or telemetry.
+- Keep every control at least 48dp, icon buttons included. Keep user data on device: no analytics, crash reporting, or telemetry.
 
 Ask first:
 
@@ -131,6 +130,8 @@ PRODUCT.md               product record: audiences and their precedence, purpose
 - Room: `Migration(n, n + 1)` objects only, never `fallbackToDestructiveMigration`. SQLite types are `TEXT`, `INTEGER`, and `REAL`; there is no `BOOLEAN`.
 - Substitute through the existing seams, never new ones: `KoreaderSyncApi`, `HardcoverApi`, `EpubImporter`, `OpdsClient`, `NotesExporter`, all wired in `AppContainer`.
 - Credentials go through `SecretCipher` into SharedPreferences, never plaintext JSON, never a log line.
+- The Hardcover OAuth client id is not a secret and comes from `leafline.hardcoverClientId` in
+  `gradle.properties` or `HARDCOVER_CLIENT_ID`; the PKCE verifier is the secret and stays encrypted.
 - Push progress and save state inside `withContext(NonCancellable)` during teardown.
 
 ## Testing and mocking
@@ -138,8 +139,7 @@ PRODUCT.md               product record: audiences and their precedence, purpose
 - JVM: JUnit4 with Robolectric, Turbine, and kotlinx-coroutines-test; the default layer.
 - HTTP: MockWebServer against the real client. Never call a real server.
 - Prefer hand-rolled fakes over mocking frameworks; put pure logic behind injected lambdas so it tests without a device.
-- Instrumented: Compose UI test plus uiautomator via `ReaderTestHelper`; assert semantics and text, never pixels, because the Readium navigator is a WebView.
-- Run one instrumented class at a time with several devices attached, pinning `adb -s <serial>`.
+- Instrumented: Compose UI test plus uiautomator via `ReaderTestHelper`; assert semantics and text, never pixels, because the Readium navigator is a WebView. With several devices attached, pin `adb -s <serial>`.
 - Keep tests deterministic: inject clocks and identifiers, never wall time.
 - No coverage threshold; every new domain behaviour needs a test.
 
