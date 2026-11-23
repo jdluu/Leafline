@@ -32,6 +32,23 @@ object LibraryBackupSerializer {
         }
         root.put("books", booksArray)
 
+        if (backup.readingSessions.isNotEmpty()) {
+            val sessions = JSONArray()
+            backup.readingSessions.forEach { session ->
+                val obj = JSONObject()
+                obj.put("bookStableId", session.bookStableId)
+                obj.put("startTimeEpochMillis", session.startTimeEpochMillis)
+                obj.put("endTimeEpochMillis", session.endTimeEpochMillis)
+                obj.put("activeDurationMillis", session.activeDurationMillis)
+                session.startProgression?.let { obj.put("startProgression", it) }
+                session.endProgression?.let { obj.put("endProgression", it) }
+                session.startLocatorJson?.let { obj.put("startLocatorJson", it) }
+                session.endLocatorJson?.let { obj.put("endLocatorJson", it) }
+                sessions.put(obj)
+            }
+            root.put("readingSessions", sessions)
+        }
+
         if (backup.hardcoverTracking.isNotEmpty()) {
             val tracking = JSONObject()
             backup.hardcoverTracking.forEach { (stableId, choice) -> tracking.put(stableId, choice) }
@@ -190,6 +207,23 @@ object LibraryBackupSerializer {
         }
 
         return LibraryBackup(
+            readingSessions = root.optJSONArray("readingSessions")?.let { array ->
+                (0 until array.length()).mapNotNull { index ->
+                    val obj = array.optJSONObject(index) ?: return@mapNotNull null
+                    val book = obj.optString("bookStableId")
+                    if (book.isBlank()) return@mapNotNull null
+                    ReadingSessionBackup(
+                        bookStableId = book,
+                        startTimeEpochMillis = obj.optLong("startTimeEpochMillis"),
+                        endTimeEpochMillis = obj.optLong("endTimeEpochMillis"),
+                        activeDurationMillis = obj.optLong("activeDurationMillis"),
+                        startProgression = if (obj.has("startProgression")) obj.optDouble("startProgression") else null,
+                        endProgression = if (obj.has("endProgression")) obj.optDouble("endProgression") else null,
+                        startLocatorJson = if (obj.has("startLocatorJson")) obj.optString("startLocatorJson") else null,
+                        endLocatorJson = if (obj.has("endLocatorJson")) obj.optString("endLocatorJson") else null
+                    )
+                }
+            }.orEmpty(),
             hardcoverTracking = root.optJSONObject("hardcoverTracking")?.let { obj ->
                 obj.keys().asSequence().associateWith { key -> obj.optString(key) }
             }.orEmpty(),
