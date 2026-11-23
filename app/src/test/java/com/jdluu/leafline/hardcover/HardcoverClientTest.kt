@@ -115,6 +115,83 @@ class HardcoverClientTest {
         assertNull(client().userBookRead("tok", userId = 42, bookId = 19))
     }
 
+    // The three mutations were written against the wrong payload shape and every
+    // one was rejected by the live API with "field not found in type". These bodies
+    // are the real responses, so the shape cannot silently regress again.
+
+    @Test
+    fun `insert reads the library entry through the payload's user_book`() = runBlocking {
+        server.enqueue(
+            MockResponse().setBody(
+                """{"data":{"insert_user_book":{"error":null,"id":21080821,"user_book":{"id":21080821,"status_id":2,"user_book_reads":[{"id":7813975,"edition":{"pages":352}}]}}}}"""
+            )
+        )
+
+        val read = client().insertUserBook("tok", bookId = 28722, statusId = 2)!!
+
+        assertEquals(21080821, read.userBookId)
+        assertEquals(7813975, read.openReadId)
+        assertEquals(352, read.edition!!.pages)
+    }
+
+    @Test
+    fun `insert surfaces a logical error returned on a 200`() = runBlocking {
+        server.enqueue(
+            MockResponse().setBody(
+                """{"data":{"insert_user_book":{"error":"Book already in library","id":null,"user_book":null}}}"""
+            )
+        )
+
+        val failure = runCatching { client().insertUserBook("tok", bookId = 1, statusId = 2) }
+            .exceptionOrNull()
+
+        assertTrue("a refused insert must not read as success: $failure", failure is HardcoverException)
+        assertTrue((failure?.message ?: "").contains("already in library"))
+    }
+
+    @Test
+    fun `update status accepts the nested user_book payload`() = runBlocking {
+        server.enqueue(
+            MockResponse().setBody(
+                """{"data":{"update_user_book":{"error":null,"id":21080821,"user_book":{"id":21080821,"status_id":3}}}}"""
+            )
+        )
+
+        client().updateStatus("tok", userBookId = 21080821, statusId = 3)
+
+        val sent = server.takeRequest()
+        val body = sent.body.readUtf8()
+        assertTrue("status_id must be nested under user_book", body.contains("user_book { id status_id }"))
+    }
+
+    @Test
+    fun `update progress accepts the nested user_book_read payload`() = runBlocking {
+        server.enqueue(
+            MockResponse().setBody(
+                """{"data":{"update_user_book_read":{"error":null,"id":7813975,"user_book_read":{"id":7813975,"progress_pages":176}}}}"""
+            )
+        )
+
+        client().updateProgress("tok", userBookReadId = 7813975, pages = 176)
+
+        val body = server.takeRequest().body.readUtf8()
+        assertTrue("progress_pages must be nested under user_book_read", body.contains("user_book_read { id progress_pages }"))
+    }
+
+    @Test
+    fun `a rejected status update is a failure`() = runBlocking {
+        server.enqueue(
+            MockResponse().setBody(
+                """{"data":{"update_user_book":{"error":"Status not allowed","id":null,"user_book":null}}}"""
+            )
+        )
+
+        val failure = runCatching { client().updateStatus("tok", userBookId = 1, statusId = 9) }
+            .exceptionOrNull()
+
+        assertTrue(failure is HardcoverException)
+    }
+
     @Test
     fun `an error payload without a status code is a failure, not a silent success`() = runBlocking {
         server.enqueue(MockResponse().setBody("""{"errors":[{"message":"field not found"}]}"""))
