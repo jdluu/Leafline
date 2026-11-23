@@ -63,8 +63,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -86,8 +88,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.lifecycleScope
+import com.jdluu.leafline.hardcover.HardcoverBookPreference
+import com.jdluu.leafline.hardcover.HardcoverTrackingDecision
 import com.jdluu.leafline.hardcover.HardcoverConfig
 import com.jdluu.leafline.hardcover.HardcoverOAuthException
+import com.jdluu.leafline.hardcover.HardcoverTrackingMode
 import com.jdluu.leafline.hardcover.HardcoverConfigStore
 import com.jdluu.leafline.di.appContainer
 import androidx.compose.foundation.layout.Spacer
@@ -99,6 +104,7 @@ import androidx.compose.material.icons.filled.Download
 import com.jdluu.leafline.export.BookExportData
 import com.jdluu.leafline.export.NotesExporter
 import com.jdluu.leafline.export.ui.NotesExportSheet
+import com.jdluu.leafline.library.BookIdentity
 import com.jdluu.leafline.library.LibraryBook
 import com.jdluu.leafline.library.LibraryFolderStore
 import com.jdluu.leafline.library.LibraryFolderViewModel
@@ -423,6 +429,32 @@ fun LeaflineApp(activity: MainActivity) {
 
     var pendingReplaceFolderUri by rememberSaveable { mutableStateOf<String?>(null) }
 
+    // A book the reader has not yet decided about, held while the prompt is open.
+    var pendingTrackingBook by remember { mutableStateOf<LibraryBook?>(null) }
+
+    /**
+     * Opens a book, asking first when Hardcover is on and the reader has chosen to be
+     * asked about this one. Any failure to read the setting opens the book rather than
+     * blocking reading behind a question about a background feature.
+     */
+    val openReaderOrAsk: (LibraryBook) -> Unit = { book ->
+        val shouldAsk = runCatching {
+            activity.appContainer.hardcoverConfigStore.load()?.enabled == true &&
+                activity.appContainer.hardcoverTracking.decide(
+                    book.stableId,
+                    BookIdentity.publicationOf(book.stableId)
+                ) == HardcoverTrackingDecision.Ask
+        }.getOrDefault(false)
+
+        if (shouldAsk) {
+            pendingTrackingBook = book
+        } else {
+            activity.startActivity(ReaderActivity.newIntent(activity, book.filePath))
+            @Suppress("DEPRECATION")
+            activity.overridePendingTransition(android.R.anim.fade_in, 0)
+        }
+    }
+
     val addLibraryFolderLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
@@ -478,7 +510,8 @@ fun LeaflineApp(activity: MainActivity) {
         ) { padding ->
             Surface(modifier = Modifier.fillMaxSize().padding(padding)) {
                 when (LeaflineTab.entries.getOrNull(selectedTab)) {
-                    LeaflineTab.Library -> LibraryScreen(
+                    LeaflineTab.Library -> {
+                        LibraryScreen(
                         viewModel = libraryViewModel,
                         foldersViewModel = libraryFolderViewModel,
                         folderRescanViewModel = folderRescanViewModel,
@@ -490,16 +523,35 @@ fun LeaflineApp(activity: MainActivity) {
                             pendingReplaceFolderUri = uri
                             addLibraryFolderLauncher.launch(null)
                         },
-                        onOpenBook = { book ->
-                            activity.startActivity(
-                                ReaderActivity.newIntent(activity, book.filePath)
-                            )
-                            @Suppress("DEPRECATION")
-                            activity.overridePendingTransition(
-                                android.R.anim.fade_in, 0
-                            )
-                        }
+                        onOpenBook = { book -> openReaderOrAsk(book) }
                     )
+                    pendingTrackingBook?.let { book ->
+                        HardcoverTrackingPrompt(
+                            onAnswer = { tracked ->
+                                activity.appContainer.hardcoverTracking.remember(
+                                    book.stableId,
+                                    if (tracked) {
+                                        HardcoverBookPreference.TRACK
+                                    } else {
+                                        HardcoverBookPreference.IGNORE
+                                    }
+                                )
+                                pendingTrackingBook = null
+                                activity.startActivity(
+                                    ReaderActivity.newIntent(activity, book.filePath)
+                                )
+                            },
+                            onDismiss = {
+                                // Dismissing is not an answer: nothing is remembered and
+                                // the book opens, so the question can be asked again.
+                                pendingTrackingBook = null
+                                activity.startActivity(
+                                    ReaderActivity.newIntent(activity, book.filePath)
+                                )
+                            }
+                        )
+                    }
+                    }
                     LeaflineTab.Explore -> OpdsScreen(
                         viewModel = opdsViewModel,
                         onOpenBook = { book ->
@@ -1019,6 +1071,86 @@ private fun HardcoverSection() {
     }
 }
 
+/**
+ * Which books are allowed to reach Hardcover.
+ *
+ * "All books" is the default because switching sync on is already the consent;
+ * asking about each book would be a second question the reader has effectively
+ * answered. "Ask each book" exists for people who want to keep some out.
+ */
+/**
+ * Asks once whether one book may be sent to Hardcover.
+ *
+ * Dismissing is deliberately not an answer: it opens the book and records nothing, so
+ * an accidental tap does not silently opt a book out for good.
+ */
+@Composable
+private fun HardcoverTrackingPrompt(
+    onAnswer: (tracked: Boolean) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Send this book to Hardcover?") },
+        text = {
+            Text(
+                "Leafline can send this book's reading status and page progress to your " +
+                    "Hardcover account as you read it. The answer is remembered, and you " +
+                    "can change it later in the book's details."
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onAnswer(true) }) { Text("Send") }
+        },
+        dismissButton = {
+            TextButton(onClick = { onAnswer(false) }) { Text("Don't send") }
+        }
+    )
+}
+
+@Composable
+private fun HardcoverTrackingModePicker(
+    mode: HardcoverTrackingMode,
+    onModeChange: (HardcoverTrackingMode) -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+    ) {
+        Text(
+            "Track books",
+            style = MaterialTheme.typography.bodyMedium
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            val options = listOf(
+                HardcoverTrackingMode.ALL_BOOKS to "All books",
+                HardcoverTrackingMode.ASK_EACH_BOOK to "Ask each book",
+                HardcoverTrackingMode.OFF to "Off"
+            )
+            options.forEach { (option, label) ->
+                FilterChip(
+                    selected = mode == option,
+                    onClick = { onModeChange(option) },
+                    label = { Text(label) }
+                )
+            }
+        }
+        Text(
+            text = when (mode) {
+                HardcoverTrackingMode.ALL_BOOKS ->
+                    "Every book with a matching ISBN is sent as you read it."
+                HardcoverTrackingMode.ASK_EACH_BOOK ->
+                    "You are asked once for each book, and the answer is remembered. " +
+                        "Change a book's answer in its details."
+                HardcoverTrackingMode.OFF ->
+                    "Nothing is sent. Your Hardcover connection is kept."
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
 @Composable
 private fun HardcoverForm(onConfigChanged: () -> Unit) {
     val context = LocalContext.current
@@ -1140,6 +1272,15 @@ private fun HardcoverForm(onConfigChanged: () -> Unit) {
                     onCheckedChange = { next ->
                         persist(stored.copy(enabled = next))
                         status = if (next) "Sending progress" else "Paused"
+                    }
+                )
+            }
+            if (stored.enabled) {
+                HardcoverTrackingModePicker(
+                    mode = context.appContainer.hardcoverTracking.mode(),
+                    onModeChange = { mode ->
+                        context.appContainer.hardcoverTracking.setMode(mode)
+                        onConfigChanged()
                     }
                 )
             }

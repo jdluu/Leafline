@@ -13,6 +13,8 @@ import com.jdluu.leafline.hardcover.HardcoverConfigPersistence
 import com.jdluu.leafline.hardcover.HardcoverOAuthClient
 import com.jdluu.leafline.hardcover.HardcoverOAuthCoordinator
 import com.jdluu.leafline.hardcover.HardcoverTokenProvider
+import com.jdluu.leafline.hardcover.HardcoverTrackingResolver
+import com.jdluu.leafline.hardcover.HardcoverTrackingStorage
 import com.jdluu.leafline.hardcover.HardcoverConfigStorage
 import com.jdluu.leafline.hardcover.HardcoverSyncer
 import com.jdluu.leafline.library.data.AnnotationRepository
@@ -136,6 +138,14 @@ class AppContainer(private val context: Context) {
 
     val hardcoverTokenProvider: HardcoverTokenProvider by lazy {
         HardcoverTokenProvider(store = hardcoverConfigStore, oauth = hardcoverOAuthClient)
+    }
+
+    /**
+     * Which books may be sent: the mode plus the reader's per-book answers. Kept
+     * separate from the connection so declining one book never disturbs the account.
+     */
+    val hardcoverTracking: HardcoverTrackingResolver by lazy {
+        HardcoverTrackingResolver(HardcoverTrackingStorage(context))
     }
 
     val hardcoverOAuth: HardcoverOAuthCoordinator by lazy {

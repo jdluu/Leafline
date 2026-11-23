@@ -8,7 +8,7 @@
 A local-first EPUB reader for Android. Reading, search, annotations, statistics,
 and the library all work offline, with no account and no telemetry. Bring your own
 books, or browse OPDS 1.x/2.0 catalogs (Calibre-web, Kavita) over your own network.
-Progress sync is optional and goes to a KOReader-compatible server you host.
+Progress sync is optional and can go to a KOReader-compatible server you host, to Hardcover, or to both at once.
 
 <img src="screenshots/library.png" alt="Leafline library in list layout: four books with covers, authors, reading-status tags, and progress" width="300" /> <img src="screenshots/reader.png" alt="Leafline reader showing the Chapter 2 heading above justified serif prose, with progress in the footer" width="300" />
 
@@ -44,10 +44,12 @@ and a sleep timer (5–60 minutes or end of chapter) that fades the audio out.
 built-in public-domain ones) and download straight into the library.
 
 **Optional Hardcover sync.** If you track reading on Hardcover, Leafline can send
-a book's status and page progress there. You sign in once and the connection
-refreshes itself, so nothing expires mid-read; a pasted API token works too. It
-stays off until you switch it on, the credentials are encrypted on the device,
-and nothing is sent for a book with no ISBN.
+a book's status and page progress there — on its own, or alongside a KOReader
+server. You sign in once and the connection refreshes itself, so nothing expires
+mid-read; a pasted API token works too. It stays off until you switch it on, the
+credentials are encrypted on the device, and nothing is sent for a book with no
+ISBN. You choose which books go: all of them, ask once per book, or none, and any
+single book can be changed later from its details.
 
 ## Loading books
 

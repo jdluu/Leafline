@@ -13,6 +13,7 @@ import androidx.work.WorkerParameters
 import com.jdluu.leafline.di.appContainer
 import com.jdluu.leafline.hardcover.HardcoverConfigStore
 import com.jdluu.leafline.hardcover.HardcoverPushOutcome
+import com.jdluu.leafline.hardcover.HardcoverTrackingDecision
 import com.jdluu.leafline.library.BookIdentity
 import kotlinx.coroutines.flow.first
 import java.util.UUID
@@ -120,12 +121,19 @@ class SyncWorker(
         allBooks: List<com.jdluu.leafline.library.LibraryBook>
     ): Pair<Int, Int> {
         val syncer = applicationContext.appContainer.hardcoverSyncer
+        val tracking = applicationContext.appContainer.hardcoverTracking
         var pushed = 0
         var failed = 0
 
         for (book in allBooks) {
             val locatorJson = book.lastLocatorJson ?: continue
             val percentage = ReadingProgressMath.percentageFromLocator(locatorJson) ?: continue
+
+            // The reader may have declined this book, or asked to be prompted about
+            // it and not answered yet; in both cases nothing is sent.
+            val decision = tracking.decide(book.stableId, BookIdentity.publicationOf(book.stableId))
+            if (decision != HardcoverTrackingDecision.Track) continue
+
             val outcome = syncer.push(
                 identifier = BookIdentity.publicationOf(book.stableId),
                 status = book.readingStatus,
