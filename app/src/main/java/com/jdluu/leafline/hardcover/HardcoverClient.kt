@@ -90,7 +90,8 @@ class HardcoverClient(
         statusId: Int
     ): HardcoverRead? = withContext(dispatcher) {
         val data = post(token, MUTATION_INSERT_USER_BOOK, mapOf("bookId" to bookId, "statusId" to statusId))
-        val inserted = data.getAsJsonObject("insert_user_book") ?: return@withContext null
+        val payload = data.requireMutation("insert_user_book")
+        val inserted = payload.getAsJsonObject("user_book") ?: return@withContext null
         val reads = inserted.getAsJsonArray("user_book_reads")
         val openRead = reads?.takeIf { it.size() > 0 }?.get(0)?.asJsonObject
         HardcoverRead(
@@ -108,13 +109,15 @@ class HardcoverClient(
 
     override suspend fun updateStatus(token: String, userBookId: Int, statusId: Int) =
         withContext(dispatcher) {
-            post(token, MUTATION_UPDATE_STATUS, mapOf("id" to userBookId, "statusId" to statusId))
+            val data = post(token, MUTATION_UPDATE_STATUS, mapOf("id" to userBookId, "statusId" to statusId))
+            data.requireMutation("update_user_book")
             Unit
         }
 
     override suspend fun updateProgress(token: String, userBookReadId: Int, pages: Int) =
         withContext(dispatcher) {
-            post(token, MUTATION_UPDATE_PROGRESS, mapOf("readId" to userBookReadId, "pages" to pages))
+            val data = post(token, MUTATION_UPDATE_PROGRESS, mapOf("readId" to userBookReadId, "pages" to pages))
+            data.requireMutation("update_user_book_read")
             Unit
         }
 
@@ -173,6 +176,21 @@ class HardcoverClient(
         }
     }
 
+    /**
+     * Returns the mutation payload, rejecting it when Hasura reported a logical
+     * failure in `error` on an otherwise-200 response. Without this a refused write
+     * (for example a book already in the library) would read as success.
+     */
+    private fun JsonObject.requireMutation(name: String): JsonObject {
+        val payload = getAsJsonObject(name)
+            ?: throw HardcoverException("Hardcover did not return $name")
+        val error = payload.get("error")
+        if (error != null && !error.isJsonNull) {
+            throw HardcoverException(error.asString)
+        }
+        return payload
+    }
+
     private fun JsonObject.requiredInt(field: String, label: String): Int {
         val element = get(field)
         if (element == null || element.isJsonNull) {
@@ -216,26 +234,39 @@ class HardcoverClient(
             }
         """
 
+        // The mutation payloads are Hasura "IdType" wrappers: { error, id, <row> }.
+        // Selecting a column directly (user_book_reads / status_id / progress_pages)
+        // is rejected with "field not found in type", so the row is selected nested.
         internal const val MUTATION_INSERT_USER_BOOK = """
             mutation InsertUserBook(${'$'}bookId: Int!, ${'$'}statusId: Int!) {
               insert_user_book(object: {book_id: ${'$'}bookId, status_id: ${'$'}statusId}) {
+                error
                 id
-                user_book_reads(order_by: {id: desc}, limit: 1) { id edition { pages } }
+                user_book {
+                  id
+                  status_id
+                  user_book_reads(order_by: {id: desc}, limit: 1) { id edition { pages } }
+                }
               }
             }
         """
 
         internal const val MUTATION_UPDATE_STATUS = """
             mutation UpdateStatus(${'$'}id: Int!, ${'$'}statusId: Int!) {
-              update_user_book(id: ${'$'}id, object: {status_id: ${'$'}statusId}) { id status_id }
+              update_user_book(id: ${'$'}id, object: {status_id: ${'$'}statusId}) {
+                error
+                id
+                user_book { id status_id }
+              }
             }
         """
 
         internal const val MUTATION_UPDATE_PROGRESS = """
             mutation UpdateProgress(${'$'}readId: Int!, ${'$'}pages: Int!) {
               update_user_book_read(id: ${'$'}readId, object: {progress_pages: ${'$'}pages}) {
+                error
                 id
-                progress_pages
+                user_book_read { id progress_pages }
               }
             }
         """
