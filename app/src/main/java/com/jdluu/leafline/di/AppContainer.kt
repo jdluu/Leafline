@@ -84,6 +84,7 @@ class AppContainer(private val context: Context) {
             collectionDao = database.collectionDao(),
             bookmarkDao = database.bookmarkDao(),
             annotationDao = database.annotationDao(),
+            readingSessionDao = database.readingSessionDao(),
             appVersion = runCatching {
                 context.packageManager.getPackageInfo(context.packageName, 0).versionName
             }.getOrNull() ?: "unknown",

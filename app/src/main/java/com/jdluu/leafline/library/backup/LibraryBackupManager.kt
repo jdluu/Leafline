@@ -10,6 +10,8 @@ import com.jdluu.leafline.library.data.local.CollectionDao
 import com.jdluu.leafline.hardcover.HardcoverBookPreference
 import com.jdluu.leafline.hardcover.HardcoverTrackingStore
 import com.jdluu.leafline.library.data.local.CollectionEntity
+import com.jdluu.leafline.library.data.local.ReadingSessionDao
+import com.jdluu.leafline.library.data.local.ReadingSessionEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -21,6 +23,7 @@ class LibraryBackupManager(
     private val collectionDao: CollectionDao,
     private val bookmarkDao: BookmarkDao,
     private val annotationDao: AnnotationDao,
+    private val readingSessionDao: ReadingSessionDao,
     /** Recorded in the file so a shared backup can be traced to the build that wrote it. */
     private val appVersion: String = "1.0",
     /**
@@ -43,6 +46,19 @@ class LibraryBackupManager(
                 }.toMap()
             }
             .orEmpty()
+
+        val sessions = readingSessionDao.getAll().map { session ->
+            ReadingSessionBackup(
+                bookStableId = session.bookId,
+                startTimeEpochMillis = session.startTimeEpochMillis,
+                endTimeEpochMillis = session.endTimeEpochMillis,
+                activeDurationMillis = session.activeDurationMillis,
+                startProgression = session.startProgression,
+                endProgression = session.endProgression,
+                startLocatorJson = session.startLocatorJson,
+                endLocatorJson = session.endLocatorJson
+            )
+        }
 
         val books = allBooks.map { entity ->
             BookBackup(
@@ -84,14 +100,15 @@ class LibraryBackupManager(
         }
 
         LibraryBackup(
-            version = 2,
+            version = 3,
             exportedAt = System.currentTimeMillis(),
             appVersion = appVersion,
             books = books,
             collections = collections,
             bookmarks = bookmarks,
             annotations = annotations,
-            hardcoverTracking = trackingChoices
+            hardcoverTracking = trackingChoices,
+            readingSessions = sessions
         )
     }
 
@@ -227,13 +244,49 @@ class LibraryBackupManager(
             }
         }
 
+        // Sessions are restored last, because a session without its book is an orphan.
+        // Identity is (book, start, end): importing the same file twice must not double
+        // count the reader's hours.
+        var readingSessionsRestored = 0
+        var readingSessionsSkipped = 0
+        if (backup.readingSessions.isNotEmpty()) {
+            val knownBooks = bookDao.getAllBooksList().map { it.stableId }.toSet()
+            val existing = readingSessionDao.getAll()
+                .map { Triple(it.bookId, it.startTimeEpochMillis, it.endTimeEpochMillis) }
+                .toMutableSet()
+
+            backup.readingSessions.forEach { session ->
+                when {
+                    session.bookStableId !in knownBooks -> readingSessionsSkipped++
+                    !existing.add(session.identity) -> readingSessionsSkipped++
+                    else -> {
+                        readingSessionDao.insert(
+                            ReadingSessionEntity(
+                                bookId = session.bookStableId,
+                                startTimeEpochMillis = session.startTimeEpochMillis,
+                                endTimeEpochMillis = session.endTimeEpochMillis,
+                                activeDurationMillis = session.activeDurationMillis,
+                                startProgression = session.startProgression,
+                                endProgression = session.endProgression,
+                                startLocatorJson = session.startLocatorJson,
+                                endLocatorJson = session.endLocatorJson
+                            )
+                        )
+                        readingSessionsRestored++
+                    }
+                }
+            }
+        }
+
         BackupRestoreSummary(
             booksMatched = booksMatched,
             tagsUpdated = tagsUpdated,
             collectionsRestored = collectionsRestored,
             bookmarksRestored = bookmarksRestored,
             annotationsRestored = annotationsRestored,
-            hardcoverChoicesRestored = hardcoverChoicesRestored
+            hardcoverChoicesRestored = hardcoverChoicesRestored,
+            readingSessionsRestored = readingSessionsRestored,
+            readingSessionsSkipped = readingSessionsSkipped
         )
     }
 

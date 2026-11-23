@@ -142,4 +142,72 @@ class LibraryBackupSerializerTest {
             restored.hardcoverTracking.isEmpty()
         )
     }
+
+    @Test
+    fun `reading sessions survive a round trip`() {
+        val backup = LibraryBackup(
+            version = 3,
+            books = listOf(BookBackup(stableId = "book-1", title = "T", authors = emptyList())),
+            readingSessions = listOf(
+                ReadingSessionBackup(
+                    bookStableId = "book-1",
+                    startTimeEpochMillis = 1_700_000_000_000L,
+                    endTimeEpochMillis = 1_700_000_600_000L,
+                    activeDurationMillis = 540_000L,
+                    startProgression = 0.1,
+                    endProgression = 0.2,
+                    startLocatorJson = "{\"a\":1}",
+                    endLocatorJson = "{\"a\":2}"
+                )
+            )
+        )
+
+        val restored = LibraryBackupSerializer.deserialize(LibraryBackupSerializer.serialize(backup))
+
+        val session = restored.readingSessions.single()
+        assertEquals("book-1", session.bookStableId)
+        assertEquals(1_700_000_000_000L, session.startTimeEpochMillis)
+        assertEquals(1_700_000_600_000L, session.endTimeEpochMillis)
+        assertEquals(540_000L, session.activeDurationMillis)
+        assertEquals(0.2, session.endProgression!!, 0.0001)
+        assertEquals("{\"a\":2}", session.endLocatorJson)
+    }
+
+    @Test
+    fun `a version 2 file with no sessions still loads`() {
+        val v2 = """
+            {"version":2,"exportedAt":1700000000000,"appVersion":"1.0",
+             "books":[{"stableId":"b","title":"T","authors":[]}],
+             "collections":[],"bookmarks":[],"annotations":[],
+             "hardcoverTracking":{"b":"IGNORE"}}
+        """.trimIndent()
+
+        val restored = LibraryBackupSerializer.deserialize(v2)
+
+        assertTrue("a v2 file must not invent sessions", restored.readingSessions.isEmpty())
+        assertEquals(mapOf("b" to "IGNORE"), restored.hardcoverTracking)
+    }
+
+    /**
+     * The merge rule: identity is (book, start, end), so importing the same file twice
+     * collapses to one session and the reader's hours are not double counted.
+     */
+    @Test
+    fun `session identity deduplicates a repeated import`() {
+        val a = ReadingSessionBackup("book-1", 100L, 200L, 90_000L)
+        val sameAgain = ReadingSessionBackup("book-1", 100L, 200L, 90_000L)
+        val differentDuration = ReadingSessionBackup("book-1", 100L, 200L, 1L)
+        val laterStart = ReadingSessionBackup("book-1", 101L, 200L, 90_000L)
+        val otherBook = ReadingSessionBackup("book-2", 100L, 200L, 90_000L)
+
+        val identities = listOf(a, sameAgain, differentDuration, laterStart, otherBook)
+            .map { it.identity }
+            .toSet()
+
+        assertEquals(
+            "only book, start and end distinguish sessions; duration must not resurrect one",
+            3,
+            identities.size
+        )
+    }
 }

@@ -173,6 +173,13 @@ fun BackupRestoreSheet(
                                                 append("${summary.collectionsRestored} ${plural(summary.collectionsRestored, "collection")} restored • ")
                                                 append("${summary.bookmarksRestored} ${plural(summary.bookmarksRestored, "bookmark")} • ")
                                                 append("${summary.annotationsRestored} ${plural(summary.annotationsRestored, "highlight")}")
+
+                                                // Only mention sessions when the file
+                                                // actually carried some, so restoring an
+                                                // older backup does not show a bare "0 sessions".
+                                                if (summary.readingSessionsRestored > 0) {
+                                                    append(" • ${summary.readingSessionsRestored} ${plural(summary.readingSessionsRestored, "reading session")} restored")
+                                                }
                                             },
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSecondaryContainer
