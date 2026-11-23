@@ -29,10 +29,26 @@
         android:theme="@style/Theme.Leafline.Splash">
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!--
+              Hardcover OAuth redirect. The custom scheme matches
+              HardcoverOAuth.REDIRECT_URI, which must be registered on the developer
+              app verbatim. singleTop keeps the running activity rather than
+              stacking a second copy behind the browser.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <!-- Scheme only: the registered redirect is com.jdluu.leafline:/oauth2/callback,
+                     which has no authority, so a host/path filter would never match.
+                     MainActivity checks the path before acting on it. -->
+                <data android:scheme="com.jdluu.leafline" />
             </intent-filter>
         </activity>
         <activity

@@ -54,6 +54,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
@@ -86,6 +87,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.lifecycleScope
 import com.jdluu.leafline.hardcover.HardcoverConfig
+import com.jdluu.leafline.hardcover.HardcoverOAuthException
 import com.jdluu.leafline.hardcover.HardcoverConfigStore
 import com.jdluu.leafline.di.appContainer
 import androidx.compose.foundation.layout.Spacer
@@ -137,6 +139,12 @@ import androidx.compose.material3.Switch
 
 private const val TAG = "MainActivity"
 
+private const val HARDCOVER_REDIRECT_SCHEME = "com.jdluu.leafline"
+private const val HARDCOVER_REDIRECT_PATH = "/oauth2/callback"
+
+/** Bumped when a redirect changes the Hardcover connection, to refresh the row. */
+private val hardcoverConfigVersion = mutableIntStateOf(0)
+
 class MainActivity : ComponentActivity() {
     companion object {
         internal const val EPUB_MIME_TYPE = "application/epub+zip"
@@ -156,11 +164,50 @@ class MainActivity : ComponentActivity() {
             setTurnScreenOn(true)
         }
         setContent { LeaflineApp(this as MainActivity) }
+        // The intent this activity was created with, not the `intent` property: on a
+        // warm start getIntent() has not been updated yet at this point.
+        handleHardcoverRedirect(getIntent())
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         handleToast()
+        handleHardcoverRedirect(intent)
+    }
+
+    /**
+     * Completes a Hardcover sign-in the browser handed back.
+     *
+     * The scheme is matched in the manifest, but the path is checked here: another app
+     * can send an intent with our scheme, and only this one leads anywhere.
+     */
+    private fun handleHardcoverRedirect(intent: Intent?) {
+        val data = intent?.data ?: return
+        if (data.scheme != HARDCOVER_REDIRECT_SCHEME) return
+        if (!data.toString().contains(HARDCOVER_REDIRECT_PATH)) return
+
+        lifecycleScope.launch {
+            val coordinator = applicationContext.appContainer.hardcoverOAuth
+            try {
+                val config = coordinator.completeAuthorization(data.toString())
+                showToast(
+                    if (config.userId != null) {
+                        "Connected to Hardcover as user ${config.userId}. Turn on progress sync to start sending."
+                    } else {
+                        "Connected to Hardcover. Turn on progress sync to start sending."
+                    }
+                )
+            } catch (e: HardcoverOAuthException) {
+                showToast("Hardcover sign-in failed: ${e.message}")
+            } catch (e: Exception) {
+                showToast("Hardcover sign-in failed: ${e.message ?: "unknown error"}")
+            } finally {
+                // Re-read the settings row so it shows the new state without a restart.
+                HardcoverConfigStore.config = applicationContext.appContainer.hardcoverConfigStore.load()
+                hardcoverConfigVersion.value = hardcoverConfigVersion.value + 1
+            }
+        }
     }
 
     private fun handleToast() {
@@ -927,8 +974,12 @@ private data class SyncStatus(val message: String, val success: Boolean)
 /**
  * Opt-in Hardcover sync.
  *
- * Nothing is sent and no request is made until a token has been verified and the
- * switch turned on. The token is stored encrypted by [HardcoverConfigStorage].
+ * Two ways in: "Connect" runs the OAuth flow, which is the normal path and keeps a
+ * refresh token so the connection does not expire mid-read; pasting a personal API
+ * token stays available underneath for anyone who already has one, or for builds
+ * with no OAuth app registered.
+ *
+ * Neither path sends anything on its own: the switch is the opt-in.
  */
 @Composable
 private fun HardcoverSection() {
@@ -936,7 +987,12 @@ private fun HardcoverSection() {
     remember { context.appContainer.hardcoverConfigStore }
     var expanded by rememberSaveable { mutableStateOf(false) }
     var configVersion by remember { mutableIntStateOf(0) }
-    val stored = remember(configVersion) { HardcoverConfigStore.config }
+    // Reading the process-wide counter here is what refreshes the row when the browser
+    // hands the redirect back while this screen is already composed.
+    val bumped = hardcoverConfigVersion.intValue
+    val stored = remember(configVersion, bumped) {
+        HardcoverConfigStore.config ?: context.appContainer.hardcoverConfigStore.load()
+    }
 
     Column(modifier = Modifier.fillMaxWidth()) {
         SettingsSectionHeading("Hardcover")
@@ -944,17 +1000,14 @@ private fun HardcoverSection() {
             title = "Reading progress",
             summary = when {
                 stored == null -> "Not set up"
-                !stored.enabled -> "Set up, off"
+                stored.needsReauthorization -> "Sign in again"
+                !stored.enabled -> "Connected, paused"
                 else -> "Sending progress"
             },
             onClick = { expanded = !expanded },
             trailing = {
                 Icon(
-                    imageVector = if (expanded) {
-                        Icons.Default.ExpandLess
-                    } else {
-                        Icons.Default.ExpandMore
-                    },
+                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -970,11 +1023,17 @@ private fun HardcoverSection() {
 private fun HardcoverForm(onConfigChanged: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val uriHandler = LocalUriHandler.current
     remember { context.appContainer.hardcoverConfigStore }
-    val stored = HardcoverConfigStore.config
+    val coordinator = remember { context.appContainer.hardcoverOAuth }
+    val bumped = hardcoverConfigVersion.intValue
+    val stored = remember(bumped) {
+        HardcoverConfigStore.config ?: context.appContainer.hardcoverConfigStore.load()
+    }
+
     var token by remember { mutableStateOf(stored?.token.orEmpty()) }
     var tokenVisible by remember { mutableStateOf(false) }
-    var enabled by remember { mutableStateOf(stored?.enabled ?: false) }
+    var showTokenEntry by remember { mutableStateOf(false) }
     var working by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
 
@@ -984,9 +1043,10 @@ private fun HardcoverForm(onConfigChanged: () -> Unit) {
         // The worker exits immediately when nothing is enabled, so scheduling is
         // harmless; cancelling here would stop KOReader sync too.
         SyncWorker.schedule(context)
-        enabled = next.enabled
         onConfigChanged()
     }
+
+    val connected = stored != null && (stored.token.isNotBlank() || stored.needsReauthorization)
 
     Column(
         modifier = Modifier
@@ -994,89 +1054,81 @@ private fun HardcoverForm(onConfigChanged: () -> Unit) {
             .padding(top = Spacing.sm),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm)
     ) {
-        Text(
-            "Create a token at hardcover.app/account/api with the read:me, read:library " +
-                "and write:library scopes. It is stored encrypted on this device and is " +
-                "only used when you turn sync on.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        LeaflineTextField(
-            value = token,
-            onValueChange = {
-                token = it
-                status = null
-            },
-            label = "API token",
-            modifier = Modifier.fillMaxWidth(),
-            visualTransformation = if (tokenVisible) {
-                VisualTransformation.None
-            } else {
-                PasswordVisualTransformation()
-            },
-            trailingIcon = {
-                IconButton(onClick = { tokenVisible = !tokenVisible }) {
-                    Icon(
-                        imageVector = if (tokenVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                        contentDescription = if (tokenVisible) "Hide token" else "Show token"
-                    )
-                }
-            }
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Button(
-                onClick = {
-                    val clean = token.trim()
-                    if (clean.isEmpty() || working) return@Button
-                    working = true
-                    status = null
-                    scope.launch {
-                        try {
-                            val userId = context.appContainer.hardcoverApi.userId(clean)
-                            // Saving a verified token leaves the switch as it was,
-                            // so the integration still only runs when the reader
-                            // turns it on.
-                            persist(
-                                HardcoverConfig(
-                                    token = clean,
-                                    enabled = enabled,
-                                    userId = userId
-                                )
-                            )
-                            status = "Connected as Hardcover user $userId"
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: Exception) {
-                            status = e.message ?: "Could not reach Hardcover"
-                        } finally {
-                            working = false
-                        }
-                    }
-                },
-                enabled = token.isNotBlank() && !working
-            ) {
-                Text(if (working) "Checking\u2026" else "Test and save")
-            }
-            if (stored != null) {
-                TextButton(
+        if (coordinator.isConfigured) {
+            if (!connected) {
+                Text(
+                    "Sign in to send your reading progress to Hardcover. Leafline asks only " +
+                        "for your profile, your library, catalog lookups, and writing progress.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Button(
                     onClick = {
-                        context.appContainer.hardcoverConfigStore.clear()
-                        HardcoverConfigStore.config = null
-                        token = ""
-                        enabled = false
-                        status = "Token removed"
-                        onConfigChanged()
-                    }
+                        val url = coordinator.startAuthorization()
+                        if (url == null) {
+                            status = "Hardcover sign-in is not configured in this build."
+                        } else {
+                            uriHandler.openUri(url)
+                        }
+                    },
+                    enabled = !working
                 ) {
-                    Text("Remove token")
+                    Text("Connect to Hardcover")
+                }
+            } else {
+                Text(
+                    text = when {
+                        stored!!.needsReauthorization -> "Hardcover needs you to sign in again."
+                        stored.userId != null -> "Connected as Hardcover user ${stored.userId}."
+                        else -> "Connected to Hardcover."
+                    },
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    if (stored.needsReauthorization) {
+                        Button(
+                            onClick = {
+                                val url = coordinator.startAuthorization()
+                                if (url == null) {
+                                    status = "Hardcover sign-in is not configured in this build."
+                                } else {
+                                    uriHandler.openUri(url)
+                                }
+                            }
+                        ) { Text("Sign in again") }
+                    }
+                    TextButton(
+                        onClick = {
+                            working = true
+                            scope.launch {
+                                try {
+                                    coordinator.disconnect()
+                                    token = ""
+                                    status = "Disconnected from Hardcover"
+                                    onConfigChanged()
+                                } catch (e: CancellationException) {
+                                    throw e
+                                } catch (e: Exception) {
+                                    status = e.message ?: "Could not disconnect"
+                                } finally {
+                                    working = false
+                                }
+                            }
+                        },
+                        enabled = !working
+                    ) { Text("Disconnect") }
                 }
             }
+        } else {
+            Text(
+                "This build has no Hardcover OAuth app, so sign-in is unavailable. " +
+                    "You can still connect with a personal API token below.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
-        if (stored != null) {
+
+        if (connected && stored != null && !stored.needsReauthorization) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1084,7 +1136,7 @@ private fun HardcoverForm(onConfigChanged: () -> Unit) {
             ) {
                 Text("Send reading progress", style = MaterialTheme.typography.bodyMedium)
                 Switch(
-                    checked = enabled,
+                    checked = stored.enabled,
                     onCheckedChange = { next ->
                         persist(stored.copy(enabled = next))
                         status = if (next) "Sending progress" else "Paused"
@@ -1092,6 +1144,77 @@ private fun HardcoverForm(onConfigChanged: () -> Unit) {
                 )
             }
         }
+
+        TextButton(onClick = { showTokenEntry = !showTokenEntry }) {
+            Text(if (showTokenEntry) "Hide API token option" else "Use an API token instead")
+        }
+
+        if (showTokenEntry) {
+            Text(
+                "Create a token at hardcover.app/account/api with the read:me, read:library " +
+                    "and write:library scopes. It is stored encrypted on this device and is " +
+                    "only used when you turn sync on.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            LeaflineTextField(
+                value = token,
+                onValueChange = {
+                    token = it
+                    status = null
+                },
+                label = "API token",
+                modifier = Modifier.fillMaxWidth(),
+                visualTransformation = if (tokenVisible) {
+                    VisualTransformation.None
+                } else {
+                    PasswordVisualTransformation()
+                },
+                trailingIcon = {
+                    IconButton(onClick = { tokenVisible = !tokenVisible }) {
+                        Icon(
+                            imageVector = if (tokenVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                            contentDescription = if (tokenVisible) "Hide token" else "Show token"
+                        )
+                    }
+                }
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                Button(
+                    onClick = {
+                        val clean = token.trim()
+                        if (clean.isEmpty() || working) return@Button
+                        working = true
+                        status = null
+                        scope.launch {
+                            try {
+                                val userId = context.appContainer.hardcoverApi.userId(clean)
+                                // Saving a token leaves the switch as it was, so the
+                                // integration still only runs when the reader turns it on.
+                                persist(
+                                    HardcoverConfig.apiToken(
+                                        token = clean,
+                                        userId = userId,
+                                        enabled = stored?.enabled ?: false
+                                    )
+                                )
+                                status = "Connected as Hardcover user $userId"
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                status = e.message ?: "Could not reach Hardcover"
+                            } finally {
+                                working = false
+                            }
+                        }
+                    },
+                    enabled = token.isNotBlank() && !working
+                ) {
+                    Text(if (working) "Checking\u2026" else "Test and save")
+                }
+            }
+        }
+
         status?.let {
             Text(
                 text = it,

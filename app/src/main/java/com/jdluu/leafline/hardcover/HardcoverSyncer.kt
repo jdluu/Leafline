@@ -40,6 +40,12 @@ sealed interface HardcoverPushOutcome {
 class HardcoverSyncer(
     private val api: HardcoverApi,
     private val config: () -> HardcoverConfig?,
+    /**
+     * Supplies the access token, refreshing it when needed. Keeping this separate from
+     * [config] is what lets OAuth tokens stay short-lived without every push having to
+     * know how refresh works.
+     */
+    private val accessToken: suspend () -> String?,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
 
@@ -49,7 +55,11 @@ class HardcoverSyncer(
         progression: Double?
     ): HardcoverPushOutcome = withContext(dispatcher) {
         val current = config()
-        if (current == null || !current.enabled || current.token.isBlank()) {
+        if (current == null || !current.enabled) {
+            return@withContext HardcoverPushOutcome.Disabled
+        }
+        val token = accessToken()
+        if (token.isNullOrBlank()) {
             return@withContext HardcoverPushOutcome.Disabled
         }
 
@@ -57,21 +67,21 @@ class HardcoverSyncer(
             ?: return@withContext HardcoverPushOutcome.SkippedNoIsbn
 
         try {
-            val userId = current.userId ?: api.userId(current.token)
-            val edition = api.editionByIsbn13(current.token, isbn)
+            val userId = current.userId ?: api.userId(token)
+            val edition = api.editionByIsbn13(token, isbn)
                 ?: return@withContext HardcoverPushOutcome.NoMatchingEdition
 
             val statusId = HardcoverStatus.idFor(status)
-            val existing = api.userBookRead(current.token, userId, edition.bookId)
+            val existing = api.userBookRead(token, userId, edition.bookId)
 
             val read = existing
-                ?: api.insertUserBook(current.token, edition.bookId, statusId)
+                ?: api.insertUserBook(token, edition.bookId, statusId)
                 ?: return@withContext HardcoverPushOutcome.Failure("Hardcover did not return the new library entry")
 
             if (existing != null && existing.userBookId == read.userBookId) {
                 // Keep the remote status in step; Hardcover starts or finishes the
                 // read itself, so no journal entry is written here.
-                api.updateStatus(current.token, read.userBookId, statusId)
+                api.updateStatus(token, read.userBookId, statusId)
             }
 
             val pages = HardcoverProgress.pages(progression, read.edition?.pages ?: edition.pages)
@@ -79,7 +89,7 @@ class HardcoverSyncer(
             val readId = read.openReadId
                 ?: return@withContext HardcoverPushOutcome.StatusOnly
 
-            api.updateProgress(current.token, readId, pages)
+            api.updateProgress(token, readId, pages)
             HardcoverPushOutcome.Pushed
         } catch (e: HardcoverException) {
             when {

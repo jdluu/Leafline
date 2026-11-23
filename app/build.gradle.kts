@@ -23,6 +23,16 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
 
+        // Hardcover OAuth client id. It is not a secret (PKCE carries the proof), so it
+        // comes from a Gradle property or CI variable rather than being hardcoded here:
+        // set leafline.hardcoverClientId in ~/.gradle/gradle.properties, or the repo
+        // variable HARDCOVER_CLIENT_ID for CI. Blank means the OAuth button is hidden
+        // and only the pasted-token path is offered.
+        val hardcoverClientId = (project.findProperty("leafline.hardcoverClientId") as String?)
+            ?: System.getenv("HARDCOVER_CLIENT_ID")
+            ?: ""
+        buildConfigField("String", "HARDCOVER_CLIENT_ID", "\"$hardcoverClientId\"")
+
         javaCompileOptions {
             annotationProcessorOptions {
                 arguments += mapOf("room.schemaLocation" to "$projectDir/schemas")
@@ -77,7 +87,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
         isCoreLibraryDesugaringEnabled = true
     }
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
 }
 

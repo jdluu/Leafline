@@ -14,7 +14,7 @@ import okhttp3.Request
  * A public client sends no secret — the only proof it is the same app that started
  * the flow is the PKCE verifier presented at exchange time.
  */
-class HardcoverOAuthClient(
+open class HardcoverOAuthClient(
     private val clientId: String,
     private val tokenEndpoint: String = HardcoverOAuth.TOKEN_ENDPOINT,
     private val revocationEndpoint: String = HardcoverOAuth.REVOCATION_ENDPOINT,
@@ -28,7 +28,7 @@ class HardcoverOAuthClient(
 ) {
 
     /** Redeems the authorization code for tokens. */
-    suspend fun exchangeCode(
+    open suspend fun exchangeCode(
         code: String,
         verifier: String,
         redirectUri: String = HardcoverOAuth.REDIRECT_URI
@@ -52,7 +52,7 @@ class HardcoverOAuthClient(
      * caller must keep the old one, which is why [HardcoverTokens.refreshToken] is
      * nullable here and the caller does the merge.
      */
-    suspend fun refresh(refreshToken: String): HardcoverTokens = withContext(dispatcher) {
+    open suspend fun refresh(refreshToken: String): HardcoverTokens = withContext(dispatcher) {
         post(
             tokenEndpoint,
             FormBody.Builder()
@@ -67,7 +67,7 @@ class HardcoverOAuthClient(
      * Revokes a token at the server. Best effort: a revocation that fails still gets
      * forgotten locally, so disconnecting always disconnects on this device.
      */
-    suspend fun revoke(token: String): Boolean = withContext(dispatcher) {
+    open suspend fun revoke(token: String): Boolean = withContext(dispatcher) {
         runCatching {
             val request = Request.Builder()
                 .url(revocationEndpoint)

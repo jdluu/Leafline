@@ -40,7 +40,7 @@ class HardcoverConfigStorageTest {
 
     @Test
     fun `a token is never written in plaintext`() {
-        storage().save(HardcoverConfig(token = "hc_live_token_123", enabled = true, userId = 42))
+        storage().save(HardcoverConfig.apiToken("hc_live_token_123", userId = 42, enabled = true))
 
         assertFalse("token reached disk: ${raw()}", raw().contains("hc_live_token_123"))
         assertTrue("token did not go through the cipher", raw().contains("enc:v1:"))
@@ -48,7 +48,7 @@ class HardcoverConfigStorageTest {
 
     @Test
     fun `a saved token round-trips with its settings`() {
-        storage().save(HardcoverConfig(token = "hc_live_token_123", enabled = true, userId = 42))
+        storage().save(HardcoverConfig.apiToken("hc_live_token_123", userId = 42, enabled = true))
 
         val loaded = storage().load()!!
         assertEquals("hc_live_token_123", loaded.token)
@@ -69,6 +69,85 @@ class HardcoverConfigStorageTest {
 
         assertNull(storage.load())
         assertFalse(raw().contains("hc_live_token_123"))
+    }
+
+    @Test
+    fun `an oauth refresh token is never written in plaintext either`() {
+        storage().save(
+            HardcoverConfig.oauth(
+                HardcoverTokens(
+                    accessToken = "at_access",
+                    refreshToken = "rt_refresh_secret",
+                    expiresAtEpochMillis = 5_000L
+                ),
+                userId = 7
+            )
+        )
+
+        val raw = raw()
+        assertFalse("refresh token reached disk: $raw", raw.contains("rt_refresh_secret"))
+        assertFalse("access token reached disk: $raw", raw.contains("at_access"))
+    }
+
+    @Test
+    fun `an oauth connection round-trips its expiry and refresh token`() {
+        storage().save(
+            HardcoverConfig.oauth(
+                HardcoverTokens(
+                    accessToken = "at_access",
+                    refreshToken = "rt_refresh",
+                    expiresAtEpochMillis = 1_700_000_000_000L
+                ),
+                userId = 7,
+                enabled = true
+            )
+        )
+
+        val loaded = storage().load()!!
+        assertEquals("at_access", loaded.token)
+        assertEquals("rt_refresh", loaded.refreshToken)
+        assertEquals(1_700_000_000_000L, loaded.accessExpiresAtEpochMillis)
+        assertEquals(HardcoverAuthMethod.OAUTH, loaded.authMethod)
+        assertTrue(loaded.enabled)
+        assertFalse("a token with a future expiry is not stuck needing sign-in", loaded.needsReauthorization)
+    }
+
+    @Test
+    fun `an oauth link whose token was dropped still loads so the row can ask for sign-in`() {
+        storage().save(
+            HardcoverConfig(
+                token = "",
+                authMethod = HardcoverAuthMethod.OAUTH,
+                enabled = false
+            )
+        )
+
+        val loaded = storage().load()
+        assertTrue("the connection must survive so Settings can offer sign-in again", loaded != null)
+        assertTrue(loaded!!.needsReauthorization)
+    }
+
+    @Test
+    fun `a pending authorization round-trips and is consumed once`() {
+        val storage = storage()
+        storage.savePendingAuth(HardcoverPendingAuth(verifier = "the-verifier", state = "the-state"))
+
+        assertFalse("the verifier is a credential", raw().contains("the-verifier"))
+
+        val taken = storage.takePendingAuth()!!
+        assertEquals("the-verifier", taken.verifier)
+        assertEquals("the-state", taken.state)
+
+        assertNull("a second read must find nothing, so a redirect cannot be replayed", storage.takePendingAuth())
+    }
+
+    @Test
+    fun `clearing removes a pending authorization too`() {
+        val storage = storage()
+        storage.savePendingAuth(HardcoverPendingAuth(verifier = "v", state = "s"))
+        storage.clear()
+
+        assertNull(storage.takePendingAuth())
     }
 
     @Test
