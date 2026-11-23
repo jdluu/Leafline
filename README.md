@@ -35,7 +35,7 @@ title, author, or rating.
 activity chart, and an optional daily goal. The numbers inform; nothing nags.
 
 **Everything leaves cleanly.** Export annotations to Markdown, an Obsidian vault
-ZIP, Readwise CSV, or Anki TSV. Back up and restore the whole library as JSON.
+ZIP, Readwise CSV, or Anki TSV. Back up and restore the whole library as JSON, including where you were in each book.
 
 **Reading aloud.** On-device text-to-speech with adjustable speed, sentence skip,
 and a sleep timer (5–60 minutes or end of chapter) that fades the audio out.

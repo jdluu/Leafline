@@ -7,6 +7,8 @@ import com.jdluu.leafline.library.data.local.BookDao
 import com.jdluu.leafline.library.data.local.BookmarkDao
 import com.jdluu.leafline.library.data.local.BookmarkEntity
 import com.jdluu.leafline.library.data.local.CollectionDao
+import com.jdluu.leafline.hardcover.HardcoverBookPreference
+import com.jdluu.leafline.hardcover.HardcoverTrackingStore
 import com.jdluu.leafline.library.data.local.CollectionEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -20,11 +22,29 @@ class LibraryBackupManager(
     private val bookmarkDao: BookmarkDao,
     private val annotationDao: AnnotationDao,
     /** Recorded in the file so a shared backup can be traced to the build that wrote it. */
-    private val appVersion: String = "1.0"
+    private val appVersion: String = "1.0",
+    /**
+     * Where the reader's per-book Hardcover choices live. Optional so the manager can
+     * still be built without one; null simply means none are exported or restored.
+     */
+    private val hardcoverTracking: HardcoverTrackingStore? = null
 ) {
 
     suspend fun createBackup(): LibraryBackup = withContext(Dispatchers.IO) {
-        val books = bookDao.getAllBooksList().map { entity ->
+        val allBooks = bookDao.getAllBooksList()
+        // Only decisions the reader actually made; an unanswered book is absent rather
+        // than exported as a default, so a restore cannot invent a choice.
+        val trackingChoices = hardcoverTracking
+            ?.let { store ->
+                allBooks.mapNotNull { entity ->
+                    store.preferenceFor(entity.stableId)?.let { pref ->
+                        entity.stableId to pref.name
+                    }
+                }.toMap()
+            }
+            .orEmpty()
+
+        val books = allBooks.map { entity ->
             BookBackup(
                 stableId = entity.stableId,
                 title = entity.title,
@@ -64,13 +84,14 @@ class LibraryBackupManager(
         }
 
         LibraryBackup(
-            version = 1,
+            version = 2,
             exportedAt = System.currentTimeMillis(),
             appVersion = appVersion,
             books = books,
             collections = collections,
             bookmarks = bookmarks,
-            annotations = annotations
+            annotations = annotations,
+            hardcoverTracking = trackingChoices
         )
     }
 
@@ -193,12 +214,26 @@ class LibraryBackupManager(
             }
         }
 
+        // Restored last, and only where nothing is decided locally: a backup must not
+        // override a choice the reader made on this device.
+        var hardcoverChoicesRestored = 0
+        if (hardcoverTracking != null && backup.hardcoverTracking.isNotEmpty()) {
+            backup.hardcoverTracking.forEach { (stableId, name) ->
+                val preference = runCatching { HardcoverBookPreference.valueOf(name) }.getOrNull()
+                if (preference != null && hardcoverTracking.preferenceFor(stableId) == null) {
+                    hardcoverTracking.setPreference(stableId, preference)
+                    hardcoverChoicesRestored++
+                }
+            }
+        }
+
         BackupRestoreSummary(
             booksMatched = booksMatched,
             tagsUpdated = tagsUpdated,
             collectionsRestored = collectionsRestored,
             bookmarksRestored = bookmarksRestored,
-            annotationsRestored = annotationsRestored
+            annotationsRestored = annotationsRestored,
+            hardcoverChoicesRestored = hardcoverChoicesRestored
         )
     }
 
