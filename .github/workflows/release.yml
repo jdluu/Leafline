@@ -57,12 +57,24 @@ jobs:
           LEAFLINE_STORE_PASSWORD: ${{ secrets.LEAFLINE_STORE_PASSWORD }}
           LEAFLINE_KEY_ALIAS: ${{ secrets.LEAFLINE_KEY_ALIAS }}
           LEAFLINE_KEY_PASSWORD: ${{ secrets.LEAFLINE_KEY_PASSWORD }}
+          # Not a secret (PKCE carries the proof), but the build needs it: without it
+          # BuildConfig.HARDCOVER_CLIENT_ID is blank and the release APK ships with
+          # OAuth hidden, which is exactly what happened in v0.4.13.
+          HARDCOVER_CLIENT_ID: ${{ vars.HARDCOVER_CLIENT_ID }}
         run: |
           missing=0
           for v in LEAFLINE_KEYSTORE_BASE64 LEAFLINE_STORE_PASSWORD LEAFLINE_KEY_ALIAS LEAFLINE_KEY_PASSWORD; do
             [ -n "${!v}" ] || { echo "FAIL: secret $v is not set"; missing=1; }
           done
           [ "$missing" -eq 0 ] || exit 1
+
+          # A blank client id would silently ship a release where Hardcover sign-in
+          # does not exist, so fail here instead of discovering it in the APK.
+          if [ -z "${HARDCOVER_CLIENT_ID:-}" ]; then
+            echo "FAIL: HARDCOVER_CLIENT_ID is not set (repository variable)."
+            echo "Set it with: gh variable set HARDCOVER_CLIENT_ID --body <uuid>"
+            exit 1
+          fi
 
           mkdir -p "$RUNNER_TEMP/keys"
           printf '%s' "$LEAFLINE_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/keys/leafline-release.jks"
@@ -85,6 +97,20 @@ jobs:
         run: |
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs \
             app/build/outputs/apk/release/app-release.apk
+
+      - name: Verify Hardcover OAuth is compiled in
+        env:
+          HARDCOVER_CLIENT_ID: ${{ vars.HARDCOVER_CLIENT_ID }}
+        run: |
+          # The signed APK is what ships; assert the id actually reached the dex,
+          # rather than trusting that the build picked the variable up.
+          if unzip -p app/build/outputs/apk/release/app-release.apk classes.dex \
+               | grep -qa "$HARDCOVER_CLIENT_ID"; then
+            echo "OK: Hardcover client id is present in the release APK"
+          else
+            echo "FAIL: the release APK has no Hardcover client id, so OAuth is hidden"
+            exit 1
+          fi
 
       - name: Publish
         # A tag push publishes; a manual run with build_only does not.
