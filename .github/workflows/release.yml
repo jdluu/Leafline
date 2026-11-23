@@ -104,11 +104,20 @@ jobs:
         run: |
           # The signed APK is what ships; assert the id actually reached the dex,
           # rather than trusting that the build picked the variable up.
-          if unzip -p app/build/outputs/apk/release/app-release.apk classes.dex \
-               | grep -qa "$HARDCOVER_CLIENT_ID"; then
-            echo "OK: Hardcover client id is present in the release APK"
-          else
-            echo "FAIL: the release APK has no Hardcover client id, so OAuth is hidden"
+          # Scan every classesN.dex: this app is multidex and the constant does not
+          # land in classes.dex, which is a false negative worth avoiding twice.
+          apk=app/build/outputs/apk/release/app-release.apk
+          found=0
+          for dex in $(unzip -l "$apk" | awk '/classes[0-9]*\.dex$/ {print $4}'); do
+            if unzip -p "$apk" "$dex" | grep -qa "$HARDCOVER_CLIENT_ID"; then
+              echo "OK: client id found in $dex"
+              found=1
+              break
+            fi
+          done
+          if [ "$found" -eq 0 ]; then
+            echo "FAIL: no Hardcover client id in any dex, so OAuth is hidden in this build"
+            echo "dex entries were: $(unzip -l "$apk" | awk '/classes[0-9]*\.dex$/ {print $4}' | tr '\n' ' ')"
             exit 1
           fi
 
