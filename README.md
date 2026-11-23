@@ -31,8 +31,8 @@ and per-chapter filtering.
 reading-status filters, 1–5 star ratings, custom tags, and sorting by recency,
 title, author, or rating.
 
-**Reading time.** On-device tracking with daily and weekly insights, a streak
-counter, a 7-day activity chart, and a daily goal.
+**Reading time.** On-device tracking with daily and weekly insights, a 7-day
+activity chart, and an optional daily goal. The numbers inform; nothing nags.
 
 **Everything leaves cleanly.** Export annotations to Markdown, an Obsidian vault
 ZIP, Readwise CSV, or Anki TSV. Back up and restore the whole library as JSON.
