@@ -145,13 +145,50 @@ class HardcoverSyncerTest {
             )
         )
 
-        val outcome = syncer(api).push("urn:isbn:9780141439471", ReadingStatus.FINISHED, 1.0)
+        val outcome = syncer(api).push("urn:isbn:9780141439471", ReadingStatus.READING, 0.5)
 
         assertEquals(HardcoverPushOutcome.Pushed, outcome)
         assertTrue("book was re-added: ${api.calls}", "insertUserBook" !in api.calls)
         assertTrue("status was not synced: ${api.calls}", "updateStatus" in api.calls)
+        assertEquals(2, api.lastStatusId) // Currently Reading
+        assertEquals(100, api.lastProgressPages)
+    }
+
+    /**
+     * Setting status to Read makes Hardcover finish the read itself. Sending progress
+     * afterwards would overwrite its full-page completion with a partial page, so the
+     * finished case must send no progress at all.
+     */
+    @Test
+    fun `a finished book is marked Read and its progress is left alone`() = runBlocking {
+        val api = FakeHardcoverApi(
+            existing = HardcoverRead(
+                userBookId = 456,
+                openReadId = 789,
+                edition = HardcoverEdition(editionId = 7, bookId = 19, pages = 200)
+            )
+        )
+
+        val outcome = syncer(api).push("urn:isbn:9780141439471", ReadingStatus.FINISHED, 0.5)
+
+        assertEquals(HardcoverPushOutcome.FinishedRemote, outcome)
         assertEquals(3, api.lastStatusId) // Read
-        assertEquals(200, api.lastProgressPages)
+        assertTrue(
+            "progress must not be written for a finished book: ${api.calls}",
+            "updateProgress" !in api.calls
+        )
+    }
+
+    @Test
+    fun `finishing a book not yet in the library inserts it as Read without progress`() = runBlocking {
+        val api = FakeHardcoverApi(existing = null)
+
+        val outcome = syncer(api).push("urn:isbn:9780141439471", ReadingStatus.FINISHED, 1.0)
+
+        assertEquals(HardcoverPushOutcome.FinishedRemote, outcome)
+        assertEquals(3, api.lastStatusId)
+        assertTrue("insert carries the Read status", "insertUserBook" in api.calls)
+        assertTrue("no progress after finishing", api.lastProgressPages == null)
     }
 
     @Test

@@ -132,7 +132,9 @@ class SyncWorker(
                 progression = percentage / 100.0
             )
             when (outcome) {
-                HardcoverPushOutcome.Pushed, HardcoverPushOutcome.StatusOnly -> pushed++
+                HardcoverPushOutcome.Pushed,
+                HardcoverPushOutcome.StatusOnly,
+                HardcoverPushOutcome.FinishedRemote -> pushed++
                 HardcoverPushOutcome.Unauthorized -> {
                     // Stop, and do not count this as a retryable failure: a rejected
                     // token stays rejected until the reader replaces it, so asking

@@ -19,6 +19,13 @@ sealed interface HardcoverPushOutcome {
     /** Hardcover knows the book, but has no page count to express progress. */
     data object StatusOnly : HardcoverPushOutcome
 
+    /**
+     * The book was marked Read. Hardcover finishes the read itself, stamping
+     * `finished_at` and setting progress to the edition's full page count, so no
+     * progress is sent for this status: a partial page would contradict "Read".
+     */
+    data object FinishedRemote : HardcoverPushOutcome
+
     data object Pushed : HardcoverPushOutcome
 
     /** The token was rejected; the integration should be turned off. */
@@ -82,6 +89,15 @@ class HardcoverSyncer(
                 // Keep the remote status in step; Hardcover starts or finishes the
                 // read itself, so no journal entry is written here.
                 api.updateStatus(token, read.userBookId, statusId)
+            }
+
+            // Marking a book Read makes Hardcover finish the read: it stamps
+            // finished_at and sets progress to the edition's full page count. Writing
+            // our position afterwards would overwrite that with a partial page and
+            // leave a finished book showing, say, 50% -- so progress is not sent at
+            // all for a finished book, and "Read" is the whole statement.
+            if (status == ReadingStatus.FINISHED) {
+                return@withContext HardcoverPushOutcome.FinishedRemote
             }
 
             val pages = HardcoverProgress.pages(progression, read.edition?.pages ?: edition.pages)
