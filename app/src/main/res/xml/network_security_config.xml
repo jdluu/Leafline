@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Release and main builds trust only the platform anchors. Cleartext stays on
      for LAN Calibre/OPDS servers (see PR #57); the user anchor exists only for a
-     debugging proxy and lives in src/debug. -->
+     debugging proxy and lives in src/debug.
+
+     Two files, not one config with <debug-overrides>: AGP compiles that section
+     into the release variant too, so the user anchor would ship and be inert
+     only because android:debuggable is false at runtime. Keeping the split makes
+     the shipped release bytes system-only, which a dump can show. -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
