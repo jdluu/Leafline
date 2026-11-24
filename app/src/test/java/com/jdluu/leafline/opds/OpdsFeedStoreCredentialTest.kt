@@ -163,6 +163,19 @@ class OpdsFeedStoreCredentialTest {
     }
 
     @Test
+    fun `a built-in catalog cannot have credentials cleared`() {
+        val store = OpdsFeedStore.fromContext(context, TestSecretCipher())
+        val builtIn = OpdsFeedStore.BUILT_IN_FEEDS.first()
+
+        // Not merely unexposed in the UI: the store never looks built-ins up, so a call
+        // aimed at one has nothing to clear and writes nothing.
+        assertFalse(store.clearCredentials(builtIn.id))
+        assertEquals("", rawPrefs())
+        assertEquals(0, store.loadFeeds().count { !it.isBuiltIn })
+        assertEquals(builtIn.title, store.loadFeeds().first().title)
+    }
+
+    @Test
     fun `a saved auth token is never written in plaintext`() {
         val store = OpdsFeedStore.fromContext(context, TestSecretCipher())
 
