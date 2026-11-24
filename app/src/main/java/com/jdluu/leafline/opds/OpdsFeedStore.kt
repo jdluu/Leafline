@@ -81,7 +81,12 @@ class OpdsFeedStore internal constructor(
     }
 
     /**
-     * Adds a custom OPDS feed. Returns the newly created [OpdsFeedSource].
+     * Adds a custom OPDS feed. Returns the saved [OpdsFeedSource].
+     *
+     * A feed whose URL is already saved is updated in place, keeping its id. Re-adding a
+     * built-in catalog with credentials from the 401 screen must not leave two rows for
+     * the same address, and the credentials the reader just typed belong on the row that
+     * is already selected.
      */
     fun addCustomFeed(
         title: String,
@@ -92,8 +97,11 @@ class OpdsFeedStore internal constructor(
     ): OpdsFeedSource {
         val trimmedTitle = title.trim().ifEmpty { "Custom Catalog" }
         val trimmedUrl = url.trim()
-        val newSource = OpdsFeedSource(
-            id = UUID.randomUUID().toString(),
+
+        val currentCustom = loadCustomFeedsOnly().toMutableList()
+        val index = currentCustom.indexOfFirst { it.url == trimmedUrl }
+        val saved = OpdsFeedSource(
+            id = currentCustom.getOrNull(index)?.id ?: UUID.randomUUID().toString(),
             title = trimmedTitle,
             url = trimmedUrl,
             isBuiltIn = false,
@@ -102,11 +110,10 @@ class OpdsFeedStore internal constructor(
             password = password?.ifBlank { null },
             authToken = authToken?.trim()?.ifBlank { null }
         )
+        if (index >= 0) currentCustom[index] = saved else currentCustom.add(saved)
 
-        val currentCustom = loadCustomFeedsOnly().toMutableList()
-        currentCustom.add(newSource)
         saveCustomFeeds(currentCustom)
-        return newSource
+        return saved
     }
 
     /**

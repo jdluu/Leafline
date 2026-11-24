@@ -122,6 +122,9 @@ fun OpdsScreen(
     val downloadStatuses by viewModel.downloadStatuses.collectAsState()
 
     var showAddFeedDialog by remember { mutableStateOf(false) }
+    // Non-null when the dialog should open pre-filled, which is how the 401 screen turns
+    // "this catalog needs an account" into something the reader can finish.
+    var addFeedSeed by remember { mutableStateOf<OpdsFeedSource?>(null) }
     var selectedBookForDetails by remember { mutableStateOf<OpdsBook?>(null) }
     var isSearchActive by remember { mutableStateOf(false) }
 
@@ -139,7 +142,10 @@ fun OpdsScreen(
                     isSearchActive = false
                     viewModel.selectSource(source)
                 },
-                onAddFeedClick = { showAddFeedDialog = true },
+                onAddFeedClick = {
+                    addFeedSeed = null
+                    showAddFeedDialog = true
+                },
                 onRefreshClick = { viewModel.refresh() },
                 onDeleteSource = { sourceId -> viewModel.deleteCustomFeed(sourceId) },
                 searchQuery = searchQuery,
@@ -210,40 +216,58 @@ fun OpdsScreen(
                                     color = MaterialTheme.colorScheme.error
                                 )
                                 Text(
-                                    // A 401 always means the catalog wants an
-                                    // account, so say that instead of echoing a
-                                    // bare status the reader cannot act on.
-                                    text = if (statusCode == "HTTP 401") {
-                                        "This catalog needs an account. Add your credentials in the catalog's settings, then try again."
-                                    } else {
-                                        detail
-                                    },
+                                    // The 401 sentence the client builds already names the
+                                    // recovery, so echo it rather than inventing a
+                                    // settings screen this app does not have.
+                                    text = detail,
                                     style = MaterialTheme.typography.bodyMedium,
                                     textAlign = TextAlign.Center,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Button(onClick = { viewModel.refresh() }) {
-                                        Icon(
-                                            imageVector = Icons.Default.Refresh,
-                                            contentDescription = null
+                                if (statusCode == "HTTP 401") {
+                                    // One action, and it carries the failing feed's name and
+                                    // address into the add-feed form so the reader only has
+                                    // to type the account.
+                                    Button(onClick = {
+                                        val failing = breadcrumbs.lastOrNull()
+                                        addFeedSeed = OpdsFeedSource(
+                                            id = "",
+                                            title = failing?.title ?: selectedSource.title,
+                                            url = failing?.url ?: selectedSource.url
                                         )
-                                        Spacer(modifier = Modifier.width(Spacing.xs))
-                                        Text("Retry")
-                                    }
-                                    // A catalog that needs a sign-in cannot be repaired from
-                                    // this screen, so the recovery the app can actually offer
-                                    // is adding it again with credentials, or another catalog.
-                                    OutlinedButton(onClick = { showAddFeedDialog = true }) {
+                                        showAddFeedDialog = true
+                                    }) {
                                         Icon(
                                             imageVector = Icons.Default.Add,
                                             contentDescription = null
                                         )
                                         Spacer(modifier = Modifier.width(Spacing.xs))
-                                        Text("Add catalog")
+                                        Text("Add with credentials")
+                                    }
+                                } else {
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Button(onClick = { viewModel.refresh() }) {
+                                            Icon(
+                                                imageVector = Icons.Default.Refresh,
+                                                contentDescription = null
+                                            )
+                                            Spacer(modifier = Modifier.width(Spacing.xs))
+                                            Text("Retry")
+                                        }
+                                        OutlinedButton(onClick = {
+                                            addFeedSeed = null
+                                            showAddFeedDialog = true
+                                        }) {
+                                            Icon(
+                                                imageVector = Icons.Default.Add,
+                                                contentDescription = null
+                                            )
+                                            Spacer(modifier = Modifier.width(Spacing.xs))
+                                            Text("Add catalog")
+                                        }
                                     }
                                 }
                                 if (statusCode != null) {
@@ -314,10 +338,16 @@ fun OpdsScreen(
     // Add Feed Dialog
     if (showAddFeedDialog) {
         AddOpdsFeedDialog(
-            onDismiss = { showAddFeedDialog = false },
+            onDismiss = {
+                showAddFeedDialog = false
+                addFeedSeed = null
+            },
+            initialTitle = addFeedSeed?.title.orEmpty(),
+            initialUrl = addFeedSeed?.url.orEmpty(),
             onAdd = { title, url, username, password, authToken ->
                 viewModel.addCustomFeed(title, url, username, password, authToken)
                 showAddFeedDialog = false
+                addFeedSeed = null
             }
         )
     }
@@ -981,10 +1011,12 @@ private enum class OpdsAuthType(val label: String) {
 @Composable
 private fun AddOpdsFeedDialog(
     onDismiss: () -> Unit,
+    initialTitle: String = "",
+    initialUrl: String = "",
     onAdd: (String, String, String?, String?, String?) -> Unit
 ) {
-    var title by remember { mutableStateOf("") }
-    var url by remember { mutableStateOf("") }
+    var title by remember { mutableStateOf(initialTitle) }
+    var url by remember { mutableStateOf(initialUrl) }
     var authType by remember { mutableStateOf(OpdsAuthType.NONE) }
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
