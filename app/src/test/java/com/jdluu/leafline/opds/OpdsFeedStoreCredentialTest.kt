@@ -214,4 +214,65 @@ class OpdsFeedStoreCredentialTest {
         store.addCustomFeed("Second", "https://second.test/opds")
         assertFalse("legacy plaintext survived a save", rawPrefs().contains("legacy"))
     }
+
+    @Test
+    fun `blank fields on an edit leave all three credentials in place`() {
+        val store = OpdsFeedStore.fromContext(context, TestSecretCipher())
+        val feed = store.addCustomFeed(
+            title = "Calibre",
+            url = "https://calibre.test/opds",
+            username = "patron",
+            password = "hunter2",
+            authToken = "tok_123"
+        )
+
+        // An edit form that submits the same URL with empty credential fields.
+        val updated = store.updateCustomFeed(feed.id, "Calibre Library", "https://calibre.test/opds")
+
+        assertEquals("Calibre Library", updated?.title)
+        val stored = OpdsFeedStore.fromContext(context, TestSecretCipher())
+            .loadFeeds().single { it.id == feed.id }
+        assertTrue("a blank edit must not strip the stored account", stored.hasAuth)
+        assertEquals("patron", stored.username)
+        assertEquals("hunter2", stored.password)
+        assertEquals("tok_123", stored.authToken)
+    }
+
+    @Test
+    fun `non-blank fields on an edit replace the stored credentials`() {
+        val store = OpdsFeedStore.fromContext(context, TestSecretCipher())
+        val feed = store.addCustomFeed(
+            title = "Calibre",
+            url = "https://calibre.test/opds",
+            username = "patron",
+            password = "hunter2",
+            authToken = "tok_123"
+        )
+
+        store.updateCustomFeed(
+            id = feed.id,
+            title = "Calibre",
+            url = "https://calibre.test/opds",
+            username = "librarian",
+            password = "s3cret",
+            authToken = "tok_456"
+        )
+
+        val stored = OpdsFeedStore.fromContext(context, TestSecretCipher())
+            .loadFeeds().single { it.id == feed.id }
+        assertEquals("librarian", stored.username)
+        assertEquals("s3cret", stored.password)
+        assertEquals("tok_456", stored.authToken)
+    }
+
+    @Test
+    fun `editing an unknown id returns null and writes nothing`() {
+        val store = OpdsFeedStore.fromContext(context, TestSecretCipher())
+        val before = rawPrefs()
+
+        assertEquals(null, store.updateCustomFeed("no-such-feed", "Title", "https://calibre.test/opds"))
+
+        assertEquals(before, rawPrefs())
+        assertEquals(0, store.loadFeeds().count { !it.isBuiltIn })
+    }
 }
