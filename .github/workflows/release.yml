@@ -35,6 +35,30 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
+      # A tag whose name disagrees with the tree ships two lies at once: an APK
+      # that reports the older version and cannot install over the previous
+      # release (Android refuses a versionCode that does not increase), and a
+      # release page that claims the newer one. Nothing downstream catches it:
+      # the build reads the file, not the tag. Manual dry runs have no tag, so
+      # the check applies to tag pushes only. The ref name comes from the
+      # default GITHUB_REF_NAME variable and is never interpolated into this
+      # script, so a hostile tag name cannot inject shell.
+      - name: Verify the tag matches the version in the tree
+        if: ${{ github.event_name == 'push' }}
+        run: |
+          version_name=$(sed -n 's/^ *versionName *= *"\([^"]*\)".*/\1/p' app/build.gradle.kts)
+          expected="${GITHUB_REF_NAME#v}"
+          if [ -z "$version_name" ]; then
+            echo "FAIL: no versionName found in app/build.gradle.kts"
+            exit 1
+          fi
+          if [ "$version_name" != "$expected" ]; then
+            echo "FAIL: tag ${GITHUB_REF_NAME} does not match versionName \"$version_name\" in app/build.gradle.kts"
+            echo "Bump the version in the commit being tagged, or tag the release commit."
+            exit 1
+          fi
+          echo "OK: ${GITHUB_REF_NAME} matches versionName \"$version_name\""
+
       # The APK is what a reader installs, so a release without one is not a
       # release. Signed only when the four signing properties are configured;
       # otherwise this fails rather than publishing an unsigned artifact.
