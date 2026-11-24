@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Release and main builds trust only the platform anchors. Cleartext stays on
+     for LAN Calibre/OPDS servers (see PR #57); the user anchor exists only for a
+     debugging proxy and lives in src/debug. -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
-            <certificates src="user" />
         </trust-anchors>
     </base-config>
 </network-security-config>
