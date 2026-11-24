@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Visibility
@@ -144,6 +145,8 @@ fun OpdsScreen(
     var addFeedSeed by remember { mutableStateOf<OpdsFeedSource?>(null) }
     var selectedBookForDetails by remember { mutableStateOf<OpdsBook?>(null) }
     var isSearchActive by remember { mutableStateOf(false) }
+    // Non-null while the confirmation for removing a catalog's stored account is open.
+    var removeCredentialsFor by remember { mutableStateOf<OpdsFeedSource?>(null) }
 
     // Intercept hardware back button to navigate backwards in catalog hierarchy
     BackHandler(enabled = breadcrumbs.size > 1) {
@@ -165,6 +168,7 @@ fun OpdsScreen(
                 },
                 onRefreshClick = { viewModel.refresh() },
                 onDeleteSource = { sourceId -> viewModel.deleteCustomFeed(sourceId) },
+                onRemoveCredentials = { source -> removeCredentialsFor = source },
                 searchQuery = searchQuery,
                 isSearchActive = isSearchActive,
                 onSearchToggle = { isSearchActive = !isSearchActive },
@@ -363,6 +367,34 @@ fun OpdsScreen(
             }
         )
     }
+
+    // Removing a stored account is its own action: blank fields preserve credentials now,
+    // so this is the only path and the reader gets told what happens next.
+    removeCredentialsFor?.let { source ->
+        AlertDialog(
+            onDismissRequest = { removeCredentialsFor = null },
+            title = { Text("Remove saved credentials?") },
+            text = {
+                Text(
+                    "${source.title} keeps its place in the list. The next time it loads, " +
+                        "Leafline asks the catalog for access without the saved account."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.clearCredentials(source.id)
+                    removeCredentialsFor = null
+                }) {
+                    Text("Remove credentials", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { removeCredentialsFor = null }) {
+                    Text("Keep")
+                }
+            }
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -374,6 +406,7 @@ private fun OpdsTopBar(
     onAddFeedClick: () -> Unit,
     onRefreshClick: () -> Unit,
     onDeleteSource: (String) -> Unit,
+    onRemoveCredentials: (OpdsFeedSource) -> Unit,
     searchQuery: String,
     isSearchActive: Boolean,
     onSearchToggle: () -> Unit,
@@ -486,15 +519,31 @@ private fun OpdsTopBar(
                                 },
                                 trailingIcon = if (!source.isBuiltIn) {
                                     {
-                                        IconButton(onClick = {
-                                            showSourceDropdown = false
-                                            onDeleteSource(source.id)
-                                        }) {
-                                            Icon(
-                                                imageVector = Icons.Default.Delete,
-                                                contentDescription = "Delete custom feed",
-                                                tint = MaterialTheme.colorScheme.error
-                                            )
+                                        Row {
+                                            // Removal is an explicit action, never a blank
+                                            // field, so a reader can tell the stored account
+                                            // is gone rather than merely hidden.
+                                            if (source.hasAuth) {
+                                                IconButton(onClick = {
+                                                    showSourceDropdown = false
+                                                    onRemoveCredentials(source)
+                                                }) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.LockOpen,
+                                                        contentDescription = "Remove stored credentials"
+                                                    )
+                                                }
+                                            }
+                                            IconButton(onClick = {
+                                                showSourceDropdown = false
+                                                onDeleteSource(source.id)
+                                            }) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Delete,
+                                                    contentDescription = "Delete custom feed",
+                                                    tint = MaterialTheme.colorScheme.error
+                                                )
+                                            }
                                         }
                                     }
                                 } else null,
