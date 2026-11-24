@@ -85,6 +85,33 @@ class OpdsFeedStoreCredentialTest {
     }
 
     @Test
+    fun `re-adding a saved URL with blank credentials keeps the stored account`() {
+        val store = OpdsFeedStore.fromContext(context, TestSecretCipher())
+        val url = "https://standardebooks.org/feeds/opds"
+        val first = store.addCustomFeed(
+            title = "Standard Ebooks",
+            url = url,
+            username = "patron",
+            password = "hunter2",
+            authToken = "tok_123"
+        )
+
+        // The dialog sends nulls when the auth section is left untouched.
+        val second = store.addCustomFeed("Standard Ebooks (Patrons)", url)
+
+        assertEquals("a re-add must keep the existing row's id", first.id, second.id)
+        val custom = OpdsFeedStore.fromContext(context, TestSecretCipher())
+            .loadFeeds()
+            .filter { !it.isBuiltIn }
+        assertEquals(1, custom.size)
+        assertEquals("Standard Ebooks (Patrons)", custom.single().title)
+        assertEquals("patron", custom.single().username)
+        assertEquals("hunter2", custom.single().password)
+        assertEquals("tok_123", custom.single().authToken)
+        assertEquals(first.id, custom.single().id)
+    }
+
+    @Test
     fun `a saved auth token is never written in plaintext`() {
         val store = OpdsFeedStore.fromContext(context, TestSecretCipher())
 

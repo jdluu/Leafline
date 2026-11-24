@@ -107,6 +107,23 @@ import com.jdluu.leafline.theme.Spacing
 
 private const val COVER_ASPECT_RATIO = 1f / 1.5f
 
+/**
+ * Seeds the add-feed form from the catalog the reader subscribed to. A 401 can arrive
+ * from a sub-feed, but the account belongs to the server, and saving a mid-hierarchy
+ * URL as a catalog would leave one that cannot be browsed from its root.
+ */
+internal fun credentialSeed(
+    breadcrumbs: List<BreadcrumbItem>,
+    source: OpdsFeedSource
+): OpdsFeedSource {
+    val root = breadcrumbs.firstOrNull()
+    return OpdsFeedSource(
+        id = "",
+        title = root?.title ?: source.title,
+        url = root?.url ?: source.url
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OpdsScreen(
@@ -229,12 +246,7 @@ fun OpdsScreen(
                                     // address into the add-feed form so the reader only has
                                     // to type the account.
                                     Button(onClick = {
-                                        val failing = breadcrumbs.lastOrNull()
-                                        addFeedSeed = OpdsFeedSource(
-                                            id = "",
-                                            title = failing?.title ?: selectedSource.title,
-                                            url = failing?.url ?: selectedSource.url
-                                        )
+                                        addFeedSeed = credentialSeed(breadcrumbs, selectedSource)
                                         showAddFeedDialog = true
                                     }) {
                                         Icon(
