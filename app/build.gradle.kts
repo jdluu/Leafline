@@ -16,9 +16,9 @@ android {
         // current platform. Revisit only with a concrete device requirement.
         minSdk = 26
         targetSdk = 36
-        versionCode = 21
+        versionCode = 22
         // Pre-release: 0.y.z; MINOR bumps (0.1.0+) per the versioning policy in AGENTS.md.
-        versionName = "0.4.16"
+        versionName = "0.4.17"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
