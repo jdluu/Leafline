@@ -69,7 +69,9 @@ reader-grade typographic control, and accessible-by-default surfaces.
 Confirmed capabilities: EPUB 2/3 reading in paginated and scrolled modes;
 footnote and note previews; navigation history with a return capsule; on-device
 library with folders, collections, reading status, ratings, tags, sorting,
-grid and list layouts, and batch actions; OPDS 1.x/2.0 browsing and download;
+grid and list layouts, and batch actions; OPDS 1.x/2.0 browsing and download of
+catalogs the reader adds (none are built in, and an empty catalog list is a
+supported state);
 KOReader-compatible progress sync with encrypted stored credentials;
 on-device reading statistics and a 7-day chart; multi-color
 highlights, notes, bookmarks, offline dictionary lookup, and full-text in-book

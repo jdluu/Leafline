@@ -163,16 +163,15 @@ class OpdsFeedStoreCredentialTest {
     }
 
     @Test
-    fun `a built-in catalog cannot have credentials cleared`() {
+    fun `a catalog id this build no longer ships has nothing to clear`() {
         val store = OpdsFeedStore.fromContext(context, TestSecretCipher())
-        val builtIn = OpdsFeedStore.BUILT_IN_FEEDS.first()
 
-        // Not merely unexposed in the UI: the store never looks built-ins up, so a call
-        // aimed at one has nothing to clear and writes nothing.
-        assertFalse(store.clearCredentials(builtIn.id))
+        // Older versions offered this catalog by id without ever writing it to disk, so a
+        // saved selection can still name it. Nothing is stored under that id, nothing is
+        // cleared, and nothing is resurrected.
+        assertFalse(store.clearCredentials("standard_ebooks"))
         assertEquals("", rawPrefs())
-        assertEquals(0, store.loadFeeds().count { !it.isBuiltIn })
-        assertEquals(builtIn.title, store.loadFeeds().first().title)
+        assertTrue(store.loadFeeds().isEmpty())
     }
 
     @Test

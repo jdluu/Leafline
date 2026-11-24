@@ -40,8 +40,9 @@ ZIP, Readwise CSV, or Anki TSV. Back up and restore the whole library as JSON, i
 **Reading aloud.** On-device text-to-speech with adjustable speed, sentence skip,
 and a sleep timer (5–60 minutes or end of chapter) that fades the audio out.
 
-**Finding books.** Browse OPDS catalogs (your own Calibre-web or Kavita, or the
-built-in public-domain ones) and download straight into the library.
+**Finding books.** Browse the OPDS catalogs you add — your own Calibre-web or
+Kavita — and download straight into the library. No catalog ships with the app,
+so the list starts empty until you add one.
 
 **Optional Hardcover sync.** If you track reading on Hardcover, Leafline can send
 a book's status and page progress there — on its own, or alongside a KOReader

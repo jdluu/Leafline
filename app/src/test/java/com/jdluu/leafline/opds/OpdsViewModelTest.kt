@@ -124,6 +124,9 @@ class OpdsViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        ApplicationProvider.getApplicationContext<android.content.Context>()
+            .getSharedPreferences("leafline_opds_feeds", android.content.Context.MODE_PRIVATE)
+            .edit().clear().commit()
     }
 
     @After
@@ -135,6 +138,7 @@ class OpdsViewModelTest {
     fun init_loadsRootFeedAndInitializesBreadcrumbs() = runTest(testDispatcher) {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val feedStore = OpdsFeedStore.fromContext(context, TestSecretCipher())
+        val saved = feedStore.addCustomFeed("Home Calibre", "https://calibre.test/opds")
         val opdsClient = FakeOpdsClient()
         val repo = FakeLibraryRepository()
         val downloadManager = OpdsDownloadManager(
@@ -154,8 +158,9 @@ class OpdsViewModelTest {
 
         testScheduler.advanceUntilIdle()
 
+        assertEquals(saved.id, viewModel.selectedSource.value?.id)
         assertEquals(1, viewModel.breadcrumbs.value.size)
-        assertEquals("Standard Ebooks", viewModel.breadcrumbs.value[0].title)
+        assertEquals("Home Calibre", viewModel.breadcrumbs.value[0].title)
 
         val state = viewModel.uiState.value
         assertTrue("UI state should be success", state is OpdsUiState.Success)
@@ -168,6 +173,7 @@ class OpdsViewModelTest {
     fun navigateSubfeedAndBack_managesBreadcrumbsCorrectly() = runTest(testDispatcher) {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val feedStore = OpdsFeedStore.fromContext(context, TestSecretCipher())
+        feedStore.addCustomFeed("Home Calibre", "https://calibre.test/opds")
         val opdsClient = FakeOpdsClient()
         val repo = FakeLibraryRepository()
         val downloadManager = OpdsDownloadManager(
@@ -200,13 +206,14 @@ class OpdsViewModelTest {
 
         assertTrue(handled)
         assertEquals(1, viewModel.breadcrumbs.value.size)
-        assertEquals("Standard Ebooks", viewModel.breadcrumbs.value.last().title)
+        assertEquals("Home Calibre", viewModel.breadcrumbs.value.last().title)
     }
 
     @Test
     fun search_usesDiscoveredSearchTemplate() = runTest(testDispatcher) {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val feedStore = OpdsFeedStore.fromContext(context, TestSecretCipher())
+        feedStore.addCustomFeed("Home Calibre", "https://calibre.test/opds")
         val opdsClient = FakeOpdsClient()
         val repo = FakeLibraryRepository()
         val downloadManager = OpdsDownloadManager(
@@ -328,7 +335,7 @@ class OpdsViewModelTest {
     }
 
     @Test
-    fun addCustomFeed_fromFailedBuiltInCatalog_selectsTheSavedFeed() = runTest(testDispatcher) {
+    fun addCustomFeed_withNoCatalogSelected_selectsTheSavedFeed() = runTest(testDispatcher) {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val feedStore = OpdsFeedStore.fromContext(context, TestSecretCipher())
         val opdsClient = FakeOpdsClient()
@@ -357,7 +364,7 @@ class OpdsViewModelTest {
         )
         testScheduler.advanceUntilIdle()
 
-        assertEquals("https://standardebooks.org/feeds/opds", viewModel.selectedSource.value.url)
+        assertEquals("https://standardebooks.org/feeds/opds", viewModel.selectedSource.value?.url)
         assertEquals(1, viewModel.feedSources.value.count { !it.isBuiltIn })
         assertEquals("https://standardebooks.org/feeds/opds", opdsClient.lastFetchedUrl)
     }
@@ -440,5 +447,97 @@ class OpdsViewModelTest {
         assertEquals(null, stored.username)
         assertEquals(null, stored.password)
         assertEquals(1, reloaded.loadFeeds().count { !it.isBuiltIn })
+    }
+
+    @Test
+    fun noSavedCatalogs_showsTheEmptyStateAndFetchesNothing() = runTest(testDispatcher) {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val feedStore = OpdsFeedStore.fromContext(context, TestSecretCipher())
+        val opdsClient = FakeOpdsClient()
+        val repo = FakeLibraryRepository()
+        val downloadManager = OpdsDownloadManager(
+            context = context,
+            opdsClient = opdsClient,
+            importer = com.jdluu.leafline.ReadiumEpubImporter(context),
+            repository = repo,
+            scope = this
+        )
+
+        val viewModel = OpdsViewModel(
+            feedStore = feedStore,
+            opdsClient = opdsClient,
+            downloadManager = downloadManager,
+            libraryRepository = repo
+        )
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(null, viewModel.selectedSource.value)
+        assertEquals(OpdsUiState.NoCatalogs, viewModel.uiState.value)
+        assertTrue("no catalog means no request", viewModel.breadcrumbs.value.isEmpty())
+        assertEquals(null, opdsClient.lastFetchedUrl)
+    }
+
+    @Test
+    fun aSelectedIdFromARemovedCatalog_landsOnTheEmptyStateAndDropsTheKey() = runTest(testDispatcher) {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val feedStore = OpdsFeedStore.fromContext(context, TestSecretCipher())
+        // Exactly the state an install from the previous version carries: a remembered
+        // catalog id with no catalog behind it.
+        feedStore.saveSelectedFeedId("project_gutenberg")
+        val opdsClient = FakeOpdsClient()
+        val repo = FakeLibraryRepository()
+        val downloadManager = OpdsDownloadManager(
+            context = context,
+            opdsClient = opdsClient,
+            importer = com.jdluu.leafline.ReadiumEpubImporter(context),
+            repository = repo,
+            scope = this
+        )
+
+        val viewModel = OpdsViewModel(
+            feedStore = feedStore,
+            opdsClient = opdsClient,
+            downloadManager = downloadManager,
+            libraryRepository = repo
+        )
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(null, viewModel.selectedSource.value)
+        assertEquals(OpdsUiState.NoCatalogs, viewModel.uiState.value)
+        assertEquals(null, opdsClient.lastFetchedUrl)
+        assertEquals("the dead id must not be remembered", null, feedStore.loadSelectedFeedId())
+    }
+
+    @Test
+    fun deletingTheLastCatalog_returnsToTheEmptyState() = runTest(testDispatcher) {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val feedStore = OpdsFeedStore.fromContext(context, TestSecretCipher())
+        val saved = feedStore.addCustomFeed("Calibre", "https://calibre.test/opds")
+        val opdsClient = FakeOpdsClient()
+        val repo = FakeLibraryRepository()
+        val downloadManager = OpdsDownloadManager(
+            context = context,
+            opdsClient = opdsClient,
+            importer = com.jdluu.leafline.ReadiumEpubImporter(context),
+            repository = repo,
+            scope = this
+        )
+
+        val viewModel = OpdsViewModel(
+            feedStore = feedStore,
+            opdsClient = opdsClient,
+            downloadManager = downloadManager,
+            libraryRepository = repo
+        )
+        testScheduler.advanceUntilIdle()
+        assertEquals(saved.id, viewModel.selectedSource.value?.id)
+
+        viewModel.deleteCustomFeed(saved.id)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(null, viewModel.selectedSource.value)
+        assertEquals(OpdsUiState.NoCatalogs, viewModel.uiState.value)
+        assertTrue(viewModel.feedSources.value.isEmpty())
+        assertEquals(null, feedStore.loadSelectedFeedId())
     }
 }

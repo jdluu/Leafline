@@ -137,6 +137,7 @@ import com.jdluu.leafline.library.rescan.FolderRescanUiState
 import com.jdluu.leafline.library.rescan.FolderRescanViewModel
 import com.jdluu.leafline.library.rescan.RescanSummary
 import com.jdluu.leafline.sync.ReadingProgressMath
+import com.jdluu.leafline.theme.LeaflineEmptyState
 import com.jdluu.leafline.theme.IconSize
 import androidx.compose.material.icons.filled.SaveAlt
 import androidx.compose.material.icons.filled.Description
@@ -488,7 +489,7 @@ fun LibraryScreen(
                 // Each filtered-empty state clears its own filter: once the last book is
                 // gone the filter bar hides, so without an action here the reader is left
                 // staring at a reason with no way out of it.
-                query.isNotBlank() -> LibraryEmptyState(
+                query.isNotBlank() -> LeaflineEmptyState(
                     title = "No books match",
                     body = "Try a different search term",
                     actionLabel = "Clear search",
@@ -497,31 +498,31 @@ fun LibraryScreen(
                         searchActive = false
                     }
                 )
-                selectedCollection != null -> LibraryEmptyState(
+                selectedCollection != null -> LeaflineEmptyState(
                     title = "Collection is empty",
                     body = "Books added to this collection will appear here",
                     actionLabel = "Show all books",
                     onAction = { viewModel.selectCollection(null) }
                 )
-                readingStatusFilter != null -> LibraryEmptyState(
+                readingStatusFilter != null -> LeaflineEmptyState(
                     title = "No books with this status",
                     body = "Status filter: ${readingStatusFilter!!.displayName}",
                     actionLabel = "Clear filter",
                     onAction = { viewModel.setReadingStatusFilter(null) }
                 )
-                progressFilter != ProgressFilter.ALL -> LibraryEmptyState(
+                progressFilter != ProgressFilter.ALL -> LeaflineEmptyState(
                     title = "No books in this range",
                     body = "Progress filter: ${progressFilter.displayName}",
                     actionLabel = "Clear filter",
                     onAction = { viewModel.setProgressFilter(ProgressFilter.ALL) }
                 )
-                selectedTag != null -> LibraryEmptyState(
+                selectedTag != null -> LeaflineEmptyState(
                     title = "No books with this tag",
                     body = "Tag filter: $selectedTag",
                     actionLabel = "Clear filter",
                     onAction = { viewModel.selectTag(null) }
                 )
-                else -> LibraryEmptyState(
+                else -> LeaflineEmptyState(
                     title = "Your library awaits",
                     body = "Import an EPUB to start reading. Folder scanning lives in the menu.",
                     actionLabel = "Import EPUB",
@@ -956,67 +957,6 @@ private fun LibraryLoadingState() {
         CircularProgressIndicator(
             modifier = Modifier.semantics { contentDescription = "Loading library" }
         )
-    }
-}
-
-/**
- * Branded empty surface: the leaf mark on the soft container tone, a short
- * heading, a one-line explanation, and one optional primary action.
- */
-@Composable
-private fun LibraryEmptyState(
-    title: String,
-    body: String,
-    actionLabel: String? = null,
-    onAction: (() -> Unit)? = null
-) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(
-                modifier = Modifier
-                    .size(88.dp)
-                    .clip(MaterialTheme.shapes.large)
-                    .background(MaterialTheme.colorScheme.primaryContainer)
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Eco,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .size(40.dp) // touch-target-ok: decorative leaf glyph
-                )
-            }
-            Spacer(Modifier.height(Spacing.md))
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.Center
-            )
-            Spacer(Modifier.height(Spacing.xs))
-            Text(
-                text = body,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-            if (actionLabel != null && onAction != null) {
-                Spacer(Modifier.height(Spacing.md))
-                FilledTonalButton(onClick = onAction) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = null,
-                        modifier = Modifier.size(IconSize.small) // touch-target-ok: decorative icon in button
-                    )
-                    Spacer(Modifier.width(Spacing.xs))
-                    Text(actionLabel)
-                }
-            }
-        }
     }
 }
 

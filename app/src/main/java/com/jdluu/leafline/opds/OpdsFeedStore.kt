@@ -26,26 +26,6 @@ class OpdsFeedStore internal constructor(
         /** Marks a stored credential as encrypted; anything else is legacy plaintext. */
         private const val ENC_PREFIX = "enc:v1:"
 
-        val BUILT_IN_FEEDS = listOf(
-            OpdsFeedSource(
-                id = "standard_ebooks",
-                title = "Standard Ebooks",
-                // Published OPDS path per standardebooks.org/feeds. The previous
-                // /opds path answers 401 for every request, with or without an
-                // OPDS/Atom Accept header.
-                url = "https://standardebooks.org/feeds/opds",
-                isBuiltIn = true,
-                description = "Free, high-quality public domain ebooks. Browsing the full catalog needs a Patrons Circle membership."
-            ),
-            OpdsFeedSource(
-                id = "project_gutenberg",
-                title = "Project Gutenberg",
-                url = "https://m.gutenberg.org/ebooks.opds/",
-                isBuiltIn = true,
-                description = "Over 60,000 free public domain ebooks and literary classics"
-            )
-        )
-
         fun fromContext(context: Context): OpdsFeedStore =
             OpdsFeedStore(context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE))
 
@@ -66,25 +46,22 @@ class OpdsFeedStore internal constructor(
         prefs.edit().putString(KEY_SELECTED_FEED, id).apply()
     }
 
-    /**
-     * Loads the combined list of built-in and user-saved custom OPDS feeds.
-     */
-    fun loadFeeds(): List<OpdsFeedSource> {
-        val customJson = prefs.getString(KEY_CUSTOM_FEEDS, null) ?: return BUILT_IN_FEEDS
-        return try {
-            val type = object : TypeToken<List<OpdsFeedSource>>() {}.type
-            val customList: List<OpdsFeedSource> = gson.fromJson(customJson, type) ?: emptyList()
-            BUILT_IN_FEEDS + customList.map(::withDecryptedCredentials)
-        } catch (_: Exception) {
-            BUILT_IN_FEEDS
-        }
+    /** Drops the remembered catalog, so a deleted row does not leave a dead id behind. */
+    fun clearSelectedFeedId() {
+        prefs.edit().remove(KEY_SELECTED_FEED).apply()
     }
+
+    /**
+     * Loads the catalogs the reader has saved. There are none by default: the app ships
+     * no catalog it does not control, and browsing starts from an empty state.
+     */
+    fun loadFeeds(): List<OpdsFeedSource> = loadCustomFeedsOnly()
 
     /**
      * Adds a custom OPDS feed. Returns the saved [OpdsFeedSource].
      *
-     * A feed whose URL is already saved is updated in place, keeping its id. Re-adding a
-     * built-in catalog from the 401 screen must not leave two rows for the same address.
+     * A feed whose URL is already saved is updated in place, keeping its id, so re-adding
+     * an address from the 401 screen cannot leave two rows for the same catalog.
      * An omitted credential leaves the stored one alone, because the add form is also the
      * only place to fix a title, and clearing the account would make the row useless.
      */

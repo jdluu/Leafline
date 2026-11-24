@@ -13,15 +13,11 @@ import org.robolectric.RobolectricTestRunner
 class OpdsFeedStoreTest {
 
     @Test
-    fun builtInFeeds_areIncludedByDefault() {
+    fun aFreshStoreHasNoCatalogs() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val store = OpdsFeedStore.fromContext(context, TestSecretCipher())
 
-        val feeds = store.loadFeeds()
-        assertTrue("Should include Standard Ebooks", feeds.any { it.title.contains("Standard Ebooks") })
-        assertTrue("Should include Project Gutenberg", feeds.any { it.title.contains("Project Gutenberg") })
-        // Feedbooks' public-domain catalog returns 404, so it is no longer offered.
-        assertFalse("Feedbooks is retired", feeds.any { it.title.contains("Feedbooks") })
+        assertTrue("The app ships no catalog of its own", store.loadFeeds().isEmpty())
     }
 
     @Test
@@ -114,12 +110,14 @@ class OpdsFeedStoreTest {
     }
 
     @Test
-    fun builtInFeeds_cannotBeRemoved() {
+    fun removingAnUnknownCatalogChangesNothing() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val store = OpdsFeedStore.fromContext(context, TestSecretCipher())
+        val saved = store.addCustomFeed("Calibre", "https://calibre.test/opds")
 
-        store.removeCustomFeed("standard_ebooks")
-        val feeds = store.loadFeeds()
-        assertTrue("Standard Ebooks must remain intact", feeds.any { it.id == "standard_ebooks" })
+        // The ids older versions shipped are ordinary unknown ids now: nothing to remove,
+        // and nothing resurrected in their place.
+        assertFalse(store.removeCustomFeed("standard_ebooks"))
+        assertEquals(listOf(saved.id), store.loadFeeds().map { it.id })
     }
 }

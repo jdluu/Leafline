@@ -18,6 +18,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 sealed interface OpdsUiState {
+    /** No catalog is saved. Browsing has not started, and nothing has failed. */
+    data object NoCatalogs : OpdsUiState
     data class Loading(val message: String? = null) : OpdsUiState
     data class Success(val feed: OpdsFeedResult) : OpdsUiState
     data class Error(val message: String) : OpdsUiState
@@ -33,12 +35,20 @@ class OpdsViewModel(
     private val _feedSources = MutableStateFlow<List<OpdsFeedSource>>(feedStore.loadFeeds())
     val feedSources: StateFlow<List<OpdsFeedSource>> = _feedSources.asStateFlow()
 
-    private val _selectedSource = MutableStateFlow<OpdsFeedSource>(
-        _feedSources.value.firstOrNull { it.id == feedStore.loadSelectedFeedId() }
-            ?: _feedSources.value.firstOrNull()
-            ?: OpdsFeedStore.BUILT_IN_FEEDS.first()
-    )
-    val selectedSource: StateFlow<OpdsFeedSource> = _selectedSource.asStateFlow()
+    private val _selectedSource = MutableStateFlow(resolveSelectedSource())
+    val selectedSource: StateFlow<OpdsFeedSource?> = _selectedSource.asStateFlow()
+
+    /**
+     * Restores the remembered catalog, or the first saved one. A remembered id that no
+     * longer resolves (the row was deleted, or it named a catalog this version no longer
+     * ships) is dropped rather than carried forever.
+     */
+    private fun resolveSelectedSource(): OpdsFeedSource? {
+        val savedId = feedStore.loadSelectedFeedId() ?: return _feedSources.value.firstOrNull()
+        val saved = _feedSources.value.firstOrNull { it.id == savedId }
+        if (saved == null) feedStore.clearSelectedFeedId()
+        return saved ?: _feedSources.value.firstOrNull()
+    }
 
     private val _breadcrumbs = MutableStateFlow<List<BreadcrumbItem>>(emptyList())
     val breadcrumbs: StateFlow<List<BreadcrumbItem>> = _breadcrumbs.asStateFlow()
@@ -57,11 +67,16 @@ class OpdsViewModel(
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     init {
-        loadRootFeed(_selectedSource.value)
+        val source = _selectedSource.value
+        if (source == null) {
+            _uiState.value = OpdsUiState.NoCatalogs
+        } else {
+            loadRootFeed(source)
+        }
     }
 
     fun selectSource(source: OpdsFeedSource) {
-        if (_selectedSource.value.id == source.id && _breadcrumbs.value.size <= 1) return
+        if (_selectedSource.value?.id == source.id && _breadcrumbs.value.size <= 1) return
         _selectedSource.value = source
         feedStore.saveSelectedFeedId(source.id)
         _searchQuery.value = ""
@@ -102,7 +117,7 @@ class OpdsViewModel(
     }
 
     val currentAuthHeader: String?
-        get() = _selectedSource.value.authHeader()
+        get() = _selectedSource.value?.authHeader()
 
     fun search(query: String) {
         _searchQuery.value = query
@@ -134,7 +149,12 @@ class OpdsViewModel(
     }
 
     fun refresh() {
-        val currentUrl = _breadcrumbs.value.lastOrNull()?.url ?: _selectedSource.value.url
+        // With no catalog there is no address to retry; say that rather than fetch "".
+        val currentUrl = _breadcrumbs.value.lastOrNull()?.url ?: _selectedSource.value?.url
+        if (currentUrl == null) {
+            _uiState.value = OpdsUiState.NoCatalogs
+            return
+        }
         loadFeedUrl(currentUrl)
     }
 
@@ -188,7 +208,7 @@ class OpdsViewModel(
     ) {
         val updated = feedStore.updateCustomFeed(id, title, url, username, password, authToken)
         _feedSources.value = feedStore.loadFeeds()
-        if (updated != null && _selectedSource.value.id == id) {
+        if (updated != null && _selectedSource.value?.id == id) {
             _selectedSource.value = updated
             refresh()
         }
@@ -198,20 +218,30 @@ class OpdsViewModel(
         if (!feedStore.clearCredentials(id)) return
         _feedSources.value = feedStore.loadFeeds()
         val refreshed = _feedSources.value.firstOrNull { it.id == id } ?: return
-        if (_selectedSource.value.id == id) {
+        if (_selectedSource.value?.id == id) {
             _selectedSource.value = refreshed
             refresh()
         }
     }
 
     fun deleteCustomFeed(id: String) {
-        val wasSelected = _selectedSource.value.id == id
+        val wasSelected = _selectedSource.value?.id == id
         feedStore.removeCustomFeed(id)
         _feedSources.value = feedStore.loadFeeds()
-        if (wasSelected) {
-            val fallback = _feedSources.value.firstOrNull() ?: OpdsFeedStore.BUILT_IN_FEEDS.first()
-            selectSource(fallback)
+        if (!wasSelected) return
+
+        val next = _feedSources.value.firstOrNull()
+        if (next != null) {
+            selectSource(next)
+            return
         }
+        // The last catalog is gone, so the screen goes back to the empty state instead of
+        // holding a source that no longer exists.
+        _selectedSource.value = null
+        _breadcrumbs.value = emptyList()
+        _searchQuery.value = ""
+        feedStore.clearSelectedFeedId()
+        _uiState.value = OpdsUiState.NoCatalogs
     }
 
     fun isBookInLibrary(book: OpdsBook): Boolean {
