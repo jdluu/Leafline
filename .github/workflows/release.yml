@@ -72,6 +72,19 @@ jobs:
           fi
           previous=$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)
           if [ -z "$previous" ]; then
+            # A failed lookup means one of three things, and only one of them is
+            # a legitimate first release. Split them or the guard reports OK on
+            # the run where it could not compare anything.
+            if ! git rev-parse -q --verify "${GITHUB_REF_NAME}^{commit}" >/dev/null; then
+              echo "FAIL: ${GITHUB_REF_NAME} is not a commit in this checkout, so no comparison is possible"
+              echo "Refusing to skip the versionCode check."
+              exit 1
+            fi
+            if [ "$(git rev-parse --is-shallow-repository 2>/dev/null || echo false)" = "true" ]; then
+              echo "FAIL: shallow checkout cannot resolve the previous release for ${GITHUB_REF_NAME}"
+              echo "Refusing to skip the versionCode check. Check out with fetch-depth: 0."
+              exit 1
+            fi
             echo "OK: ${GITHUB_REF_NAME} is the first release; versionCode $version_code has nothing to exceed"
             exit 0
           fi
