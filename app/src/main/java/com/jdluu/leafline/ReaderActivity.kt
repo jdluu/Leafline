@@ -1258,7 +1258,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     onToggleBookmark = { bookmarkManager.toggle(bookStableId, currentChapterTitle) },
                     onOpenBookmarks = { bookmarkSheetVisible.value = true },
                     onDismissBookmarks = { bookmarkSheetVisible.value = false },
-                    onBookmarkClick = { bookmarkManager.navigateTo(it) }, // TODO: delegate to bookmarkManager
+                    onBookmarkClick = { bookmarkManager.navigateTo(it) },
                     onDeleteBookmark = { bookmarkManager.delete(it) },
                     onOpenHighlights = { highlightsSheetVisible.value = true },
                     onDismissHighlights = { highlightsSheetVisible.value = false },
