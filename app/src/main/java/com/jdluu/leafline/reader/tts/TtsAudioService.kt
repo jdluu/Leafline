@@ -128,11 +128,7 @@ class TtsAudioService : Service() {
                 putExtra(EXTRA_SESSION_TOKEN, sessionToken)
             }
             runCatching {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(intent)
-                } else {
-                    context.startService(intent)
-                }
+                context.startForegroundService(intent)
             }.onFailure { e ->
                 Log.w(TAG, "Could not start or update TtsAudioService", e)
             }
