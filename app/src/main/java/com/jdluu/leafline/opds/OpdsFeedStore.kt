@@ -119,6 +119,9 @@ class OpdsFeedStore internal constructor(
 
     /**
      * Updates an existing custom OPDS feed. Returns the updated [OpdsFeedSource], or null if not found.
+     *
+     * A blank credential field means "unchanged", exactly as in [addCustomFeed]; removing a
+     * stored account is [clearCredentials], the single explicit gesture for it.
      */
     fun updateCustomFeed(
         id: String,
@@ -135,9 +138,9 @@ class OpdsFeedStore internal constructor(
         val updated = existing.copy(
             title = title.trim().ifEmpty { existing.title },
             url = url.trim().ifEmpty { existing.url },
-            username = username?.trim()?.ifBlank { null },
-            password = password?.ifBlank { null },
-            authToken = authToken?.trim()?.ifBlank { null }
+            username = username?.trim()?.ifBlank { null } ?: existing.username,
+            password = password?.ifBlank { null } ?: existing.password,
+            authToken = authToken?.trim()?.ifBlank { null } ?: existing.authToken
         )
         currentCustom[index] = updated
         saveCustomFeeds(currentCustom)
