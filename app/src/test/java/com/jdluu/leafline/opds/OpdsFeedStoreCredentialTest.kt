@@ -112,6 +112,70 @@ class OpdsFeedStoreCredentialTest {
     }
 
     @Test
+    fun `clearing credentials keeps the row and removes all three fields`() {
+        val store = OpdsFeedStore.fromContext(context, TestSecretCipher())
+        val url = "https://calibre.test/opds"
+        val feed = store.addCustomFeed(
+            title = "Calibre",
+            url = url,
+            username = "patron",
+            password = "hunter2",
+            authToken = "tok_123"
+        )
+        store.saveSelectedFeedId(feed.id)
+
+        assertTrue(store.clearCredentials(feed.id))
+
+        val reopened = OpdsFeedStore.fromContext(context, TestSecretCipher())
+        val custom = reopened.loadFeeds().filter { !it.isBuiltIn }
+        assertEquals(1, custom.size)
+        assertEquals(feed.id, custom.single().id)
+        assertEquals("Calibre", custom.single().title)
+        assertEquals(url, custom.single().url)
+        assertEquals(null, custom.single().username)
+        assertEquals(null, custom.single().password)
+        assertEquals(null, custom.single().authToken)
+        assertFalse("cleared row must not report auth", custom.single().hasAuth)
+        assertEquals("clearing credentials must not disturb selection", feed.id, reopened.loadSelectedFeedId())
+        assertFalse("cleared password survived on disk", rawPrefs().contains("hunter2"))
+        assertFalse("cleared token survived on disk", rawPrefs().contains("tok_123"))
+    }
+
+    @Test
+    fun `a second clear is a no-op rather than an error`() {
+        val store = OpdsFeedStore.fromContext(context, TestSecretCipher())
+        val feed = store.addCustomFeed("Calibre", "https://calibre.test/opds", password = "hunter2")
+
+        assertTrue(store.clearCredentials(feed.id))
+        val afterFirst = rawPrefs()
+        assertTrue("a second clear of the same row must still succeed", store.clearCredentials(feed.id))
+
+        assertEquals(afterFirst, rawPrefs())
+        assertEquals(1, store.loadFeeds().count { !it.isBuiltIn })
+    }
+
+    @Test
+    fun `clearing credentials for an unknown feed reports nothing to clear`() {
+        val store = OpdsFeedStore.fromContext(context, TestSecretCipher())
+
+        assertFalse(store.clearCredentials("no-such-feed"))
+        assertEquals("", rawPrefs())
+    }
+
+    @Test
+    fun `a built-in catalog cannot have credentials cleared`() {
+        val store = OpdsFeedStore.fromContext(context, TestSecretCipher())
+        val builtIn = OpdsFeedStore.BUILT_IN_FEEDS.first()
+
+        // Not merely unexposed in the UI: the store never looks built-ins up, so a call
+        // aimed at one has nothing to clear and writes nothing.
+        assertFalse(store.clearCredentials(builtIn.id))
+        assertEquals("", rawPrefs())
+        assertEquals(0, store.loadFeeds().count { !it.isBuiltIn })
+        assertEquals(builtIn.title, store.loadFeeds().first().title)
+    }
+
+    @Test
     fun `a saved auth token is never written in plaintext`() {
         val store = OpdsFeedStore.fromContext(context, TestSecretCipher())
 

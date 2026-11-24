@@ -194,6 +194,16 @@ class OpdsViewModel(
         }
     }
 
+    fun clearCredentials(id: String) {
+        if (!feedStore.clearCredentials(id)) return
+        _feedSources.value = feedStore.loadFeeds()
+        val refreshed = _feedSources.value.firstOrNull { it.id == id } ?: return
+        if (_selectedSource.value.id == id) {
+            _selectedSource.value = refreshed
+            refresh()
+        }
+    }
+
     fun deleteCustomFeed(id: String) {
         val wasSelected = _selectedSource.value.id == id
         feedStore.removeCustomFeed(id)

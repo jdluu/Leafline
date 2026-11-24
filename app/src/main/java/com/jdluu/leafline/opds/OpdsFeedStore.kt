@@ -145,6 +145,22 @@ class OpdsFeedStore internal constructor(
     }
 
     /**
+     * Removes the stored credentials from a custom feed, keeping the row, its id, title,
+     * URL and selection. Returns false when no custom feed has that id. A second call on
+     * an already-cleared row succeeds without writing.
+     */
+    fun clearCredentials(id: String): Boolean {
+        val currentCustom = loadCustomFeedsOnly().toMutableList()
+        val index = currentCustom.indexOfFirst { it.id == id }
+        if (index < 0) return false
+        val existing = currentCustom[index]
+        if (!existing.hasAuth) return true
+        currentCustom[index] = existing.copy(username = null, password = null, authToken = null)
+        saveCustomFeeds(currentCustom)
+        return true
+    }
+
+    /**
      * Removes a custom feed by ID. Built-in feeds cannot be removed.
      */
     fun removeCustomFeed(id: String): Boolean {
