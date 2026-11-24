@@ -8,7 +8,6 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.drawable.Icon
 import android.media.session.MediaSession
-import android.os.Build
 import com.jdluu.leafline.R
 import com.jdluu.leafline.ReaderActivity
 
@@ -25,19 +24,17 @@ object TtsNotificationManager {
      * Registers the notification channel with the system [NotificationManager].
      */
     fun createNotificationChannel(context: Context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-                ?: return
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = CHANNEL_DESCRIPTION
-                setShowBadge(false)
-            }
-            notificationManager.createNotificationChannel(channel)
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            ?: return
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            CHANNEL_NAME,
+            NotificationManager.IMPORTANCE_LOW
+        ).apply {
+            description = CHANNEL_DESCRIPTION
+            setShowBadge(false)
         }
+        notificationManager.createNotificationChannel(channel)
     }
 
     /**
@@ -128,12 +125,7 @@ object TtsNotificationManager {
         val primaryTitle = chapterTitle ?: bookTitle
         val secondaryText = if (!author.isNullOrBlank()) author else bookTitle
 
-        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Notification.Builder(context, CHANNEL_ID)
-        } else {
-            @Suppress("DEPRECATION")
-            Notification.Builder(context)
-        }
+        val builder = Notification.Builder(context, CHANNEL_ID)
 
         return builder
             .setSmallIcon(R.drawable.splash_leaf)
