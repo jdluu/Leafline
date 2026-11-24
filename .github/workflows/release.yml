@@ -65,6 +65,11 @@ jobs:
       - name: Verify versionCode exceeds the previous release
         if: github.ref_type == 'tag'
         run: |
+          # The checkout can be trimmed (fetch-tags off, a narrowed ref), and then
+          # an absent tag would read as "first release". Fetch the real tag set
+          # first: under `-e` a failed fetch fails the step, and once the tags are
+          # present an empty `previous` really does mean no earlier release.
+          git fetch --tags --force --quiet origin
           version_code=$(sed -n 's/^ *versionCode *= *\([0-9][0-9]*\).*/\1/p' app/build.gradle.kts)
           if [ -z "$version_code" ]; then
             echo "FAIL: no versionCode found in app/build.gradle.kts"
