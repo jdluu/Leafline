@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Debug-only override: same as main plus the user anchor, so a local proxy
-     (mitmproxy, Charles) can inspect HTTPS without weakening release builds. -->
+     (mitmproxy, Charles) can inspect HTTPS without weakening release builds.
+
+     A separate file rather than <debug-overrides> in src/main: the fold ships
+     its section in release as well, leaving the user anchor inert only at
+     runtime. The split keeps release bytes system-only; do not merge them. -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
