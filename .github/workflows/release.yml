@@ -38,10 +38,8 @@ jobs:
       # A tag whose name disagrees with the tree ships an APK that reports the
       # older versionName under a release page that claims the newer one, and
       # nothing downstream catches it: the build reads the file, not the tag.
-      # This compares versionName only; a versionCode that fails to increase is
-      # the separate, install-blocking case and is not checked here. A manual
-      # dry run has a branch ref, so the step is skipped for it. The ref name
-      # comes from the default GITHUB_REF_NAME variable and is never
+      # A manual dry run has a branch ref, so the step is skipped for it. The
+      # ref name comes from the default GITHUB_REF_NAME variable and is never
       # interpolated into this script, so a hostile tag name cannot inject shell.
       - name: Verify the tag matches the version in the tree
         if: github.ref_type == 'tag'
@@ -58,6 +56,35 @@ jobs:
             exit 1
           fi
           echo "OK: ${GITHUB_REF_NAME} matches versionName \"$version_name\""
+
+      # The versionName check above catches a tag on the wrong commit. This
+      # catches the other half: a bump that moves versionName and forgets
+      # versionCode, which passes that check and still ships an APK Android
+      # refuses to install over the previous release. The previous tag is the
+      # one the notes range is computed from, resolved the same way.
+      - name: Verify versionCode exceeds the previous release
+        if: github.ref_type == 'tag'
+        run: |
+          version_code=$(sed -n 's/^ *versionCode *= *\([0-9][0-9]*\).*/\1/p' app/build.gradle.kts)
+          if [ -z "$version_code" ]; then
+            echo "FAIL: no versionCode found in app/build.gradle.kts"
+            exit 1
+          fi
+          previous=$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)
+          if [ -z "$previous" ]; then
+            echo "OK: ${GITHUB_REF_NAME} is the first release; versionCode $version_code has nothing to exceed"
+            exit 0
+          fi
+          previous_code=$(git show "${previous}:app/build.gradle.kts" 2>/dev/null | sed -n 's/^ *versionCode *= *\([0-9][0-9]*\).*/\1/p' || true)
+          if [ -z "$previous_code" ]; then
+            echo "FAIL: no versionCode found in ${previous}:app/build.gradle.kts"
+            exit 1
+          fi
+          if [ "$version_code" -le "$previous_code" ]; then
+            echo "FAIL: versionCode $version_code does not exceed ${previous}'s $previous_code, so Android refuses the in-place update"
+            exit 1
+          fi
+          echo "OK: versionCode $version_code exceeds ${previous}'s $previous_code"
 
       # The APK is what a reader installs, so a release without one is not a
       # release. Signed only when the four signing properties are configured;
