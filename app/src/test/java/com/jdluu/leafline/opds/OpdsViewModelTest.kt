@@ -361,4 +361,84 @@ class OpdsViewModelTest {
         assertEquals(1, viewModel.feedSources.value.count { !it.isBuiltIn })
         assertEquals("https://standardebooks.org/feeds/opds", opdsClient.lastFetchedUrl)
     }
+
+    @Test
+    fun addFormSubmit_leavesStoredCredentialsInPlace() = runTest(testDispatcher) {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val feedStore = OpdsFeedStore.fromContext(context, TestSecretCipher())
+        val opdsClient = FakeOpdsClient()
+        val repo = FakeLibraryRepository()
+        val downloadManager = OpdsDownloadManager(
+            context = context,
+            opdsClient = opdsClient,
+            importer = com.jdluu.leafline.ReadiumEpubImporter(context),
+            repository = repo,
+            scope = this
+        )
+        val seeded = feedStore.addCustomFeed(
+            title = "Calibre",
+            url = "https://calibre.test/opds",
+            username = "patron",
+            password = "hunter2"
+        )
+
+        val viewModel = OpdsViewModel(
+            feedStore = feedStore,
+            opdsClient = opdsClient,
+            downloadManager = downloadManager,
+            libraryRepository = repo
+        )
+        testScheduler.advanceUntilIdle()
+
+        // The add form re-submits the same URL with blank credential fields, which is how
+        // #260's carry-forward is reached in practice. Nothing on that path may clear the
+        // stored account; removal is the explicit action only.
+        viewModel.addCustomFeed("Calibre", "https://calibre.test/opds", null, null)
+        testScheduler.advanceUntilIdle()
+
+        val stored = OpdsFeedStore.fromContext(context, TestSecretCipher())
+            .loadFeeds().single { it.id == seeded.id }
+        assertTrue("add path must not strip the stored account", stored.hasAuth)
+        assertEquals("patron", stored.username)
+        assertEquals("hunter2", stored.password)
+    }
+
+    @Test
+    fun clearCredentialsAction_removesTheAccountAndKeepsTheRow() = runTest(testDispatcher) {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val feedStore = OpdsFeedStore.fromContext(context, TestSecretCipher())
+        val opdsClient = FakeOpdsClient()
+        val repo = FakeLibraryRepository()
+        val downloadManager = OpdsDownloadManager(
+            context = context,
+            opdsClient = opdsClient,
+            importer = com.jdluu.leafline.ReadiumEpubImporter(context),
+            repository = repo,
+            scope = this
+        )
+        val seeded = feedStore.addCustomFeed(
+            title = "Calibre",
+            url = "https://calibre.test/opds",
+            username = "patron",
+            password = "hunter2"
+        )
+
+        val viewModel = OpdsViewModel(
+            feedStore = feedStore,
+            opdsClient = opdsClient,
+            downloadManager = downloadManager,
+            libraryRepository = repo
+        )
+        testScheduler.advanceUntilIdle()
+
+        viewModel.clearCredentials(seeded.id)
+        testScheduler.advanceUntilIdle()
+
+        val reloaded = OpdsFeedStore.fromContext(context, TestSecretCipher())
+        val stored = reloaded.loadFeeds().single { it.id == seeded.id }
+        assertFalse(stored.hasAuth)
+        assertEquals(null, stored.username)
+        assertEquals(null, stored.password)
+        assertEquals(1, reloaded.loadFeeds().count { !it.isBuiltIn })
+    }
 }
