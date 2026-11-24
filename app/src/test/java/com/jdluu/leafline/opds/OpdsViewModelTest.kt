@@ -326,4 +326,39 @@ class OpdsViewModelTest {
         assertEquals("Isaac Asimov", opdsClient.lastSearchQuery)
         assertEquals(expectedHeader, opdsClient.lastAuthHeader)
     }
+
+    @Test
+    fun addCustomFeed_fromFailedBuiltInCatalog_selectsTheSavedFeed() = runTest(testDispatcher) {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val feedStore = OpdsFeedStore.fromContext(context, TestSecretCipher())
+        val opdsClient = FakeOpdsClient()
+        val repo = FakeLibraryRepository()
+        val downloadManager = OpdsDownloadManager(
+            context = context,
+            opdsClient = opdsClient,
+            importer = com.jdluu.leafline.ReadiumEpubImporter(context),
+            repository = repo,
+            scope = this
+        )
+
+        val viewModel = OpdsViewModel(
+            feedStore = feedStore,
+            opdsClient = opdsClient,
+            downloadManager = downloadManager,
+            libraryRepository = repo
+        )
+        testScheduler.advanceUntilIdle()
+
+        viewModel.addCustomFeed(
+            title = "Standard Ebooks",
+            url = "https://standardebooks.org/feeds/opds",
+            username = "patron",
+            password = "hunter2"
+        )
+        testScheduler.advanceUntilIdle()
+
+        assertEquals("https://standardebooks.org/feeds/opds", viewModel.selectedSource.value.url)
+        assertEquals(1, viewModel.feedSources.value.count { !it.isBuiltIn })
+        assertEquals("https://standardebooks.org/feeds/opds", opdsClient.lastFetchedUrl)
+    }
 }
