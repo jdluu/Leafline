@@ -25,7 +25,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 class HardcoverClient(
     private val baseUrl: String = DEFAULT_BASE_URL,
     private val userAgent: String = "Leafline/unknown",
-    private val okHttpClient: OkHttpClient = OkHttpClient.Builder()
+    internal val okHttpClient: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
         .build(),

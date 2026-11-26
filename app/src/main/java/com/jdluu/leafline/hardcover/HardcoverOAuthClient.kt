@@ -19,7 +19,7 @@ open class HardcoverOAuthClient(
     private val tokenEndpoint: String = HardcoverOAuth.TOKEN_ENDPOINT,
     private val revocationEndpoint: String = HardcoverOAuth.REVOCATION_ENDPOINT,
     private val userAgent: String = "Leafline/unknown",
-    private val okHttpClient: OkHttpClient = OkHttpClient.Builder()
+    internal val okHttpClient: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
         .build(),

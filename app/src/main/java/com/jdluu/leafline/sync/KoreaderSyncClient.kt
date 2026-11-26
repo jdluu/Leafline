@@ -43,7 +43,7 @@ interface KoreaderSyncApi {
 
 /** OkHttp implementation of the Grimmory KOReader-compatible sync API. */
 class KoreaderSyncClient(
-    private val httpClient: OkHttpClient = OkHttpClient(),
+    internal val httpClient: OkHttpClient = OkHttpClient(),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : KoreaderSyncApi {
 

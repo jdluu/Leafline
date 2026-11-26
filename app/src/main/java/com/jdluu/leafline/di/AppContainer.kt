@@ -28,13 +28,18 @@ import com.jdluu.leafline.library.data.ReadingSessionRepositoryImpl
 import com.jdluu.leafline.library.backup.LibraryBackupManager
 import com.jdluu.leafline.library.data.local.LeaflineDatabase
 import com.jdluu.leafline.library.data.local.RoomBookDataSource
+import com.jdluu.leafline.library.cover.CoverLoader
+import com.jdluu.leafline.library.cover.EpubCoverLoader
 import com.jdluu.leafline.opds.OpdsClient
+import com.jdluu.leafline.opds.OpdsCoverLoader
 import com.jdluu.leafline.opds.OpdsFeedStore
 import com.jdluu.leafline.storage.KoreaderSyncConfigStorage
 import com.jdluu.leafline.sync.KoreaderSyncApi
 import com.jdluu.leafline.sync.KoreaderSyncClient
 import com.jdluu.leafline.sync.KoreaderSyncConfigPersistence
 import com.jdluu.leafline.sync.KoreaderSyncConfigStore
+import java.util.concurrent.TimeUnit
+import okhttp3.OkHttpClient
 
 /**
  * Application-wide dependency graph, built eagerly at construction. Room
@@ -58,6 +63,20 @@ class AppContainer(private val context: Context) {
     val readingSessionRepository: ReadingSessionRepository =
         ReadingSessionRepositoryImpl(database.readingSessionDao())
 
+    val coverLoader: CoverLoader by lazy { EpubCoverLoader(context) }
+
+    /**
+     * Shared OkHttp client so all network integrations reuse one connection pool
+     * and dispatcher. Call sites needing custom timeouts derive via `.newBuilder()`.
+     */
+    val httpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(20, TimeUnit.SECONDS)
+            .build()
+            .also { OpdsCoverLoader.configureHttpClient(it) }
+    }
+
     /**
      * Lazy like-for-like with the previous call-site construction: the OkHttp
      * client and cover directory are only created once sync or import is
@@ -65,7 +84,14 @@ class AppContainer(private val context: Context) {
      */
     val epubImporter: EpubImporter by lazy { ReadiumEpubImporter(context) }
 
-    val koreaderSyncApi: KoreaderSyncApi by lazy { KoreaderSyncClient() }
+    val koreaderSyncApi: KoreaderSyncApi by lazy {
+        KoreaderSyncClient(
+            httpClient = httpClient.newBuilder()
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(10, TimeUnit.SECONDS)
+                .build()
+        )
+    }
 
     /**
      * Restores saved KOReader sync settings into [KoreaderSyncConfigStore] when the
@@ -85,9 +111,7 @@ class AppContainer(private val context: Context) {
             bookmarkDao = database.bookmarkDao(),
             annotationDao = database.annotationDao(),
             readingSessionDao = database.readingSessionDao(),
-            appVersion = runCatching {
-                context.packageManager.getPackageInfo(context.packageName, 0).versionName
-            }.getOrNull() ?: "unknown",
+            appVersion = appVersionName(),
             hardcoverTracking = hardcoverTracking
         )
     }
@@ -96,10 +120,14 @@ class AppContainer(private val context: Context) {
 
     val opdsClient: OpdsClient by lazy {
         // Report the real installed version so servers and support can tell builds apart.
-        val versionName = runCatching {
-            context.packageManager.getPackageInfo(context.packageName, 0).versionName
-        }.getOrNull() ?: "unknown"
-        OpdsClient(userAgent = "Leafline/$versionName (Android; OPDS Client)")
+        val opdsHttpClient = httpClient.newBuilder()
+            .readTimeout(30, TimeUnit.SECONDS)
+            .followRedirects(true)
+            .build()
+        OpdsClient(
+            okHttpClient = opdsHttpClient,
+            userAgent = "Leafline/${appVersionName()} (Android; OPDS Client)"
+        )
     }
 
     /**
@@ -108,7 +136,10 @@ class AppContainer(private val context: Context) {
      * the reader re-entering it. It stays inactive until they enable it.
      */
     val hardcoverApi: HardcoverApi by lazy {
-        HardcoverClient(userAgent = "Leafline/${appVersionName()}")
+        HardcoverClient(
+            userAgent = "Leafline/${appVersionName()}",
+            okHttpClient = httpClient
+        )
     }
 
     private fun appVersionName(): String = runCatching {
@@ -133,7 +164,8 @@ class AppContainer(private val context: Context) {
         } else {
             HardcoverOAuthClient(
                 clientId = clientId,
-                userAgent = "Leafline/${appVersionName()}"
+                userAgent = "Leafline/${appVersionName()}",
+                okHttpClient = httpClient
             )
         }
     }

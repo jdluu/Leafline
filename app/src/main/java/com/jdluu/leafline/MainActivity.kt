@@ -119,7 +119,6 @@ import com.jdluu.leafline.library.SafEpubStager
 import com.jdluu.leafline.library.SafFolderMetadata
 import com.jdluu.leafline.library.SafStageResult
 import com.jdluu.leafline.library.cover.BitmapMemoryCache
-import com.jdluu.leafline.library.cover.EpubCoverLoader
 import com.jdluu.leafline.library.rescan.FolderRescanViewModel
 import com.jdluu.leafline.library.rescan.FolderRescanViewModelFactory
 import com.jdluu.leafline.library.rescan.createFolderRescanRunner
@@ -339,11 +338,10 @@ private enum class LeaflineTab(val label: String) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LeaflineApp(activity: MainActivity) {
-    val coverLoader = remember { EpubCoverLoader(activity.applicationContext) }
     val libraryViewModel: LibraryViewModel = viewModel(
         factory = LibraryViewModelFactory(
             repository = activity.appContainer.libraryRepository,
-            coverLoader = coverLoader,
+            coverLoader = activity.appContainer.coverLoader,
             sortStore = LibrarySortStore.fromContext(activity),
             readingSessionRepository = activity.appContainer.readingSessionRepository,
             layoutStore = LibraryLayoutStore.fromContext(activity),

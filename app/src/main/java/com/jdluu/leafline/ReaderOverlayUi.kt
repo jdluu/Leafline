@@ -251,7 +251,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.readium.r2.navigator.Decoration
 import org.readium.r2.navigator.DecorableNavigator
