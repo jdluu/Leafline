@@ -1,5 +1,9 @@
 package com.jdluu.leafline.hardcover
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
 /** How the account was connected, which decides how it is refreshed and revoked. */
 enum class HardcoverAuthMethod {
     /** Nothing connected. */
@@ -60,8 +64,14 @@ data class HardcoverConfig(
 
 /** In-memory holder, restored from disk when [com.jdluu.leafline.di.AppContainer] builds. */
 object HardcoverConfigStore {
-    @Volatile
-    var config: HardcoverConfig? = null
+    private val _state = MutableStateFlow<HardcoverConfig?>(null)
+    val state: StateFlow<HardcoverConfig?> = _state.asStateFlow()
+
+    var config: HardcoverConfig?
+        get() = _state.value
+        set(value) {
+            _state.value = value
+        }
 }
 
 /**

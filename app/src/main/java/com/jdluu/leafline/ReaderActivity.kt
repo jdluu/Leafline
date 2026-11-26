@@ -195,7 +195,6 @@ import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.seconds
 import org.readium.navigator.media.common.MediaNavigator

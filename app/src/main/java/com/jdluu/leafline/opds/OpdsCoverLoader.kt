@@ -19,9 +19,21 @@ import java.security.MessageDigest
  */
 object OpdsCoverLoader {
 
-    private val httpClient by lazy {
+    private val defaultHttpClient by lazy {
         OkHttpClient.Builder().build()
     }
+
+    @Volatile
+    private var sharedHttpClient: OkHttpClient? = null
+
+    private val httpClient: OkHttpClient
+        get() = sharedHttpClient ?: defaultHttpClient
+
+    fun configureHttpClient(client: OkHttpClient) {
+        sharedHttpClient = client
+    }
+
+    internal fun currentHttpClientForTesting(): OkHttpClient = httpClient
 
     suspend fun loadCover(
         coverUrl: String,

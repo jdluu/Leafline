@@ -50,7 +50,7 @@ private val HTTP_SUFFIX = Regex("""\s*\(HTTP (\d{3})\)$""")
  * HTTP client for fetching OPDS catalog feeds, searching feeds, and downloading EPUB publications.
  */
 open class OpdsClient(
-    private val okHttpClient: OkHttpClient = OkHttpClient.Builder()
+    internal val okHttpClient: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .followRedirects(true)
