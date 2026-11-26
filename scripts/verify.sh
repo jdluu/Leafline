@@ -21,6 +21,7 @@ a code failure.
 EOF
 }
 
+# relies on set -e; do not drop it
 run_guards() {
     bash scripts/check_dynamic_type.sh
     bash scripts/check_touch_targets.sh
