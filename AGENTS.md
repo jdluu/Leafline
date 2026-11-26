@@ -59,7 +59,7 @@ four properties only for a signed release; CI needs none.
 
 Always do:
 
-- Before reporting done, run `:app:testDebugUnitTest :app:lintDebug :app:assembleDebug`, both `scripts/check_*` guards, and `git diff --check`; paste the real output.
+- Before reporting done, run `scripts/verify.sh --all`; paste the real output.
 - Add a JVM unit test for new domain logic; keep domain models and mappers free of Android, Room, and Readium types.
 - Set text through `MaterialTheme.typography`. Never set a text size in dp or px.
 - Keep every control at least 48dp, icon buttons included. Keep user data on device: no analytics, crash reporting, or telemetry.
