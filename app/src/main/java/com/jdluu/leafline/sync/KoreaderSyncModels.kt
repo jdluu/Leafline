@@ -1,5 +1,9 @@
 package com.jdluu.leafline.sync
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
 /**
  * Configuration for the KOReader-compatible progress sync endpoint.
  *
@@ -16,8 +20,14 @@ data class KoreaderSyncConfig(
 
 /** Session-scoped holder for [KoreaderSyncConfig]. */
 object KoreaderSyncConfigStore {
-    @Volatile
-    var config: KoreaderSyncConfig? = null
+    private val _state = MutableStateFlow<KoreaderSyncConfig?>(null)
+    val state: StateFlow<KoreaderSyncConfig?> = _state.asStateFlow()
+
+    var config: KoreaderSyncConfig?
+        get() = _state.value
+        set(value) {
+            _state.value = value
+        }
 }
 
 /** Progress payload returned by GET /syncs/progress/{bookHash}. */
