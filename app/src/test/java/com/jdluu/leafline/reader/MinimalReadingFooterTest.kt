@@ -1,6 +1,6 @@
 package com.jdluu.leafline.reader
 
-import com.jdluu.leafline.formatMinimalFooterText
+import com.jdluu.leafline.reader.ui.formatMinimalFooterText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test

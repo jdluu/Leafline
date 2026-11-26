@@ -245,16 +245,12 @@ import org.readium.r2.navigator.preferences.FontFamily
 import java.io.File
 import java.io.IOException
 
-/** UI state for the sync conflict bottom sheet. */
-data class SyncConflictState(
-    val localPercentage: Double?,
-    val remotePercentage: Double?,
-    val remoteDevice: String?,
-    val remoteTimestamp: Long?,
-    val onJump: () -> Unit
-)
-
-internal const val SEARCH_DEBOUNCE_MS = 300L
+import com.jdluu.leafline.reader.ui.READER_FOOTER_INSET_DP
+import com.jdluu.leafline.reader.ui.ReaderLoadingScreen
+import com.jdluu.leafline.reader.ui.ReaderOverlay
+import com.jdluu.leafline.reader.ui.SyncConflictState
+import com.jdluu.leafline.reader.ui.annotationExcerpt
+import com.jdluu.leafline.reader.ui.matchesChapter
 
 @OptIn(ExperimentalReadiumApi::class)
 class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
