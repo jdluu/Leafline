@@ -14,6 +14,7 @@ import com.jdluu.leafline.sync.KoreaderSyncApi
 import com.jdluu.leafline.sync.KoreaderSyncConfigStore
 import com.jdluu.leafline.di.appContainer
 import com.jdluu.leafline.library.BookIdentity
+import com.jdluu.leafline.reader.ui.SyncConflictState
 import com.jdluu.leafline.sync.ProgressSyncer
 import com.jdluu.leafline.sync.PullOutcome
 import com.jdluu.leafline.sync.PushOutcome
@@ -40,7 +41,7 @@ class ReaderSyncManager(
     private val currentBookProvider: () -> com.jdluu.leafline.library.LibraryBook?,
     private val currentLocatorProvider: () -> Locator?,
     private val goToLocator: (Locator) -> Unit,
-    private val onConflictState: (com.jdluu.leafline.SyncConflictState?) -> Unit,
+    private val onConflictState: (SyncConflictState?) -> Unit,
 ) {
     lateinit var progressSyncer: ProgressSyncer
         private set
@@ -91,7 +92,7 @@ class ReaderSyncManager(
         }
         if (target == null) {
             onConflictState(
-                com.jdluu.leafline.SyncConflictState(
+                SyncConflictState(
                     localPercentage = localProgress,
                     remotePercentage = outcome.remotePercentage,
                     remoteDevice = remote.device,
@@ -102,7 +103,7 @@ class ReaderSyncManager(
             return
         }
         onConflictState(
-            com.jdluu.leafline.SyncConflictState(
+            SyncConflictState(
                 localPercentage = localProgress,
                 remotePercentage = outcome.remotePercentage,
                 remoteDevice = remote.device,

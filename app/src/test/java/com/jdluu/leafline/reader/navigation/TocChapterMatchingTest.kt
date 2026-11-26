@@ -1,6 +1,6 @@
 package com.jdluu.leafline.reader.navigation
 
-import com.jdluu.leafline.matchesChapter
+import com.jdluu.leafline.reader.ui.matchesChapter
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test

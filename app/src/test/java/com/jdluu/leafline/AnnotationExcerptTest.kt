@@ -1,6 +1,7 @@
 package com.jdluu.leafline
 
 import com.jdluu.leafline.library.data.Annotation
+import com.jdluu.leafline.reader.ui.annotationExcerpt
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
