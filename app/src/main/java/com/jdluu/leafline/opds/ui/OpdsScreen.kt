@@ -1,74 +1,25 @@
 package com.jdluu.leafline.opds.ui
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.automirrored.filled.NavigateNext
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.CloudDownload
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -77,37 +28,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.jdluu.leafline.library.LibraryBook
 import com.jdluu.leafline.opds.OpdsUiState
-import com.jdluu.leafline.opds.splitHttpStatus
 import com.jdluu.leafline.opds.OpdsViewModel
 import com.jdluu.leafline.opds.model.BreadcrumbItem
 import com.jdluu.leafline.opds.model.DownloadStatus
 import com.jdluu.leafline.opds.model.OpdsBook
-import com.jdluu.leafline.opds.model.OpdsFeedResult
 import com.jdluu.leafline.opds.model.OpdsFeedSource
-import com.jdluu.leafline.opds.model.OpdsNavigationLink
-import com.jdluu.leafline.opds.rememberOpdsCoverBitmap
+import com.jdluu.leafline.opds.splitHttpStatus
 import com.jdluu.leafline.theme.LeaflineEmptyState
-import com.jdluu.leafline.theme.LeaflineTextField
 import com.jdluu.leafline.theme.Padding
 import com.jdluu.leafline.theme.Spacing
-
-private const val COVER_ASPECT_RATIO = 1f / 1.5f
 
 /**
  * Seeds the add-feed form from the catalog the reader subscribed to. A 401 can arrive
@@ -189,7 +121,6 @@ fun OpdsScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Breadcrumbs Bar
             if (breadcrumbs.size > 1) {
                 OpdsBreadcrumbBar(
                     breadcrumbs = breadcrumbs,
@@ -197,7 +128,6 @@ fun OpdsScreen(
                 )
             }
 
-            // Main Content Area
             Box(modifier = Modifier.fillMaxSize()) {
                 when (val state = uiState) {
                     is OpdsUiState.NoCatalogs -> {
@@ -230,84 +160,20 @@ fun OpdsScreen(
                         }
                     }
                     is OpdsUiState.Error -> {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(Padding.screen),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            val (detail, statusCode) = remember(state.message) {
-                                splitHttpStatus(state.message)
+                        OpdsErrorContent(
+                            message = state.message,
+                            selectedSource = selectedSource,
+                            breadcrumbs = breadcrumbs,
+                            onAddWithCredentials = { seed ->
+                                addFeedSeed = seed
+                                showAddFeedDialog = true
+                            },
+                            onRetry = { viewModel.refresh() },
+                            onAddCatalog = {
+                                addFeedSeed = null
+                                showAddFeedDialog = true
                             }
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(Spacing.md)
-                            ) {
-                                Text(
-                                    text = "Failed to load catalog",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.error
-                                )
-                                Text(
-                                    // The 401 sentence the client builds already names the
-                                    // recovery, so echo it rather than inventing a
-                                    // settings screen this app does not have.
-                                    text = detail,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    textAlign = TextAlign.Center,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                val failedFeed = selectedSource
-                                if (statusCode == "HTTP 401" && failedFeed != null) {
-                                    // One action, and it carries the failing feed's name and
-                                    // address into the add-feed form so the reader only has
-                                    // to type the account.
-                                    Button(onClick = {
-                                        addFeedSeed = credentialSeed(breadcrumbs, failedFeed)
-                                        showAddFeedDialog = true
-                                    }) {
-                                        Icon(
-                                            imageVector = Icons.Default.Add,
-                                            contentDescription = null
-                                        )
-                                        Spacer(modifier = Modifier.width(Spacing.xs))
-                                        Text("Add with credentials")
-                                    }
-                                } else {
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Button(onClick = { viewModel.refresh() }) {
-                                            Icon(
-                                                imageVector = Icons.Default.Refresh,
-                                                contentDescription = null
-                                            )
-                                            Spacer(modifier = Modifier.width(Spacing.xs))
-                                            Text("Retry")
-                                        }
-                                        OutlinedButton(onClick = {
-                                            addFeedSeed = null
-                                            showAddFeedDialog = true
-                                        }) {
-                                            Icon(
-                                                imageVector = Icons.Default.Add,
-                                                contentDescription = null
-                                            )
-                                            Spacer(modifier = Modifier.width(Spacing.xs))
-                                            Text("Add catalog")
-                                        }
-                                    }
-                                }
-                                if (statusCode != null) {
-                                    Text(
-                                        text = statusCode,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                                    )
-                                }
-                            }
-                        }
+                        )
                     }
                     is OpdsUiState.Success -> {
                         FeedContentView(
@@ -326,8 +192,7 @@ fun OpdsScreen(
                                     onSuccess = {},
                                     onError = {}
                                 )
-                            },
-                            onOpenInReader = onOpenBook
+                            }
                         )
                     }
                 }
@@ -335,7 +200,6 @@ fun OpdsScreen(
         }
     }
 
-    // Book Detail Sheet / Dialog
     selectedBookForDetails?.let { book ->
         val status = downloadStatuses[book.id] ?: DownloadStatus.Idle
         val isInLibrary = viewModel.isBookInLibrary(book)
@@ -364,7 +228,6 @@ fun OpdsScreen(
         )
     }
 
-    // Add Feed Dialog
     if (showAddFeedDialog) {
         AddOpdsFeedDialog(
             onDismiss = {
@@ -384,870 +247,85 @@ fun OpdsScreen(
     // Removing a stored account is its own action: blank fields preserve credentials now,
     // so this is the only path and the reader gets told what happens next.
     removeCredentialsFor?.let { source ->
-        AlertDialog(
-            onDismissRequest = { removeCredentialsFor = null },
-            title = { Text("Remove saved credentials?") },
-            text = {
-                Text(
-                    "${source.title} keeps its place in the list. The next time it loads, " +
-                        "Leafline asks the catalog for access without the saved account."
-                )
+        OpdsRemoveCredentialsDialog(
+            source = source,
+            onConfirm = {
+                viewModel.clearCredentials(source.id)
+                removeCredentialsFor = null
             },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.clearCredentials(source.id)
-                    removeCredentialsFor = null
-                }) {
-                    Text("Remove credentials", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { removeCredentialsFor = null }) {
-                    Text("Keep")
-                }
-            }
+            onDismiss = { removeCredentialsFor = null }
         )
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun OpdsTopBar(
+private fun OpdsErrorContent(
+    message: String,
     selectedSource: OpdsFeedSource?,
-    sources: List<OpdsFeedSource>,
-    onSelectSource: (OpdsFeedSource) -> Unit,
-    onAddFeedClick: () -> Unit,
-    onRefreshClick: () -> Unit,
-    onDeleteSource: (String) -> Unit,
-    onRemoveCredentials: (OpdsFeedSource) -> Unit,
-    searchQuery: String,
-    isSearchActive: Boolean,
-    onSearchToggle: () -> Unit,
-    onSearchQueryChange: (String) -> Unit,
-    onSearchClear: () -> Unit,
-    canNavigateBack: Boolean,
-    onNavigateBack: () -> Unit
-) {
-    var showSourceDropdown by remember { mutableStateOf(false) }
-    val keyboardController = LocalSoftwareKeyboardController.current
-
-    // With no catalog there is nothing to switch between and nothing to search, so the
-    // bar keeps a neutral title and offers the only action that exists.
-    if (selectedSource == null) {
-        TopAppBar(
-            title = {
-                Text(
-                    text = "Catalogs",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-            },
-            actions = {
-                IconButton(onClick = onAddFeedClick) {
-                    Icon(imageVector = Icons.Default.Add, contentDescription = "Add catalog")
-                }
-            }
-        )
-        return
-    }
-
-    if (isSearchActive) {
-        TopAppBar(
-            title = {
-                LeaflineTextField(
-                    value = searchQuery,
-                    onValueChange = onSearchQueryChange,
-                    placeholder = "Search catalog…",
-                    imeAction = ImeAction.Search,
-                    keyboardActions = KeyboardActions(onSearch = { keyboardController?.hide() }),
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = onSearchClear) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Exit search"
-                    )
-                }
-            },
-            actions = {
-                if (searchQuery.isNotEmpty()) {
-                    IconButton(onClick = onSearchClear) {
-                        Icon(imageVector = Icons.Default.Clear, contentDescription = "Clear search")
-                    }
-                }
-            }
-        )
-    } else {
-        TopAppBar(
-            title = {
-                Box {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .clip(MaterialTheme.shapes.small)
-                            .clickable { showSourceDropdown = true }
-                            .padding(horizontal = Spacing.xs, vertical = 4.dp)
-                    ) {
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = selectedSource.title,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                if (selectedSource.hasAuth) {
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Icon(
-                                        imageVector = Icons.Default.Lock,
-                                        contentDescription = "Authenticated catalog",
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(14.dp) // touch-target-ok
-                                    )
-                                }
-                            }
-                            Text(
-                                text = "Tap to switch catalog",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-
-                    DropdownMenu(
-                        expanded = showSourceDropdown,
-                        onDismissRequest = { showSourceDropdown = false }
-                    ) {
-                        sources.forEach { source ->
-                            DropdownMenuItem(
-                                text = {
-                                    Column {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(
-                                                text = source.title,
-                                                fontWeight = if (source.id == selectedSource.id) FontWeight.Bold else FontWeight.Normal
-                                            )
-                                            if (source.hasAuth) {
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Icon(
-                                                    imageVector = Icons.Default.Lock,
-                                                    contentDescription = "Authenticated catalog",
-                                                    tint = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.size(14.dp) // touch-target-ok
-                                                )
-                                            }
-                                        }
-                                        if (source.description != null) {
-                                            Text(
-                                                text = source.description,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    }
-                                },
-                                trailingIcon = if (!source.isBuiltIn) {
-                                    {
-                                        Row {
-                                            // Removal is an explicit action, never a blank
-                                            // field, so a reader can tell the stored account
-                                            // is gone rather than merely hidden.
-                                            if (source.hasAuth) {
-                                                IconButton(onClick = {
-                                                    showSourceDropdown = false
-                                                    onRemoveCredentials(source)
-                                                }) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.LockOpen,
-                                                        contentDescription = "Remove stored credentials"
-                                                    )
-                                                }
-                                            }
-                                            IconButton(onClick = {
-                                                showSourceDropdown = false
-                                                onDeleteSource(source.id)
-                                            }) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Delete,
-                                                    contentDescription = "Delete custom feed",
-                                                    tint = MaterialTheme.colorScheme.error
-                                                )
-                                            }
-                                        }
-                                    }
-                                } else null,
-                                onClick = {
-                                    showSourceDropdown = false
-                                    onSelectSource(source)
-                                }
-                            )
-                        }
-                    }
-                }
-            },
-            navigationIcon = {
-                if (canNavigateBack) {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
-                        )
-                    }
-                }
-            },
-            actions = {
-                IconButton(onClick = onSearchToggle) {
-                    Icon(imageVector = Icons.Default.Search, contentDescription = "Search catalog")
-                }
-                IconButton(onClick = onAddFeedClick) {
-                    Icon(imageVector = Icons.Default.Add, contentDescription = "Add custom feed")
-                }
-                IconButton(onClick = onRefreshClick) {
-                    Icon(imageVector = Icons.Default.Refresh, contentDescription = "Refresh catalog")
-                }
-            }
-        )
-    }
-}
-
-@Composable
-private fun OpdsBreadcrumbBar(
     breadcrumbs: List<BreadcrumbItem>,
-    onBreadcrumbClick: (Int) -> Unit
+    onAddWithCredentials: (OpdsFeedSource) -> Unit,
+    onRetry: () -> Unit,
+    onAddCatalog: () -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = Spacing.sm, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        breadcrumbs.forEachIndexed { index, item ->
-            val isLast = index == breadcrumbs.lastIndex
-            Text(
-                text = item.title,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = if (isLast) FontWeight.Bold else FontWeight.Normal,
-                color = if (isLast) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .clip(MaterialTheme.shapes.extraSmall)
-                    .clickable(enabled = !isLast) { onBreadcrumbClick(index) }
-                    .padding(horizontal = 4.dp, vertical = 4.dp)
-            )
-            if (!isLast) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.NavigateNext,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.size(16.dp) // touch-target-ok
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun FeedContentView(
-    feed: OpdsFeedResult,
-    viewModel: OpdsViewModel,
-    downloadStatuses: Map<String, DownloadStatus>,
-    onSubfeedClick: (OpdsNavigationLink) -> Unit,
-    onBookClick: (OpdsBook) -> Unit,
-    onDownloadClick: (OpdsBook) -> Unit,
-    onOpenInReader: (LibraryBook) -> Unit
-) {
-    val screenWidth = LocalConfiguration.current.screenWidthDp
-    val columns = when {
-        screenWidth < 600 -> 2
-        screenWidth < 840 -> 3
-        else -> 4
-    }
-
-    // Catalogs sometimes expose a "Home" link that points back at the feed itself; treat
-    // those as noise so the reader is not sent in a loop and the empty state can appear.
-    val navigationLinks = feed.navigationLinks.filterNot { it.href == feed.feedUrl }
-
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(columns),
-        contentPadding = PaddingValues(Spacing.sm),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        modifier = Modifier.fillMaxSize()
-    ) {
-        // Navigation subsections (e.g. Categories, Genres)
-        if (navigationLinks.isNotEmpty()) {
-            item(span = { GridItemSpan(columns) }) {
-                Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                    Text(
-                        text = "Categories & Shelves",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
-                    ) {
-                        navigationLinks.forEach { navLink ->
-                            SuggestionChip(
-                                onClick = { onSubfeedClick(navLink) },
-                                label = { Text(navLink.title) },
-                                icon = {
-                                    Icon(
-                                        imageVector = Icons.Default.Folder,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp) // touch-target-ok
-                                    )
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // Direct books
-        if (feed.books.isNotEmpty()) {
-            item(span = { GridItemSpan(columns) }) {
-                Text(
-                    text = "Books (${feed.books.size})",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(top = Spacing.xs)
-                )
-            }
-
-            items(feed.books, key = { it.id }) { book ->
-                val status = downloadStatuses[book.id] ?: DownloadStatus.Idle
-                val isInLibrary = viewModel.isBookInLibrary(book)
-
-                OpdsBookTile(
-                    book = book,
-                    downloadStatus = status,
-                    isInLibrary = isInLibrary,
-                    authHeader = viewModel.currentAuthHeader,
-                    onClick = { onBookClick(book) },
-                    onDownloadClick = { onDownloadClick(book) }
-                )
-            }
-        }
-
-        // Groups / Collections in feed
-        feed.groups.forEach { group ->
-            if (group.books.isNotEmpty()) {
-                item(span = { GridItemSpan(columns) }) {
-                    Text(
-                        text = group.title,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(top = Spacing.sm)
-                    )
-                }
-
-                items(group.books, key = { "${group.title}_${it.id}" }) { book ->
-                    val status = downloadStatuses[book.id] ?: DownloadStatus.Idle
-                    val isInLibrary = viewModel.isBookInLibrary(book)
-
-                    OpdsBookTile(
-                        book = book,
-                        downloadStatus = status,
-                        isInLibrary = isInLibrary,
-                        authHeader = viewModel.currentAuthHeader,
-                        onClick = { onBookClick(book) },
-                        onDownloadClick = { onDownloadClick(book) }
-                    )
-                }
-            }
-        }
-
-        // Empty state when nothing returned
-        if (feed.books.isEmpty() && feed.groups.isEmpty() && navigationLinks.isEmpty()) {
-            item(span = { GridItemSpan(columns) }) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(Padding.screen),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(Spacing.sm)
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.MenuBook,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.outline,
-                            modifier = Modifier.size(48.dp) // touch-target-ok
-                        )
-                        Text(
-                            text = "No books found in this section",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun OpdsBookTile(
-    book: OpdsBook,
-    downloadStatus: DownloadStatus,
-    isInLibrary: Boolean,
-    authHeader: String? = null,
-    onClick: () -> Unit,
-    onDownloadClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-    ) {
-        Column(modifier = Modifier.padding(Spacing.xs)) {
-            val coverBitmap = rememberOpdsCoverBitmap(book.coverUrl, authHeader)
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(COVER_ASPECT_RATIO)
-                    .clip(MaterialTheme.shapes.small)
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center
-            ) {
-                if (coverBitmap != null) {
-                    Image(
-                        bitmap = coverBitmap.asImageBitmap(),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                        modifier = Modifier.padding(Spacing.xs)
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.MenuBook,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.outline,
-                            modifier = Modifier.size(32.dp) // touch-target-ok
-                        )
-                        Spacer(modifier = Modifier.height(Spacing.xs))
-                        Text(
-                            text = book.title,
-                            style = MaterialTheme.typography.labelSmall,
-                            textAlign = TextAlign.Center,
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
-                // In-library badge
-                if (isInLibrary) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(Spacing.xs),
-                        contentAlignment = Alignment.TopEnd
-                    ) {
-                        SurfaceBadge(label = "In Library", color = MaterialTheme.colorScheme.primaryContainer)
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(Spacing.xs))
-
-            Text(
-                text = book.title,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            if (!book.author.isNullOrBlank()) {
-                Text(
-                    text = book.author,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            when (downloadStatus) {
-                is DownloadStatus.Downloading -> {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        LinearProgressIndicator(
-                            progress = { downloadStatus.progressFraction },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Text(
-                            text = "Downloading ${(downloadStatus.progressFraction * 100).toInt()}%",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-                is DownloadStatus.Importing -> {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
-                    ) {
-                        CircularProgressIndicator(modifier = Modifier.size(14.dp)) // touch-target-ok
-                        Text(
-                            text = "Importing...",
-                            style = MaterialTheme.typography.labelSmall
-                        )
-                    }
-                }
-                is DownloadStatus.Success -> {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(16.dp) // touch-target-ok
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Added",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-                is DownloadStatus.Error -> {
-                    Text(
-                        text = "Download failed",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-                DownloadStatus.Idle -> {
-                    if (!isInLibrary && !book.downloadUrl.isNullOrBlank()) {
-                        OutlinedButton(
-                            onClick = onDownloadClick,
-                            modifier = Modifier.fillMaxWidth(),
-                            contentPadding = PaddingValues(horizontal = Spacing.xs, vertical = 4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CloudDownload,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp) // touch-target-ok
-                            )
-                            Spacer(modifier = Modifier.width(Spacing.xs))
-                            Text("Get EPUB", style = MaterialTheme.typography.labelSmall)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SurfaceBadge(label: String, color: androidx.compose.ui.graphics.Color) {
     Box(
         modifier = Modifier
-            .clip(MaterialTheme.shapes.extraSmall)
-            .background(color)
-            .padding(horizontal = Spacing.xs, vertical = 4.dp)
+            .fillMaxSize()
+            .padding(Padding.screen),
+        contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold
-        )
-    }
-}
-
-@Composable
-private fun OpdsBookDetailDialog(
-    book: OpdsBook,
-    downloadStatus: DownloadStatus,
-    isInLibrary: Boolean,
-    onDismiss: () -> Unit,
-    onDownloadClick: () -> Unit,
-    onOpenInReader: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
+        val (detail, statusCode) = remember(message) {
+            splitHttpStatus(message)
+        }
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Spacing.md)
+        ) {
             Text(
-                text = book.title,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
+                text = "Failed to load catalog",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.error
             )
-        },
-        text = {
-            Column(
-                modifier = Modifier
-                    .verticalScroll(rememberScrollState())
-                    .fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(Spacing.sm)
-            ) {
-                if (!book.author.isNullOrBlank()) {
-                    Text(
-                        text = "By ${book.author}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-
-                if (book.categories.isNotEmpty()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        book.categories.forEach { category ->
-                            AssistChip(
-                                onClick = {},
-                                label = { Text(category) }
-                            )
-                        }
-                    }
-                }
-
-                if (!book.summary.isNullOrBlank()) {
-                    Text(
-                        text = book.summary,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                when (downloadStatus) {
-                    is DownloadStatus.Downloading -> {
-                        LinearProgressIndicator(
-                            progress = { downloadStatus.progressFraction },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Text(
-                            text = "Downloading... ${(downloadStatus.progressFraction * 100).toInt()}%",
-                            style = MaterialTheme.typography.labelSmall
-                        )
-                    }
-                    is DownloadStatus.Importing -> {
-                        Text(
-                            text = "Importing into your Leafline library...",
-                            style = MaterialTheme.typography.labelSmall
-                        )
-                    }
-                    is DownloadStatus.Error -> {
-                        Text(
-                            text = "Download error: ${downloadStatus.message}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                    else -> {}
-                }
-            }
-        },
-        confirmButton = {
-            if (isInLibrary) {
-                Button(onClick = onOpenInReader) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.MenuBook,
-                        contentDescription = null
-                    )
+            Text(
+                // The 401 sentence the client builds already names the recovery,
+                // so echo it rather than inventing a settings screen this app does not have.
+                text = detail,
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (statusCode == "HTTP 401" && selectedSource != null) {
+                // One action, and it carries the failing feed's name and
+                // address into the add-feed form so the reader only has
+                // to type the account.
+                Button(onClick = { onAddWithCredentials(credentialSeed(breadcrumbs, selectedSource)) }) {
+                    Icon(imageVector = Icons.Default.Add, contentDescription = null)
                     Spacer(modifier = Modifier.width(Spacing.xs))
-                    Text("Read Book")
+                    Text("Add with credentials")
                 }
-            } else if (!book.downloadUrl.isNullOrBlank()) {
-                Button(
-                    onClick = onDownloadClick,
-                    enabled = downloadStatus !is DownloadStatus.Downloading && downloadStatus !is DownloadStatus.Importing
+            } else {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.CloudDownload,
-                        contentDescription = null
-                    )
-                    Spacer(modifier = Modifier.width(Spacing.xs))
-                    Text("Download & Add to Library")
+                    Button(onClick = onRetry) {
+                        Icon(imageVector = Icons.Default.Refresh, contentDescription = null)
+                        Spacer(modifier = Modifier.width(Spacing.xs))
+                        Text("Retry")
+                    }
+                    OutlinedButton(onClick = onAddCatalog) {
+                        Icon(imageVector = Icons.Default.Add, contentDescription = null)
+                        Spacer(modifier = Modifier.width(Spacing.xs))
+                        Text("Add catalog")
+                    }
                 }
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Close")
+            if (statusCode != null) {
+                Text(
+                    text = statusCode,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
             }
         }
-    )
-}
-
-private enum class OpdsAuthType(val label: String) {
-    NONE("None"),
-    BASIC("Basic"),
-    BEARER("Token")
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun AddOpdsFeedDialog(
-    onDismiss: () -> Unit,
-    initialTitle: String = "",
-    initialUrl: String = "",
-    onAdd: (String, String, String?, String?, String?) -> Unit
-) {
-    var title by remember { mutableStateOf(initialTitle) }
-    var url by remember { mutableStateOf(initialUrl) }
-    var authType by remember { mutableStateOf(OpdsAuthType.NONE) }
-    var username by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var passwordVisible by remember { mutableStateOf(false) }
-    var token by remember { mutableStateOf("") }
-    var isError by remember { mutableStateOf(false) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Add Catalog Feed") },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(Spacing.sm)
-            ) {
-                Text(
-                    text = "Add an OPDS catalog URL from Calibre-Web, Kavita, or any open catalog feed.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                LeaflineTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    label = "Feed Name",
-                    placeholder = "My Calibre Library"
-                )
-                LeaflineTextField(
-                    value = url,
-                    onValueChange = { url = it; isError = false },
-                    label = "OPDS URL",
-                    placeholder = "http://192.168.1.10:8080/opds",
-                    keyboardType = KeyboardType.Uri,
-                    isError = isError,
-                    supportingText = if (isError) "URL must start with http:// or https://" else null
-                )
-
-                HorizontalDivider()
-
-                Text(
-                    text = "Authentication",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    OpdsAuthType.entries.forEachIndexed { index, type ->
-                        SegmentedButton(
-                            selected = authType == type,
-                            onClick = { authType = type },
-                            shape = SegmentedButtonDefaults.itemShape(
-                                index = index,
-                                count = OpdsAuthType.entries.size
-                            ),
-                            // No leading icon: the default check glyph reserves width and
-                            // forces these three labels to wrap.
-                            icon = {},
-                            modifier = Modifier.heightIn(min = 48.dp)
-                        ) {
-                            Text(type.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                    }
-                }
-
-                when (authType) {
-                    OpdsAuthType.NONE -> { /* Open catalog: nothing more to ask for. */ }
-                    OpdsAuthType.BASIC -> {
-                        LeaflineTextField(
-                            value = username,
-                            onValueChange = { username = it },
-                            label = "Username",
-                            placeholder = "admin"
-                        )
-                        LeaflineTextField(
-                            value = password,
-                            onValueChange = { password = it },
-                            label = "Password",
-                            keyboardType = KeyboardType.Password,
-                            visualTransformation = if (passwordVisible) {
-                                VisualTransformation.None
-                            } else {
-                                PasswordVisualTransformation()
-                            },
-                            trailingIcon = {
-                                IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                    Icon(
-                                        imageVector = if (passwordVisible) {
-                                            Icons.Default.VisibilityOff
-                                        } else {
-                                            Icons.Default.Visibility
-                                        },
-                                        contentDescription = if (passwordVisible) {
-                                            "Hide password"
-                                        } else {
-                                            "Show password"
-                                        }
-                                    )
-                                }
-                            }
-                        )
-                    }
-                    OpdsAuthType.BEARER -> {
-                        LeaflineTextField(
-                            value = token,
-                            onValueChange = { token = it },
-                            label = "API / Bearer Token",
-                            placeholder = "kavita-api-key"
-                        )
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    val trimmed = url.trim()
-                    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-                        onAdd(
-                            title.trim().ifEmpty { "Custom Catalog" },
-                            trimmed,
-                            if (authType == OpdsAuthType.BASIC) username.trim().ifBlank { null } else null,
-                            if (authType == OpdsAuthType.BASIC) password.ifBlank { null } else null,
-                            if (authType == OpdsAuthType.BEARER) token.trim().ifBlank { null } else null
-                        )
-                    } else {
-                        isError = true
-                    }
-                }
-            ) {
-                Text("Add Feed")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
-    )
+    }
 }
