@@ -49,6 +49,13 @@ class AnnotationRepositoryTest {
             return removed
         }
 
+        override suspend fun deleteForBook(bookId: String): Int {
+            val current = stored.value
+            val removed = current.count { it.bookId == bookId }
+            stored.value = current.filterNot { it.bookId == bookId }
+            return removed
+        }
+
         override suspend fun updateNote(id: Long, note: String?): Int {
             val current = stored.value.toMutableList()
             val index = current.indexOfFirst { it.id == id }

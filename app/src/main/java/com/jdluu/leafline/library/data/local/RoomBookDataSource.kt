@@ -1,5 +1,6 @@
 package com.jdluu.leafline.library.data.local
 
+import androidx.room.withTransaction
 import com.jdluu.leafline.library.LibraryBook
 import com.jdluu.leafline.library.ReadingStatus
 import com.jdluu.leafline.library.data.BookDataSource
@@ -61,7 +62,13 @@ class RoomBookDataSource(
     }
 
     override suspend fun delete(stableId: String) {
-        database.bookDao().delete(stableId)
+        database.withTransaction {
+            database.bookmarkDao().deleteForBook(stableId)
+            database.annotationDao().deleteForBook(stableId)
+            database.collectionDao().removeBookFromAllCollections(stableId)
+            database.readingSessionDao().deleteForBook(stableId)
+            database.bookDao().delete(stableId)
+        }
     }
 
     override suspend fun setReadingStatus(stableId: String, status: ReadingStatus) {

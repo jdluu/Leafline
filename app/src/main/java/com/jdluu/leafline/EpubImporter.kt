@@ -12,5 +12,5 @@ import java.io.File
  * metadata parsing and cover extraction.
  */
 interface EpubImporter {
-    fun importEpub(file: File, fileHash: String): LibraryBook?
+    suspend fun importEpub(file: File, fileHash: String): LibraryBook?
 }

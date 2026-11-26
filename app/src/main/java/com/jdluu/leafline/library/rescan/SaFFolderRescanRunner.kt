@@ -84,7 +84,7 @@ class SaFFolderRescanRunner(
     private fun hasReadGrant(treeUri: Uri): Boolean =
         contentResolver.persistedUriPermissions.any { it.uri == treeUri && it.isReadPermission }
 
-    private fun importDocument(
+    private suspend fun importDocument(
         documentUri: Uri,
         occupied: MutableMap<String, String>
     ): ScannedFile {
@@ -105,7 +105,7 @@ class SaFFolderRescanRunner(
         }
     }
 
-    private fun copyAndImport(
+    private suspend fun copyAndImport(
         documentUri: Uri,
         displayName: String,
         occupied: MutableMap<String, String>

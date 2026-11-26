@@ -160,4 +160,32 @@ class HardcoverConfigStorageTest {
         storage.save(storage.load()!!)
         assertFalse("legacy plaintext survived a save", raw().contains("legacy_token"))
     }
+
+    @Test
+    fun `a token encrypted under the legacy key alias still loads and re-encrypts with the new alias on save`() {
+        val legacyCipher = object : SecretCipher {
+            override fun encrypt(value: String): String = "old:$value"
+            override fun decrypt(stored: String): String? =
+                if (stored.startsWith("old:")) stored.removePrefix("old:") else null
+        }
+        val newCipher = object : SecretCipher {
+            override fun encrypt(value: String): String = "hc:$value"
+            override fun decrypt(stored: String): String? =
+                if (stored.startsWith("hc:")) stored.removePrefix("hc:") else null
+        }
+
+        val legacyStorage = HardcoverConfigStorage(prefs, legacyCipher)
+        legacyStorage.save(HardcoverConfig.apiToken("hc_migrated", userId = 9, enabled = true))
+
+        val migratedStorage = HardcoverConfigStorage(
+            prefs,
+            com.jdluu.leafline.storage.FallbackSecretCipher(primary = newCipher, fallback = legacyCipher)
+        )
+        val loaded = migratedStorage.load()!!
+        assertEquals("hc_migrated", loaded.token)
+
+        migratedStorage.save(loaded)
+        val primaryOnlyStorage = HardcoverConfigStorage(prefs, newCipher)
+        assertEquals("hc_migrated", primaryOnlyStorage.load()!!.token)
+    }
 }

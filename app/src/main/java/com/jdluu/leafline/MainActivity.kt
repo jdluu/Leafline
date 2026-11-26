@@ -77,7 +77,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -104,6 +103,7 @@ import androidx.compose.material.icons.filled.Download
 import com.jdluu.leafline.export.BookExportData
 import com.jdluu.leafline.export.NotesExporter
 import com.jdluu.leafline.export.ui.NotesExportSheet
+import com.jdluu.leafline.library.BookArtifactCleanup
 import com.jdluu.leafline.library.BookIdentity
 import com.jdluu.leafline.library.LibraryBook
 import com.jdluu.leafline.library.LibraryFolderStore
@@ -115,7 +115,10 @@ import com.jdluu.leafline.library.LibraryLayoutStore
 import com.jdluu.leafline.library.LibrarySortStore
 import com.jdluu.leafline.library.LibraryViewModelFactory
 import com.jdluu.leafline.library.ReadingGoalStore
+import com.jdluu.leafline.library.SafEpubStager
 import com.jdluu.leafline.library.SafFolderMetadata
+import com.jdluu.leafline.library.SafStageResult
+import com.jdluu.leafline.library.cover.BitmapMemoryCache
 import com.jdluu.leafline.library.cover.EpubCoverLoader
 import com.jdluu.leafline.library.rescan.FolderRescanViewModel
 import com.jdluu.leafline.library.rescan.FolderRescanViewModelFactory
@@ -138,8 +141,9 @@ import com.jdluu.leafline.theme.Padding
 import com.jdluu.leafline.theme.Spacing
 import com.jdluu.leafline.theme.ThemeMode
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.material3.Switch
 
@@ -240,10 +244,11 @@ class MainActivity : ComponentActivity() {
 
     fun importLibraryFolder(uri: Uri, context: Context, onComplete: (List<LibraryBook>, Int) -> Unit) {
         lifecycleScope.launch(Dispatchers.IO) {
+            val occupied = seedOccupiedPaths(context)
             val imported = mutableListOf<LibraryBook>()
             var failures = 0
             LocalEpubDocumentScanner.scanTree(contentResolver, uri).forEach { documentUri ->
-                val book = importEpub(documentUri, context) { failures++ }
+                val book = importEpub(documentUri, context, occupied) { failures++ }
                 if (book != null) imported += book
             }
             withContext(Dispatchers.Main) {
@@ -252,39 +257,29 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    fun importEpub(contentUri: Uri, context: Context, onFailure: (String) -> Unit): LibraryBook? {
-        try {
-            val fileName = getFileName(context, contentUri) ?: "imported.epub"
-            val sanitizedName = sanitizeFileName(fileName)
-            val targetFile = java.io.File(context.filesDir, sanitizedName)
-
-            val inputStream = context.contentResolver.openInputStream(contentUri) ?: run {
-                onFailure("No data available")
-                return null
+    suspend fun importEpub(
+        contentUri: Uri,
+        context: Context,
+        occupied: MutableMap<String, String>? = null,
+        onFailure: (String) -> Unit
+    ): LibraryBook? = withContext(Dispatchers.IO) {
+        val occupiedMap = occupied ?: seedOccupiedPaths(context)
+        val displayName = getFileName(context, contentUri) ?: "imported.epub"
+        when (
+            val result = SafEpubStager.stageAndImport(
+                filesDir = context.filesDir,
+                displayName = displayName,
+                openStream = { context.contentResolver.openInputStream(contentUri) },
+                importer = context.appContainer.epubImporter,
+                occupied = occupiedMap
+            )
+        ) {
+            is SafStageResult.Imported -> result.book
+            is SafStageResult.Failed -> {
+                Log.w(TAG, "Import failed for $contentUri: ${result.message}")
+                withContext(Dispatchers.Main) { onFailure(result.message) }
+                null
             }
-
-            val outputStream = targetFile.outputStream()
-            try {
-                inputStream.copyTo(outputStream)
-            } finally {
-                outputStream.close()
-            }
-
-            if (targetFile.length() == 0L) {
-                targetFile.delete()
-                onFailure("Empty file cannot be imported")
-                return null
-            }
-
-            val fileHash = FileHashUtil.computeSha256(targetFile)
-
-            val libraryBook = context.appContainer.epubImporter.importEpub(targetFile, fileHash)
-
-            return libraryBook
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to copy EPUB", e)
-            onFailure("Failed to import EPUB: ${e.message}")
-            return null
         }
     }
 
@@ -293,16 +288,17 @@ class MainActivity : ComponentActivity() {
      *
      * @return Pair(successCount, failureCount)
      */
-    fun importMultipleEpub(
+    suspend fun importMultipleEpub(
         contentUris: List<Uri>,
         context: Context,
         onResult: (LibraryBook) -> Unit,
         onError: (String) -> Unit
     ): Pair<Int, Int> {
+        val occupied = withContext(Dispatchers.IO) { seedOccupiedPaths(context) }
         var successCount = 0
         var failureCount = 0
         for (uri in contentUris) {
-            val result = importEpub(uri, context) { msg ->
+            val result = importEpub(uri, context, occupied) { msg ->
                 Log.w(TAG, "Import failed for $uri: $msg")
                 failureCount++
                 onError(msg)
@@ -314,6 +310,13 @@ class MainActivity : ComponentActivity() {
         }
         return successCount to failureCount
     }
+
+    private suspend fun seedOccupiedPaths(context: Context): MutableMap<String, String> =
+        context.appContainer.libraryRepository
+            .getAllBooks()
+            .first()
+            .associate { it.filePath to it.fileHash }
+            .toMutableMap()
 }
 
 private fun getFileName(context: Context, uri: Uri): String? {
@@ -336,14 +339,23 @@ private enum class LeaflineTab(val label: String) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LeaflineApp(activity: MainActivity) {
+    val coverLoader = remember { EpubCoverLoader(activity.applicationContext) }
     val libraryViewModel: LibraryViewModel = viewModel(
         factory = LibraryViewModelFactory(
             repository = activity.appContainer.libraryRepository,
-            coverLoader = EpubCoverLoader(activity.applicationContext),
+            coverLoader = coverLoader,
             sortStore = LibrarySortStore.fromContext(activity),
             readingSessionRepository = activity.appContainer.readingSessionRepository,
             layoutStore = LibraryLayoutStore.fromContext(activity),
-            readingGoalStore = ReadingGoalStore.fromContext(activity)
+            readingGoalStore = ReadingGoalStore.fromContext(activity),
+            onBooksDeleted = { deleted, remaining ->
+                BookArtifactCleanup.cleanUp(
+                    filesDir = activity.applicationContext.filesDir,
+                    deletedBooks = deleted,
+                    remainingBooks = remaining,
+                    evictMemoryCache = BitmapMemoryCache::evict
+                )
+            }
         )
     )
 
@@ -374,47 +386,30 @@ fun LeaflineApp(activity: MainActivity) {
                     opdsClient = activity.appContainer.opdsClient,
                     importer = activity.appContainer.epubImporter,
                     repository = activity.appContainer.libraryRepository,
-                    scope = (activity as MainActivity).lifecycleScope
+                    scope = activity.lifecycleScope
                 )
             },
             libraryRepository = activity.appContainer.libraryRepository
         )
     )
 
-    var selectedTab by remember { mutableIntStateOf(0) }
-    val context = androidx.compose.ui.platform.LocalContext.current
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    val context = LocalContext.current
     val appearanceStore = remember { AppearanceStore.fromContext(context) }
     var appearance by remember { mutableStateOf(appearanceStore.load()) }
-
-    var pendingBook by remember { mutableStateOf<LibraryBook?>(null) }
-
-    LaunchedEffect(pendingBook) {
-        pendingBook?.let { book ->
-            libraryViewModel.addBook(book)
-            (activity as MainActivity).showToast("Imported: ${book.title}")
-            pendingBook = null
-        }
-    }
 
     val importEpubLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenMultipleDocuments()
     ) { uris: List<Uri>? ->
-        uris?.let { uriList ->
-            if (uriList.isEmpty()) return@let
-            var successCount = 0
-            var failureCount = 0
+        val uriList = uris?.takeIf { it.isNotEmpty() } ?: return@rememberLauncherForActivityResult
+        activity.lifecycleScope.launch {
             val imported = mutableListOf<LibraryBook>()
-            for (uri in uriList) {
-                val result = (activity as MainActivity).importEpub(uri, context) { message ->
-                    activity.showToast(message)
-                    failureCount++
-                }
-                if (result != null) {
-                    successCount++
-                    imported.add(result)
-                }
-            }
-            // Add all successfully imported books to the ViewModel
+            val (successCount, failureCount) = activity.importMultipleEpub(
+                contentUris = uriList,
+                context = context,
+                onResult = { imported.add(it) },
+                onError = { message -> activity.showToast(message) }
+            )
             imported.forEach { libraryViewModel.addBook(it) }
             if (successCount > 0) {
                 val msg = if (failureCount > 0) {
@@ -431,6 +426,12 @@ fun LeaflineApp(activity: MainActivity) {
 
     // A book the reader has not yet decided about, held while the prompt is open.
     var pendingTrackingBook by remember { mutableStateOf<LibraryBook?>(null) }
+
+    val launchReader: (LibraryBook) -> Unit = { book ->
+        activity.startActivity(ReaderActivity.newIntent(activity, book.filePath))
+        @Suppress("DEPRECATION")
+        activity.overridePendingTransition(android.R.anim.fade_in, 0)
+    }
 
     /**
      * Opens a book, asking first when Hardcover is on and the reader has chosen to be
@@ -449,9 +450,7 @@ fun LeaflineApp(activity: MainActivity) {
         if (shouldAsk) {
             pendingTrackingBook = book
         } else {
-            activity.startActivity(ReaderActivity.newIntent(activity, book.filePath))
-            @Suppress("DEPRECATION")
-            activity.overridePendingTransition(android.R.anim.fade_in, 0)
+            launchReader(book)
         }
     }
 
@@ -466,8 +465,8 @@ fun LeaflineApp(activity: MainActivity) {
                 // the replacement so the new grant is the only one held for this location.
                 libraryFolderViewModel.remove(replaceUri)
             }
-            (activity as MainActivity).saveLibraryFolder(selectedUri, context)
-            (activity as MainActivity).importLibraryFolder(selectedUri, context) { imported, failures ->
+            activity.saveLibraryFolder(selectedUri, context)
+            activity.importLibraryFolder(selectedUri, context) { imported, failures ->
                 imported.forEach(libraryViewModel::addBook)
                 val message = if (failures == 0) {
                     "Imported ${imported.size} EPUB(s)"
@@ -510,8 +509,7 @@ fun LeaflineApp(activity: MainActivity) {
         ) { padding ->
             Surface(modifier = Modifier.fillMaxSize().padding(padding)) {
                 when (LeaflineTab.entries.getOrNull(selectedTab)) {
-                    LeaflineTab.Library -> {
-                        LibraryScreen(
+                    LeaflineTab.Library -> LibraryScreen(
                         viewModel = libraryViewModel,
                         foldersViewModel = libraryFolderViewModel,
                         folderRescanViewModel = folderRescanViewModel,
@@ -523,46 +521,11 @@ fun LeaflineApp(activity: MainActivity) {
                             pendingReplaceFolderUri = uri
                             addLibraryFolderLauncher.launch(null)
                         },
-                        onOpenBook = { book -> openReaderOrAsk(book) }
+                        onOpenBook = openReaderOrAsk
                     )
-                    pendingTrackingBook?.let { book ->
-                        HardcoverTrackingPrompt(
-                            onAnswer = { tracked ->
-                                activity.appContainer.hardcoverTracking.remember(
-                                    book.stableId,
-                                    if (tracked) {
-                                        HardcoverBookPreference.TRACK
-                                    } else {
-                                        HardcoverBookPreference.IGNORE
-                                    }
-                                )
-                                pendingTrackingBook = null
-                                activity.startActivity(
-                                    ReaderActivity.newIntent(activity, book.filePath)
-                                )
-                            },
-                            onDismiss = {
-                                // Dismissing is not an answer: nothing is remembered and
-                                // the book opens, so the question can be asked again.
-                                pendingTrackingBook = null
-                                activity.startActivity(
-                                    ReaderActivity.newIntent(activity, book.filePath)
-                                )
-                            }
-                        )
-                    }
-                    }
                     LeaflineTab.Explore -> OpdsScreen(
                         viewModel = opdsViewModel,
-                        onOpenBook = { book ->
-                            activity.startActivity(
-                                ReaderActivity.newIntent(activity, book.filePath)
-                            )
-                            @Suppress("DEPRECATION")
-                            activity.overridePendingTransition(
-                                android.R.anim.fade_in, 0
-                            )
-                        }
+                        onOpenBook = openReaderOrAsk
                     )
                     LeaflineTab.Settings -> SettingsTab(
                         appearance = appearance,
@@ -573,6 +536,29 @@ fun LeaflineApp(activity: MainActivity) {
                         notesExporter = activity.appContainer.notesExporter
                     )
                     null -> {}
+                }
+
+                pendingTrackingBook?.let { book ->
+                    HardcoverTrackingPrompt(
+                        onAnswer = { tracked ->
+                            activity.appContainer.hardcoverTracking.remember(
+                                book.stableId,
+                                if (tracked) {
+                                    HardcoverBookPreference.TRACK
+                                } else {
+                                    HardcoverBookPreference.IGNORE
+                                }
+                            )
+                            pendingTrackingBook = null
+                            launchReader(book)
+                        },
+                        onDismiss = {
+                            // Dismissing is not an answer: nothing is remembered and
+                            // the book opens, so the question can be asked again.
+                            pendingTrackingBook = null
+                            launchReader(book)
+                        }
+                    )
                 }
             }
         }
