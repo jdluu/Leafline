@@ -93,11 +93,9 @@ import java.io.IOException
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.launch
@@ -541,10 +539,47 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     onAnnouncement = { announcement -> viewModel.setPageAnnouncement(announcement) }
                 )
                 navigator?.addInputListener(tapZoneHandler.inputListener)
-                launch {
-                    navigator?.currentLocator?.collect { locator ->
-                        CustomFontInjector.inject(navigator, viewModel.uiState.value.customFonts)
-                        tapZoneHandler.onReadingPositionChanged(locator)
+                if (stableId != null && !sessionRestored) {
+                    val initialProg = initialLocator?.locations?.totalProgression
+                        ?: initialLocator?.locations?.progression
+                    sessionRecorder.startSession(
+                        bookId = stableId,
+                        initialLocatorJson = savedLocatorJson,
+                        initialProgression = initialProg
+                    )
+                }
+                navigator?.let { activeNavigator ->
+                    var lastFontInjectedHref: String? = null
+                    var saveLocatorJob: Job? = null
+                    launch {
+                        activeNavigator.currentLocator.collect { locator ->
+                            val href = locator.href.toString()
+                            if (href != lastFontInjectedHref) {
+                                lastFontInjectedHref = href
+                                CustomFontInjector.inject(activeNavigator, viewModel.uiState.value.customFonts)
+                            }
+                            tapZoneHandler.onReadingPositionChanged(locator)
+                            val locatorJson = locator.toJSON().toString()
+                            viewModel.updateLocation(locator, locatorJson)
+                            if (stableId != null) {
+                                val progression = locator.locations.totalProgression
+                                    ?: locator.locations.progression
+                                sessionRecorder.updateLocation(locatorJson, progression)
+                                saveLocatorJob?.cancel()
+                                saveLocatorJob = launch {
+                                    delay(500L)
+                                    try {
+                                        libraryRepository.saveLastLocator(
+                                            stableId,
+                                            locatorJson,
+                                            System.currentTimeMillis()
+                                        )
+                                    } catch (e: Exception) {
+                                        Log.w(TAG, "Could not save reading position", e)
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 launch {
@@ -560,40 +595,6 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                 }
 
                 stableId?.let { id ->
-                    if (!sessionRestored) {
-                        val initialProg = initialLocator?.locations?.totalProgression
-                            ?: initialLocator?.locations?.progression
-                        sessionRecorder.startSession(
-                            bookId = id,
-                            initialLocatorJson = savedLocatorJson,
-                            initialProgression = initialProg
-                        )
-                    }
-                    launch {
-                        navigator?.currentLocator?.collect { locator ->
-                            val locatorJson = locator.toJSON().toString()
-                            viewModel.updateLocation(locator, locatorJson)
-                            val progression = locator.locations.totalProgression
-                                ?: locator.locations.progression
-                            sessionRecorder.updateLocation(locatorJson, progression)
-                        }
-                    }
-                    launch {
-                        @OptIn(FlowPreview::class)
-                        navigator?.currentLocator
-                            ?.debounce(500L)
-                            ?.collect { locator ->
-                                try {
-                                    libraryRepository.saveLastLocator(
-                                        id,
-                                        locator.toJSON().toString(),
-                                        System.currentTimeMillis()
-                                    )
-                                } catch (e: Exception) {
-                                    Log.w(TAG, "Could not save reading position", e)
-                                }
-                            }
-                    }
                     launch {
                         syncManager.pullRemoteProgress()
                     }
@@ -705,13 +706,13 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         super.onPause()
         val state = viewModel.uiState.value
         val stableId = state.bookStableId
-        val loc = state.currentLocation
-        if (stableId != null && loc != null) {
+        val locJson = state.currentLocatorJson ?: state.currentLocation?.toJSON()?.toString()
+        if (stableId != null && locJson != null) {
             lifecycleScope.launch(Dispatchers.IO) {
                 try {
                     libraryRepository.saveLastLocator(
                         stableId,
-                        loc.toJSON().toString(),
+                        locJson,
                         System.currentTimeMillis()
                     )
                 } catch (e: Exception) {
