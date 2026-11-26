@@ -42,7 +42,8 @@ class LibraryViewModel(
     private val sortStore: LibrarySortStore? = null,
     private val readingSessionRepository: ReadingSessionRepository? = null,
     private val layoutStore: LibraryLayoutStore? = null,
-    private val readingGoalStore: ReadingGoalStore? = null
+    private val readingGoalStore: ReadingGoalStore? = null,
+    private val onBooksDeleted: suspend (deleted: List<LibraryBook>, remaining: List<LibraryBook>) -> Unit = { _, _ -> }
 ) : ViewModel() {
 
     val books: StateFlow<List<LibraryBook>> = repository.getAllBooks()
@@ -276,9 +277,9 @@ class LibraryViewModel(
         }
     }
 
-    private val attemptedCoverIds = mutableSetOf<String>()
+    private val attemptedCoverIds = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
-    private val collectionIdsCache = mutableMapOf<String, Flow<Set<Long>>>()
+    private val collectionIdsCache = java.util.concurrent.ConcurrentHashMap<String, Flow<Set<Long>>>()
 
     /**
      * Reactive set of collection IDs that [bookStableId] belongs to.
@@ -368,15 +369,21 @@ class LibraryViewModel(
     }
 
     fun deleteBook(stableId: String) {
-        viewModelScope.launch {
-            repository.deleteBook(stableId)
-        }
+        deleteBooks(setOf(stableId))
     }
 
     fun deleteBooks(stableIds: Set<String>) {
+        if (stableIds.isEmpty()) return
         viewModelScope.launch {
+            val removedBooks = stableIds.mapNotNull { id -> repository.getBookByStableId(id) }
             stableIds.forEach { id ->
                 repository.deleteBook(id)
+                attemptedCoverIds.remove(id)
+                collectionIdsCache.remove(id)
+            }
+            if (removedBooks.isNotEmpty()) {
+                val remaining = repository.getAllBooks().first()
+                onBooksDeleted(removedBooks, remaining)
             }
         }
     }

@@ -13,7 +13,8 @@ class LibraryViewModelFactory(
     private val sortStore: LibrarySortStore? = null,
     private val readingSessionRepository: ReadingSessionRepository? = null,
     private val layoutStore: LibraryLayoutStore? = null,
-    private val readingGoalStore: ReadingGoalStore? = null
+    private val readingGoalStore: ReadingGoalStore? = null,
+    private val onBooksDeleted: suspend (deleted: List<LibraryBook>, remaining: List<LibraryBook>) -> Unit = { _, _ -> }
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(LibraryViewModel::class.java)) {
@@ -24,7 +25,8 @@ class LibraryViewModelFactory(
                 sortStore = sortStore,
                 readingSessionRepository = readingSessionRepository,
                 layoutStore = layoutStore,
-                readingGoalStore = readingGoalStore
+                readingGoalStore = readingGoalStore,
+                onBooksDeleted = onBooksDeleted
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

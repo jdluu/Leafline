@@ -578,6 +578,35 @@ class LibraryViewModelTest {
             assertEquals(35, loadedFromStore.dailyMinutes)
             assertEquals(25, loadedFromStore.booksTarget)
         }
+
+    @Test
+    fun `deleteBook passes deleted book and remaining books to cleanup callback`() =
+        runTest(dispatcher) {
+            val victim = testBook("victim", "/files/victim.epub", "h1")
+            val survivor = testBook("survivor", "/files/survivor.epub", "h2")
+            val booksFlow = MutableStateFlow(listOf(victim, survivor))
+            val repository = FakeLibraryRepository(
+                books = booksFlow,
+                booksById = mapOf("victim" to victim, "survivor" to survivor)
+            )
+            val cleaned = mutableListOf<Pair<List<LibraryBook>, List<LibraryBook>>>()
+            val viewModel = LibraryViewModel(
+                repository = repository,
+                onBooksDeleted = { deleted, remaining ->
+                    cleaned += deleted to remaining
+                }
+            )
+
+            // Simulate repository state update when deleteBook is called
+            booksFlow.value = listOf(survivor)
+            viewModel.deleteBook("victim")
+            advanceUntilIdle()
+
+            assertEquals(listOf("victim"), repository.deletedBooks)
+            assertEquals(1, cleaned.size)
+            assertEquals(listOf(victim), cleaned.single().first)
+            assertEquals(listOf(survivor), cleaned.single().second)
+        }
 }
 
 private fun testBook(

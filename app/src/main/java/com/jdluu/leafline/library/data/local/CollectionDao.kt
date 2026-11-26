@@ -42,6 +42,9 @@ interface CollectionDao {
     @Query("DELETE FROM book_collection_cross_ref WHERE collectionId = :collectionId AND bookStableId = :bookStableId")
     suspend fun removeBookFromCollection(collectionId: Long, bookStableId: String)
 
+    @Query("DELETE FROM book_collection_cross_ref WHERE bookStableId = :bookStableId")
+    suspend fun removeBookFromAllCollections(bookStableId: String)
+
     @Query("SELECT collectionId FROM book_collection_cross_ref WHERE bookStableId = :bookStableId")
     fun getCollectionIdsForBook(bookStableId: String): Flow<List<Long>>
 

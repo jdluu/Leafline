@@ -247,4 +247,18 @@ class AnnotationDaoTest {
     fun updateColor_returns_zero_for_missing_row() = runTest {
         assertEquals(0, annotationDao.updateColor(999L, "#5543A047"))
     }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun deleteForBook_removes_only_matching_book_annotations() = runTest {
+        annotationDao.insert(entity(bookId = "book-1", createdAt = 1000L))
+        annotationDao.insert(entity(bookId = "book-1", createdAt = 2000L))
+        annotationDao.insert(entity(bookId = "book-2", createdAt = 3000L))
+
+        val deleted = annotationDao.deleteForBook("book-1")
+
+        assertEquals(2, deleted)
+        assertTrue(annotationDao.getForBook("book-1").isEmpty())
+        assertEquals(1, annotationDao.getForBook("book-2").size)
+    }
 }

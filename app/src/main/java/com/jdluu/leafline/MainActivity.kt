@@ -104,6 +104,7 @@ import androidx.compose.material.icons.filled.Download
 import com.jdluu.leafline.export.BookExportData
 import com.jdluu.leafline.export.NotesExporter
 import com.jdluu.leafline.export.ui.NotesExportSheet
+import com.jdluu.leafline.library.BookArtifactCleanup
 import com.jdluu.leafline.library.BookIdentity
 import com.jdluu.leafline.library.LibraryBook
 import com.jdluu.leafline.library.LibraryFolderStore
@@ -118,6 +119,7 @@ import com.jdluu.leafline.library.ReadingGoalStore
 import com.jdluu.leafline.library.SafEpubStager
 import com.jdluu.leafline.library.SafFolderMetadata
 import com.jdluu.leafline.library.SafStageResult
+import com.jdluu.leafline.library.cover.BitmapMemoryCache
 import com.jdluu.leafline.library.cover.EpubCoverLoader
 import com.jdluu.leafline.library.rescan.FolderRescanViewModel
 import com.jdluu.leafline.library.rescan.FolderRescanViewModelFactory
@@ -345,7 +347,15 @@ fun LeaflineApp(activity: MainActivity) {
             sortStore = LibrarySortStore.fromContext(activity),
             readingSessionRepository = activity.appContainer.readingSessionRepository,
             layoutStore = LibraryLayoutStore.fromContext(activity),
-            readingGoalStore = ReadingGoalStore.fromContext(activity)
+            readingGoalStore = ReadingGoalStore.fromContext(activity),
+            onBooksDeleted = { deleted, remaining ->
+                BookArtifactCleanup.cleanUp(
+                    filesDir = activity.applicationContext.filesDir,
+                    deletedBooks = deleted,
+                    remainingBooks = remaining,
+                    evictMemoryCache = BitmapMemoryCache::evict
+                )
+            }
         )
     )
 
