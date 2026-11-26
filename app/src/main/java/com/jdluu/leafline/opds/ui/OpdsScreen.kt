@@ -102,6 +102,7 @@ import com.jdluu.leafline.opds.model.OpdsFeedResult
 import com.jdluu.leafline.opds.model.OpdsFeedSource
 import com.jdluu.leafline.opds.model.OpdsNavigationLink
 import com.jdluu.leafline.opds.rememberOpdsCoverBitmap
+import com.jdluu.leafline.theme.LeaflineEmptyState
 import com.jdluu.leafline.theme.LeaflineTextField
 import com.jdluu.leafline.theme.Padding
 import com.jdluu.leafline.theme.Spacing
@@ -199,6 +200,17 @@ fun OpdsScreen(
             // Main Content Area
             Box(modifier = Modifier.fillMaxSize()) {
                 when (val state = uiState) {
+                    is OpdsUiState.NoCatalogs -> {
+                        LeaflineEmptyState(
+                            title = "No catalogs yet",
+                            body = "Add the address of a Calibre, Kavita, or other OPDS catalog to browse it here.",
+                            actionLabel = "Add catalog",
+                            onAction = {
+                                addFeedSeed = null
+                                showAddFeedDialog = true
+                            }
+                        )
+                    }
                     is OpdsUiState.Loading -> {
                         Box(
                             modifier = Modifier.fillMaxSize(),
@@ -245,12 +257,13 @@ fun OpdsScreen(
                                     textAlign = TextAlign.Center,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                if (statusCode == "HTTP 401") {
+                                val failedFeed = selectedSource
+                                if (statusCode == "HTTP 401" && failedFeed != null) {
                                     // One action, and it carries the failing feed's name and
                                     // address into the add-feed form so the reader only has
                                     // to type the account.
                                     Button(onClick = {
-                                        addFeedSeed = credentialSeed(breadcrumbs, selectedSource)
+                                        addFeedSeed = credentialSeed(breadcrumbs, failedFeed)
                                         showAddFeedDialog = true
                                     }) {
                                         Icon(
@@ -400,7 +413,7 @@ fun OpdsScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun OpdsTopBar(
-    selectedSource: OpdsFeedSource,
+    selectedSource: OpdsFeedSource?,
     sources: List<OpdsFeedSource>,
     onSelectSource: (OpdsFeedSource) -> Unit,
     onAddFeedClick: () -> Unit,
@@ -417,6 +430,26 @@ private fun OpdsTopBar(
 ) {
     var showSourceDropdown by remember { mutableStateOf(false) }
     val keyboardController = LocalSoftwareKeyboardController.current
+
+    // With no catalog there is nothing to switch between and nothing to search, so the
+    // bar keeps a neutral title and offers the only action that exists.
+    if (selectedSource == null) {
+        TopAppBar(
+            title = {
+                Text(
+                    text = "Catalogs",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+            },
+            actions = {
+                IconButton(onClick = onAddFeedClick) {
+                    Icon(imageVector = Icons.Default.Add, contentDescription = "Add catalog")
+                }
+            }
+        )
+        return
+    }
 
     if (isSearchActive) {
         TopAppBar(
