@@ -2,6 +2,7 @@ package com.jdluu.leafline.hardcover
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.jdluu.leafline.storage.FallbackSecretCipher
 import com.jdluu.leafline.storage.KeystoreSecretCipher
 import com.jdluu.leafline.storage.SecretCipher
 
@@ -18,7 +19,7 @@ import com.jdluu.leafline.storage.SecretCipher
  */
 class HardcoverConfigStorage internal constructor(
     private val prefs: SharedPreferences,
-    private val cipher: SecretCipher = KeystoreSecretCipher()
+    private val cipher: SecretCipher = defaultCipher()
 ) : HardcoverConfigPersistence {
 
     constructor(context: Context) : this(
@@ -109,7 +110,8 @@ class HardcoverConfigStorage internal constructor(
             stored
         }
 
-    private companion object {
+    internal companion object {
+        const val KEY_ALIAS = "leafline_hardcover"
         const val PREFS_NAME = "leafline_hardcover"
         const val ENC_PREFIX = "enc:v1:"
         const val KEY_TOKEN = "token"
@@ -120,5 +122,10 @@ class HardcoverConfigStorage internal constructor(
         const val KEY_EXPIRES_AT = "expires_at"
         const val KEY_PENDING_VERIFIER = "pending_verifier"
         const val KEY_PENDING_STATE = "pending_state"
+
+        private fun defaultCipher(): SecretCipher = FallbackSecretCipher(
+            primary = KeystoreSecretCipher(KEY_ALIAS),
+            fallback = KeystoreSecretCipher()
+        )
     }
 }

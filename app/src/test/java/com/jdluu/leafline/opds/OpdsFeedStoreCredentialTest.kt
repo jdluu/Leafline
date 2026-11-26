@@ -274,4 +274,41 @@ class OpdsFeedStoreCredentialTest {
         assertEquals(before, rawPrefs())
         assertEquals(0, store.loadFeeds().count { !it.isBuiltIn })
     }
+
+    @Test
+    fun `credentials encrypted under the legacy key alias still load and re-encrypt under the new alias on save`() {
+        val prefs = context.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
+        val legacyCipher = object : com.jdluu.leafline.storage.SecretCipher {
+            override fun encrypt(value: String): String = "old:$value"
+            override fun decrypt(stored: String): String? =
+                if (stored.startsWith("old:")) stored.removePrefix("old:") else null
+        }
+        val newCipher = object : com.jdluu.leafline.storage.SecretCipher {
+            override fun encrypt(value: String): String = "opds:$value"
+            override fun decrypt(stored: String): String? =
+                if (stored.startsWith("opds:")) stored.removePrefix("opds:") else null
+        }
+
+        val legacyStore = OpdsFeedStore(prefs, cipher = legacyCipher)
+        val feed = legacyStore.addCustomFeed(
+            title = "Calibre",
+            url = "https://calibre.test/opds",
+            username = "patron",
+            password = "legacy-password",
+            authToken = "legacy-token"
+        )
+
+        val migratedStore = OpdsFeedStore(
+            prefs = prefs,
+            cipher = com.jdluu.leafline.storage.FallbackSecretCipher(primary = newCipher, fallback = legacyCipher)
+        )
+        val loaded = migratedStore.loadFeeds().single { it.id == feed.id }
+        assertEquals("legacy-password", loaded.password)
+        assertEquals("legacy-token", loaded.authToken)
+
+        migratedStore.updateCustomFeed(feed.id, "Calibre Updated", "https://calibre.test/opds")
+        val primaryOnly = OpdsFeedStore(prefs, cipher = newCipher).loadFeeds().single { it.id == feed.id }
+        assertEquals("legacy-password", primaryOnly.password)
+        assertEquals("legacy-token", primaryOnly.authToken)
+    }
 }

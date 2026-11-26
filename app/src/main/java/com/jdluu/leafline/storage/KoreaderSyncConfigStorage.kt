@@ -71,9 +71,23 @@ class KoreaderSyncConfigStorage internal constructor(
     }
 }
 
+/**
+ * Tries [primary] first for decryption and falls back to [fallback] for values
+ * encrypted under an earlier Keystore alias. New values always encrypt with [primary].
+ */
+internal class FallbackSecretCipher(
+    internal val primary: SecretCipher,
+    internal val fallback: SecretCipher
+) : SecretCipher {
+    override fun encrypt(value: String): String = primary.encrypt(value)
+
+    override fun decrypt(stored: String): String? =
+        primary.decrypt(stored) ?: fallback.decrypt(stored)
+}
+
 /** AES/GCM backed by a non-exportable Android Keystore key created on first use. */
 internal class KeystoreSecretCipher(
-    private val keyAlias: String = "leafline_koreader_sync"
+    internal val keyAlias: String = DEFAULT_KEY_ALIAS
 ) : SecretCipher {
 
     override fun encrypt(value: String): String {
@@ -115,7 +129,8 @@ internal class KeystoreSecretCipher(
 
     private fun decode(value: String): ByteArray = Base64.decode(value, Base64.NO_WRAP)
 
-    private companion object {
+    internal companion object {
+        const val DEFAULT_KEY_ALIAS = "leafline_koreader_sync"
         const val PROVIDER = "AndroidKeyStore"
         const val TRANSFORMATION = "AES/GCM/NoPadding"
         const val TAG_BITS = 128

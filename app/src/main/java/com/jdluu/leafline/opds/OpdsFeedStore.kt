@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.jdluu.leafline.opds.model.OpdsFeedSource
+import com.jdluu.leafline.storage.FallbackSecretCipher
 import com.jdluu.leafline.storage.KeystoreSecretCipher
 import com.jdluu.leafline.storage.SecretCipher
 import java.util.UUID
@@ -15,16 +16,22 @@ import java.util.UUID
 class OpdsFeedStore internal constructor(
     private val prefs: SharedPreferences,
     private val gson: Gson = Gson(),
-    private val cipher: SecretCipher = KeystoreSecretCipher()
+    private val cipher: SecretCipher = defaultCipher()
 ) {
 
     companion object {
+        internal const val KEY_ALIAS = "leafline_opds_feeds"
         private const val PREFS_NAME = "leafline_opds_feeds"
         private const val KEY_CUSTOM_FEEDS = "custom_opds_feeds_json"
         private const val KEY_SELECTED_FEED = "opds_selected_feed_id"
 
         /** Marks a stored credential as encrypted; anything else is legacy plaintext. */
         private const val ENC_PREFIX = "enc:v1:"
+
+        private fun defaultCipher(): SecretCipher = FallbackSecretCipher(
+            primary = KeystoreSecretCipher(KEY_ALIAS),
+            fallback = KeystoreSecretCipher()
+        )
 
         fun fromContext(context: Context): OpdsFeedStore =
             OpdsFeedStore(context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE))
