@@ -115,7 +115,9 @@ import com.jdluu.leafline.library.LibraryLayoutStore
 import com.jdluu.leafline.library.LibrarySortStore
 import com.jdluu.leafline.library.LibraryViewModelFactory
 import com.jdluu.leafline.library.ReadingGoalStore
+import com.jdluu.leafline.library.SafEpubStager
 import com.jdluu.leafline.library.SafFolderMetadata
+import com.jdluu.leafline.library.SafStageResult
 import com.jdluu.leafline.library.cover.EpubCoverLoader
 import com.jdluu.leafline.library.rescan.FolderRescanViewModel
 import com.jdluu.leafline.library.rescan.FolderRescanViewModelFactory
@@ -138,8 +140,9 @@ import com.jdluu.leafline.theme.Padding
 import com.jdluu.leafline.theme.Spacing
 import com.jdluu.leafline.theme.ThemeMode
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.material3.Switch
 
@@ -240,10 +243,11 @@ class MainActivity : ComponentActivity() {
 
     fun importLibraryFolder(uri: Uri, context: Context, onComplete: (List<LibraryBook>, Int) -> Unit) {
         lifecycleScope.launch(Dispatchers.IO) {
+            val occupied = seedOccupiedPaths(context)
             val imported = mutableListOf<LibraryBook>()
             var failures = 0
             LocalEpubDocumentScanner.scanTree(contentResolver, uri).forEach { documentUri ->
-                val book = importEpub(documentUri, context) { failures++ }
+                val book = importEpub(documentUri, context, occupied) { failures++ }
                 if (book != null) imported += book
             }
             withContext(Dispatchers.Main) {
@@ -252,41 +256,31 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    suspend fun importEpub(contentUri: Uri, context: Context, onFailure: (String) -> Unit): LibraryBook? =
-        withContext(Dispatchers.IO) {
-            try {
-                val fileName = getFileName(context, contentUri) ?: "imported.epub"
-                val sanitizedName = sanitizeFileName(fileName)
-                val targetFile = java.io.File(context.filesDir, sanitizedName)
-
-                val inputStream = context.contentResolver.openInputStream(contentUri) ?: run {
-                    withContext(Dispatchers.Main) { onFailure("No data available") }
-                    return@withContext null
-                }
-
-                inputStream.use { input ->
-                    targetFile.outputStream().use { output ->
-                        input.copyTo(output)
-                    }
-                }
-
-                if (targetFile.length() == 0L) {
-                    targetFile.delete()
-                    withContext(Dispatchers.Main) { onFailure("Empty file cannot be imported") }
-                    return@withContext null
-                }
-
-                val fileHash = FileHashUtil.computeSha256(targetFile)
-
-                context.appContainer.epubImporter.importEpub(targetFile, fileHash)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to copy EPUB", e)
-                withContext(Dispatchers.Main) { onFailure("Failed to import EPUB: ${e.message}") }
+    suspend fun importEpub(
+        contentUri: Uri,
+        context: Context,
+        occupied: MutableMap<String, String>? = null,
+        onFailure: (String) -> Unit
+    ): LibraryBook? = withContext(Dispatchers.IO) {
+        val occupiedMap = occupied ?: seedOccupiedPaths(context)
+        val displayName = getFileName(context, contentUri) ?: "imported.epub"
+        when (
+            val result = SafEpubStager.stageAndImport(
+                filesDir = context.filesDir,
+                displayName = displayName,
+                openStream = { context.contentResolver.openInputStream(contentUri) },
+                importer = context.appContainer.epubImporter,
+                occupied = occupiedMap
+            )
+        ) {
+            is SafStageResult.Imported -> result.book
+            is SafStageResult.Failed -> {
+                Log.w(TAG, "Import failed for $contentUri: ${result.message}")
+                withContext(Dispatchers.Main) { onFailure(result.message) }
                 null
             }
         }
+    }
 
     /**
      * Bulk-import multiple EPUBs from SAF content URIs.
@@ -299,10 +293,11 @@ class MainActivity : ComponentActivity() {
         onResult: (LibraryBook) -> Unit,
         onError: (String) -> Unit
     ): Pair<Int, Int> {
+        val occupied = withContext(Dispatchers.IO) { seedOccupiedPaths(context) }
         var successCount = 0
         var failureCount = 0
         for (uri in contentUris) {
-            val result = importEpub(uri, context) { msg ->
+            val result = importEpub(uri, context, occupied) { msg ->
                 Log.w(TAG, "Import failed for $uri: $msg")
                 failureCount++
                 onError(msg)
@@ -314,6 +309,13 @@ class MainActivity : ComponentActivity() {
         }
         return successCount to failureCount
     }
+
+    private suspend fun seedOccupiedPaths(context: Context): MutableMap<String, String> =
+        context.appContainer.libraryRepository
+            .getAllBooks()
+            .first()
+            .associate { it.filePath to it.fileHash }
+            .toMutableMap()
 }
 
 private fun getFileName(context: Context, uri: Uri): String? {
@@ -401,19 +403,13 @@ fun LeaflineApp(activity: MainActivity) {
     ) { uris: List<Uri>? ->
         val uriList = uris?.takeIf { it.isNotEmpty() } ?: return@rememberLauncherForActivityResult
         activity.lifecycleScope.launch {
-            var successCount = 0
-            var failureCount = 0
             val imported = mutableListOf<LibraryBook>()
-            for (uri in uriList) {
-                val result = activity.importEpub(uri, context) { message ->
-                    activity.showToast(message)
-                    failureCount++
-                }
-                if (result != null) {
-                    successCount++
-                    imported.add(result)
-                }
-            }
+            val (successCount, failureCount) = activity.importMultipleEpub(
+                contentUris = uriList,
+                context = context,
+                onResult = { imported.add(it) },
+                onError = { message -> activity.showToast(message) }
+            )
             imported.forEach { libraryViewModel.addBook(it) }
             if (successCount > 0) {
                 val msg = if (failureCount > 0) {
