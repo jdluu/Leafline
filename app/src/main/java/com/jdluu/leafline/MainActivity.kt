@@ -77,7 +77,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -340,10 +339,11 @@ private enum class LeaflineTab(val label: String) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LeaflineApp(activity: MainActivity) {
+    val coverLoader = remember { EpubCoverLoader(activity.applicationContext) }
     val libraryViewModel: LibraryViewModel = viewModel(
         factory = LibraryViewModelFactory(
             repository = activity.appContainer.libraryRepository,
-            coverLoader = EpubCoverLoader(activity.applicationContext),
+            coverLoader = coverLoader,
             sortStore = LibrarySortStore.fromContext(activity),
             readingSessionRepository = activity.appContainer.readingSessionRepository,
             layoutStore = LibraryLayoutStore.fromContext(activity),
@@ -386,27 +386,17 @@ fun LeaflineApp(activity: MainActivity) {
                     opdsClient = activity.appContainer.opdsClient,
                     importer = activity.appContainer.epubImporter,
                     repository = activity.appContainer.libraryRepository,
-                    scope = (activity as MainActivity).lifecycleScope
+                    scope = activity.lifecycleScope
                 )
             },
             libraryRepository = activity.appContainer.libraryRepository
         )
     )
 
-    var selectedTab by remember { mutableIntStateOf(0) }
-    val context = androidx.compose.ui.platform.LocalContext.current
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    val context = LocalContext.current
     val appearanceStore = remember { AppearanceStore.fromContext(context) }
     var appearance by remember { mutableStateOf(appearanceStore.load()) }
-
-    var pendingBook by remember { mutableStateOf<LibraryBook?>(null) }
-
-    LaunchedEffect(pendingBook) {
-        pendingBook?.let { book ->
-            libraryViewModel.addBook(book)
-            (activity as MainActivity).showToast("Imported: ${book.title}")
-            pendingBook = null
-        }
-    }
 
     val importEpubLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenMultipleDocuments()
@@ -437,6 +427,12 @@ fun LeaflineApp(activity: MainActivity) {
     // A book the reader has not yet decided about, held while the prompt is open.
     var pendingTrackingBook by remember { mutableStateOf<LibraryBook?>(null) }
 
+    val launchReader: (LibraryBook) -> Unit = { book ->
+        activity.startActivity(ReaderActivity.newIntent(activity, book.filePath))
+        @Suppress("DEPRECATION")
+        activity.overridePendingTransition(android.R.anim.fade_in, 0)
+    }
+
     /**
      * Opens a book, asking first when Hardcover is on and the reader has chosen to be
      * asked about this one. Any failure to read the setting opens the book rather than
@@ -454,9 +450,7 @@ fun LeaflineApp(activity: MainActivity) {
         if (shouldAsk) {
             pendingTrackingBook = book
         } else {
-            activity.startActivity(ReaderActivity.newIntent(activity, book.filePath))
-            @Suppress("DEPRECATION")
-            activity.overridePendingTransition(android.R.anim.fade_in, 0)
+            launchReader(book)
         }
     }
 
@@ -471,8 +465,8 @@ fun LeaflineApp(activity: MainActivity) {
                 // the replacement so the new grant is the only one held for this location.
                 libraryFolderViewModel.remove(replaceUri)
             }
-            (activity as MainActivity).saveLibraryFolder(selectedUri, context)
-            (activity as MainActivity).importLibraryFolder(selectedUri, context) { imported, failures ->
+            activity.saveLibraryFolder(selectedUri, context)
+            activity.importLibraryFolder(selectedUri, context) { imported, failures ->
                 imported.forEach(libraryViewModel::addBook)
                 val message = if (failures == 0) {
                     "Imported ${imported.size} EPUB(s)"
@@ -515,8 +509,7 @@ fun LeaflineApp(activity: MainActivity) {
         ) { padding ->
             Surface(modifier = Modifier.fillMaxSize().padding(padding)) {
                 when (LeaflineTab.entries.getOrNull(selectedTab)) {
-                    LeaflineTab.Library -> {
-                        LibraryScreen(
+                    LeaflineTab.Library -> LibraryScreen(
                         viewModel = libraryViewModel,
                         foldersViewModel = libraryFolderViewModel,
                         folderRescanViewModel = folderRescanViewModel,
@@ -528,46 +521,11 @@ fun LeaflineApp(activity: MainActivity) {
                             pendingReplaceFolderUri = uri
                             addLibraryFolderLauncher.launch(null)
                         },
-                        onOpenBook = { book -> openReaderOrAsk(book) }
+                        onOpenBook = openReaderOrAsk
                     )
-                    pendingTrackingBook?.let { book ->
-                        HardcoverTrackingPrompt(
-                            onAnswer = { tracked ->
-                                activity.appContainer.hardcoverTracking.remember(
-                                    book.stableId,
-                                    if (tracked) {
-                                        HardcoverBookPreference.TRACK
-                                    } else {
-                                        HardcoverBookPreference.IGNORE
-                                    }
-                                )
-                                pendingTrackingBook = null
-                                activity.startActivity(
-                                    ReaderActivity.newIntent(activity, book.filePath)
-                                )
-                            },
-                            onDismiss = {
-                                // Dismissing is not an answer: nothing is remembered and
-                                // the book opens, so the question can be asked again.
-                                pendingTrackingBook = null
-                                activity.startActivity(
-                                    ReaderActivity.newIntent(activity, book.filePath)
-                                )
-                            }
-                        )
-                    }
-                    }
                     LeaflineTab.Explore -> OpdsScreen(
                         viewModel = opdsViewModel,
-                        onOpenBook = { book ->
-                            activity.startActivity(
-                                ReaderActivity.newIntent(activity, book.filePath)
-                            )
-                            @Suppress("DEPRECATION")
-                            activity.overridePendingTransition(
-                                android.R.anim.fade_in, 0
-                            )
-                        }
+                        onOpenBook = openReaderOrAsk
                     )
                     LeaflineTab.Settings -> SettingsTab(
                         appearance = appearance,
@@ -578,6 +536,29 @@ fun LeaflineApp(activity: MainActivity) {
                         notesExporter = activity.appContainer.notesExporter
                     )
                     null -> {}
+                }
+
+                pendingTrackingBook?.let { book ->
+                    HardcoverTrackingPrompt(
+                        onAnswer = { tracked ->
+                            activity.appContainer.hardcoverTracking.remember(
+                                book.stableId,
+                                if (tracked) {
+                                    HardcoverBookPreference.TRACK
+                                } else {
+                                    HardcoverBookPreference.IGNORE
+                                }
+                            )
+                            pendingTrackingBook = null
+                            launchReader(book)
+                        },
+                        onDismiss = {
+                            // Dismissing is not an answer: nothing is remembered and
+                            // the book opens, so the question can be asked again.
+                            pendingTrackingBook = null
+                            launchReader(book)
+                        }
+                    )
                 }
             }
         }
