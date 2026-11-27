@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import com.jdluu.leafline.library.cover.BitmapMemoryCache
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -59,9 +60,9 @@ object OpdsCoverLoader {
             if (!authHeader.isNullOrBlank()) {
                 builder.header("Authorization", authHeader)
             }
-            httpClient.newCall(builder.build()).execute().use { response ->
-                if (!response.isSuccessful) return@withContext null
-                val bytes = response.body?.bytes() ?: return@withContext null
+            httpClient.newCall(builder.build()).executeCancellable { response ->
+                if (!response.isSuccessful) return@executeCancellable null
+                val bytes = response.body?.bytes() ?: return@executeCancellable null
 
                 cacheDir.mkdirs()
                 FileOutputStream(cachedDiskFile).use { it.write(bytes) }
@@ -72,6 +73,8 @@ object OpdsCoverLoader {
                 }
                 bitmap
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {
             null
         }

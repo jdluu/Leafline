@@ -13,7 +13,15 @@ import org.readium.r2.navigator.epub.EpubNavigatorFragment
  */
 object CustomFontInjector {
 
-    fun buildFontFacesCss(fonts: List<CustomFont>): String {
+    private data class CachedFontScript(
+        val key: List<String>,
+        val script: String
+    )
+
+    @Volatile
+    private var cachedScript: CachedFontScript? = null
+
+    internal fun buildFontFacesCss(fonts: List<CustomFont>): String {
         if (fonts.isEmpty()) return ""
         val sb = StringBuilder()
         for (font in fonts) {
@@ -38,23 +46,35 @@ object CustomFontInjector {
         return sb.toString()
     }
 
+    internal fun buildInjectionScript(fonts: List<CustomFont>): String? {
+        if (fonts.isEmpty()) return null
+        val key = fonts.map { font ->
+            "${font.name}|${font.file.absolutePath}|${font.file.length()}|${font.file.lastModified()}"
+        }
+        cachedScript?.takeIf { it.key == key }?.let { return it.script }
+
+        val css = buildFontFacesCss(fonts)
+        if (css.isBlank()) return null
+        val escapedCss = JSONObject.quote(css)
+        val script = """
+            (function() {
+                var el = document.getElementById('leafline-custom-fonts');
+                if (!el) {
+                    el = document.createElement('style');
+                    el.id = 'leafline-custom-fonts';
+                    document.head.appendChild(el);
+                }
+                el.textContent = $escapedCss;
+            })();
+        """.trimIndent()
+        cachedScript = CachedFontScript(key = key, script = script)
+        return script
+    }
+
     fun inject(navigator: EpubNavigatorFragment?, fonts: List<CustomFont>) {
         if (navigator == null || fonts.isEmpty()) return
         navigator.lifecycleScope.launch(Dispatchers.IO) {
-            val css = buildFontFacesCss(fonts)
-            if (css.isBlank()) return@launch
-            val escapedCss = JSONObject.quote(css)
-            val js = """
-                (function() {
-                    var el = document.getElementById('leafline-custom-fonts');
-                    if (!el) {
-                        el = document.createElement('style');
-                        el.id = 'leafline-custom-fonts';
-                        document.head.appendChild(el);
-                    }
-                    el.textContent = $escapedCss;
-                })();
-            """.trimIndent()
+            val js = buildInjectionScript(fonts) ?: return@launch
             withContext(Dispatchers.Main) {
                 try {
                     navigator.evaluateJavascript(js)

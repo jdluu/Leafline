@@ -368,4 +368,41 @@ class ReadingSessionRepositoryTest {
         assertEquals(3L, aggregate.activeMinutes)
         assertEquals(1, aggregate.booksOpened)
     }
+
+    @Test
+    fun `getDailyAggregates batches range query and buckets sessions per day`() = runTest {
+        val zone = ZoneId.of("UTC")
+        val day0 = LocalDate.of(2026, 3, 10)
+        val day1 = LocalDate.of(2026, 3, 11)
+        val day2 = LocalDate.of(2026, 3, 12)
+
+        val (repository, _) = newRepository()
+        val day0Noon = day0.atStartOfDay(zone).toInstant().toEpochMilli() + TimeUnit.HOURS.toMillis(12)
+        val day2Morning = day2.atStartOfDay(zone).toInstant().toEpochMilli() + TimeUnit.HOURS.toMillis(8)
+        val day2Evening = day2.atStartOfDay(zone).toInstant().toEpochMilli() + TimeUnit.HOURS.toMillis(20)
+        val outsideBefore = day0.minusDays(1).atStartOfDay(zone).toInstant().toEpochMilli() + 1000L
+        val outsideAfter = day2.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+
+        repository.recordSession(sampleSession(bookId = "b1", startTime = day0Noon, activeDuration = 120_000L))
+        repository.recordSession(sampleSession(bookId = "b1", startTime = day2Morning, activeDuration = 60_000L))
+        repository.recordSession(sampleSession(bookId = "b2", startTime = day2Evening, activeDuration = 90_000L))
+        repository.recordSession(sampleSession(bookId = "b3", startTime = outsideBefore, activeDuration = 300_000L))
+        repository.recordSession(sampleSession(bookId = "b3", startTime = outsideAfter, activeDuration = 300_000L))
+
+        val result = repository.getDailyAggregates(startDate = day0, days = 3, zoneId = zone)
+
+        assertEquals(listOf(day0, day1, day2), result.map { it.first })
+        assertEquals(1, result[0].second.sessionCount)
+        assertEquals(2L, result[0].second.activeMinutes)
+        assertEquals(1, result[0].second.booksOpened)
+
+        assertEquals(ReadingAggregate.EMPTY, result[1].second)
+
+        assertEquals(2, result[2].second.sessionCount)
+        assertEquals(150_000L, result[2].second.activeDurationMillis)
+        assertEquals(2L, result[2].second.activeMinutes)
+        assertEquals(2, result[2].second.booksOpened)
+
+        assertTrue(repository.getDailyAggregates(day0, days = 0, zoneId = zone).isEmpty())
+    }
 }

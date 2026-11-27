@@ -10,6 +10,7 @@ import com.jdluu.leafline.opds.model.DownloadStatus
 import com.jdluu.leafline.opds.model.OpdsBook
 import com.jdluu.leafline.opds.model.OpdsFeedResult
 import com.jdluu.leafline.opds.model.OpdsFeedSource
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -60,6 +61,7 @@ class OpdsViewModel(
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
     private var activeSearchTemplate: String? = null
+    private var feedLoadJob: Job? = null
 
     val downloadStatuses: StateFlow<Map<String, DownloadStatus>> = downloadManager.downloadStatuses
 
@@ -127,7 +129,8 @@ class OpdsViewModel(
             return
         }
 
-        viewModelScope.launch {
+        feedLoadJob?.cancel()
+        feedLoadJob = viewModelScope.launch {
             _uiState.value = OpdsUiState.Loading("Searching...")
             val result = opdsClient.searchFeed(template, query.trim(), currentAuthHeader)
             result.fold(
@@ -159,7 +162,8 @@ class OpdsViewModel(
     }
 
     private fun loadFeedUrl(url: String) {
-        viewModelScope.launch {
+        feedLoadJob?.cancel()
+        feedLoadJob = viewModelScope.launch {
             _uiState.value = OpdsUiState.Loading()
             val result = opdsClient.fetchFeed(url, currentAuthHeader)
             result.fold(

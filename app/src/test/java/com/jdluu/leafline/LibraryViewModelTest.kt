@@ -607,6 +607,64 @@ class LibraryViewModelTest {
             assertEquals(listOf(victim), cleaned.single().first)
             assertEquals(listOf(survivor), cleaned.single().second)
         }
+
+    @Test
+    fun `multiple library observers share a single upstream getAllBooks subscription`() =
+        runTest(dispatcher) {
+            val book = testBook(
+                stableId = "b1",
+                filePath = "/files/b1.epub",
+                fileHash = "h1",
+                tags = listOf("Sci-Fi")
+            )
+            val booksFlow = MutableStateFlow(listOf(book))
+            val repository = FakeLibraryRepository(books = booksFlow)
+            val viewModel = LibraryViewModel(repository)
+
+            val jobs = listOf(
+                launch { viewModel.books.collect {} },
+                launch { viewModel.isLibraryLoaded.collect {} },
+                launch { viewModel.allTags.collect {} },
+                launch { viewModel.tagCounts.collect {} },
+                launch { viewModel.sortedBooks.collect {} }
+            )
+            advanceUntilIdle()
+            jobs.forEach { it.cancel() }
+
+            assertEquals(1, repository.getAllBooksCalls)
+        }
+
+    @Test
+    fun `cover extraction bounds concurrency and updates repository cover path`() =
+        runTest(dispatcher) {
+            val books = (1..5).map { idx ->
+                testBook("b$idx", "/files/b$idx.epub", "h$idx")
+            }
+            val booksFlow = MutableStateFlow(books)
+            val repository = FakeLibraryRepository(books = booksFlow)
+            var currentConcurrent = 0
+            var maxConcurrent = 0
+            val loader = com.jdluu.leafline.library.cover.CoverLoader { book ->
+                currentConcurrent += 1
+                maxConcurrent = maxOf(maxConcurrent, currentConcurrent)
+                kotlinx.coroutines.delay(50L)
+                currentConcurrent -= 1
+                "/covers/${book.stableId}.jpg"
+            }
+
+            val viewModel = LibraryViewModel(
+                repository = repository,
+                coverLoader = loader,
+                ioDispatcher = dispatcher
+            )
+
+            val collectJob = launch { viewModel.books.collect {} }
+            advanceUntilIdle()
+            collectJob.cancel()
+
+            assertEquals(5, repository.updatedCoverPaths.size)
+            assertTrue("Expected bounded concurrency <= 3, was $maxConcurrent", maxConcurrent in 1..3)
+        }
 }
 
 private fun testBook(
@@ -652,7 +710,14 @@ private class FakeLibraryRepository(
     val updatedRatings = mutableListOf<Pair<String, Int?>>()
     val updatedTags = mutableListOf<Pair<String, List<String>>>()
     val renamedCollections = mutableListOf<Pair<Long, String>>()
-    override fun getAllBooks(): Flow<List<LibraryBook>> = books
+    val updatedCoverPaths = mutableListOf<Pair<String, String?>>()
+    var getAllBooksCalls: Int = 0
+        private set
+
+    override fun getAllBooks(): Flow<List<LibraryBook>> = kotlinx.coroutines.flow.flow {
+        getAllBooksCalls += 1
+        books.collect { emit(it) }
+    }
 
     override fun searchBooks(query: String): Flow<List<LibraryBook>> = books
 
@@ -684,7 +749,9 @@ private class FakeLibraryRepository(
     override suspend fun setKoreaderHash(stableId: String, koreaderHash: String?) =
         error("not used")
 
-    override suspend fun setCoverPath(stableId: String, coverPath: String?) = error("not used")
+    override suspend fun setCoverPath(stableId: String, coverPath: String?) {
+        updatedCoverPaths += stableId to coverPath
+    }
 
     override suspend fun addBook(book: LibraryBook): Long {
         addedBooks += book

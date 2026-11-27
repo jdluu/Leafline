@@ -1,7 +1,9 @@
 package com.jdluu.leafline.opds
 
 import com.jdluu.leafline.opds.model.OpdsFeedResult
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
@@ -10,6 +12,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.coroutineContext
 
 /**
  * Turns a bare status code into something a reader can act on. OkHttp reports an empty
@@ -76,7 +79,7 @@ open class OpdsClient(
             }
 
             val request = builder.build()
-            okHttpClient.newCall(request).execute().use { response ->
+            okHttpClient.newCall(request).executeCancellable { response ->
                 if (!response.isSuccessful) {
                     throw IllegalStateException(opdsHttpErrorMessage(response.code, response.message))
                 }
@@ -91,6 +94,8 @@ open class OpdsClient(
                     isJson = isJson
                 )
             }
+        }.onFailure { error ->
+            if (error is CancellationException) throw error
         }
     }
 
@@ -109,14 +114,14 @@ open class OpdsClient(
             if (!authHeader.isNullOrBlank()) {
                 builder.header("Authorization", authHeader)
             }
-            okHttpClient.newCall(builder.build()).execute().use { response ->
+            okHttpClient.newCall(builder.build()).executeCancellable { response ->
                 if (response.isSuccessful) {
                     val xml = response.body?.string().orEmpty()
                     val templateRegex = Regex("""template=["']([^"']+)["']""", RegexOption.IGNORE_CASE)
                     val match = templateRegex.find(xml)
                     if (match != null) {
                         val rawTemplate = match.groupValues[1]
-                        return@withContext try {
+                        return@executeCancellable try {
                             val base = searchUrl.toHttpUrl()
                             base.resolve(rawTemplate)?.toString() ?: rawTemplate
                         } catch (_: Exception) {
@@ -124,7 +129,10 @@ open class OpdsClient(
                         }
                     }
                 }
-            }
+                null
+            }?.let { return@withContext it }
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {
             // Fallback to original url
         }
@@ -182,7 +190,7 @@ open class OpdsClient(
 
             val request = builder.build()
 
-            okHttpClient.newCall(request).execute().use { response ->
+            okHttpClient.newCall(request).executeCancellable { response ->
                 if (!response.isSuccessful) {
                     throw IllegalStateException(opdsHttpErrorMessage(response.code, response.message, "download failed"))
                 }
@@ -194,37 +202,45 @@ open class OpdsClient(
                 val tempFile = File(destinationFile.parentFile, "${destinationFile.name}.downloading")
                 tempFile.parentFile?.mkdirs()
 
-                FileOutputStream(tempFile).use { outputStream ->
-                    val buffer = ByteArray(8 * 1024)
-                    var bytesCopied: Long = 0
-                    var read: Int
-                    while (inputStream.read(buffer).also { read = it } != -1) {
-                        outputStream.write(buffer, 0, read)
-                        bytesCopied += read
-                        if (totalBytes > 0) {
-                            val fraction = (bytesCopied.toFloat() / totalBytes).coerceIn(0f, 1f)
-                            onProgress(fraction)
+                try {
+                    FileOutputStream(tempFile).use { outputStream ->
+                        val buffer = ByteArray(8 * 1024)
+                        var bytesCopied: Long = 0
+                        var read: Int
+                        while (inputStream.read(buffer).also { read = it } != -1) {
+                            coroutineContext.ensureActive()
+                            outputStream.write(buffer, 0, read)
+                            bytesCopied += read
+                            if (totalBytes > 0) {
+                                val fraction = (bytesCopied.toFloat() / totalBytes).coerceIn(0f, 1f)
+                                onProgress(fraction)
+                            }
                         }
+                        outputStream.flush()
                     }
-                    outputStream.flush()
-                }
 
-                if (tempFile.length() == 0L) {
-                    tempFile.delete()
-                    throw IllegalStateException("Downloaded file was empty")
-                }
+                    if (tempFile.length() == 0L) {
+                        tempFile.delete()
+                        throw IllegalStateException("Downloaded file was empty")
+                    }
 
-                if (destinationFile.exists()) {
-                    destinationFile.delete()
-                }
-                if (!tempFile.renameTo(destinationFile)) {
-                    tempFile.copyTo(destinationFile, overwrite = true)
+                    if (destinationFile.exists()) {
+                        destinationFile.delete()
+                    }
+                    if (!tempFile.renameTo(destinationFile)) {
+                        tempFile.copyTo(destinationFile, overwrite = true)
+                        tempFile.delete()
+                    }
+                } catch (e: Throwable) {
                     tempFile.delete()
+                    throw e
                 }
 
                 onProgress(1f)
                 destinationFile
             }
+        }.onFailure { error ->
+            if (error is CancellationException) throw error
         }
     }
 }

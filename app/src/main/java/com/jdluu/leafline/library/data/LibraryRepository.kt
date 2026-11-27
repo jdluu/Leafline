@@ -2,8 +2,13 @@ package com.jdluu.leafline.library.data
 
 import com.jdluu.leafline.library.LibraryBook
 import com.jdluu.leafline.library.ReadingStatus
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 
 interface LibraryRepository {
     fun getAllBooks(): Flow<List<LibraryBook>>
@@ -30,6 +35,20 @@ interface LibraryRepository {
     fun getCollectionsForBook(bookStableId: String): Flow<List<Collection>>
     suspend fun getBookIdsForCollection(collectionId: Long): List<String>
     fun observeBookIdsForCollection(collectionId: Long): Flow<List<String>> = emptyFlow()
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun observeCollectionCounts(): Flow<Map<Long, Int>> =
+        getAllCollections().flatMapLatest { collections ->
+            if (collections.isEmpty()) {
+                flowOf(emptyMap())
+            } else {
+                combine(collections.map { col ->
+                    observeBookIdsForCollection(col.id).map { ids -> col.id to ids.size }
+                }) { pairs ->
+                    pairs.toMap()
+                }
+            }
+        }
 
     // -- Reading status --
     suspend fun setReadingStatus(stableId: String, status: ReadingStatus)

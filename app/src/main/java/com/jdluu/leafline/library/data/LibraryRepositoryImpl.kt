@@ -98,9 +98,8 @@ class LibraryRepositoryImpl(
 
     override fun getCollectionsForBook(bookStableId: String): Flow<List<Collection>> {
         val dao = collectionDao ?: return emptyFlow()
-        return dao.getCollectionIdsForBook(bookStableId).map { ids ->
-            ids.mapNotNull { id -> runCatching { dao.getCollectionById(id) }.getOrNull() }
-                .map { it.toCollection() }
+        return dao.observeCollectionsForBook(bookStableId).map { entities ->
+            entities.map { it.toCollection() }
         }
     }
 
@@ -114,6 +113,13 @@ class LibraryRepositoryImpl(
     override fun observeBookIdsForCollection(collectionId: Long): Flow<List<String>> {
         val dao = collectionDao ?: return emptyFlow()
         return dao.getBookIdsForCollection(collectionId)
+    }
+
+    override fun observeCollectionCounts(): Flow<Map<Long, Int>> {
+        val dao = collectionDao ?: return kotlinx.coroutines.flow.flowOf(emptyMap())
+        return dao.observeCollectionBookCounts().map { counts ->
+            counts.associate { it.collectionId to it.count }
+        }
     }
 
     // -- Reading status --

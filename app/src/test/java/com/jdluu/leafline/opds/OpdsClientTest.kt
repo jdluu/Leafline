@@ -1,5 +1,9 @@
 package com.jdluu.leafline.opds
 
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -154,6 +158,80 @@ class OpdsClientTest {
             assertEquals(fakeEpubData, targetFile.readText())
         } finally {
             targetFile.delete()
+            tempDir.delete()
+        }
+    }
+
+    @Test
+    fun fetchFeed_coroutineCancellationCancelsInFlightRequestImmediately() = runBlocking {
+        val releaseServer = java.util.concurrent.CountDownLatch(1)
+        server.dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
+            override fun dispatch(request: okhttp3.mockwebserver.RecordedRequest): MockResponse {
+                releaseServer.await(10, java.util.concurrent.TimeUnit.SECONDS)
+                return MockResponse().setResponseCode(200).setBody("<feed/>")
+            }
+        }
+
+        try {
+            var failureCaught: Throwable? = null
+            val elapsedMs = kotlin.system.measureTimeMillis {
+                val job = launch(Dispatchers.Default) {
+                    try {
+                        client.fetchFeed(server.url("/slow").toString())
+                    } catch (e: Throwable) {
+                        failureCaught = e
+                        throw e
+                    }
+                }
+                delay(50L)
+                job.cancel()
+                job.join()
+            }
+
+            assertTrue(
+                "Expected cancellation to abort quickly without waiting 10s, took ${elapsedMs}ms",
+                elapsedMs < 3000L
+            )
+            assertTrue(failureCaught is CancellationException)
+        } finally {
+            releaseServer.countDown()
+        }
+    }
+
+    @Test
+    fun downloadEpubFile_coroutineCancellationCleansUpTempFile() = runBlocking {
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/epub+zip")
+                .setBody("PK\u0003\u0004" + "A".repeat(1024))
+                .throttleBody(64, 500, java.util.concurrent.TimeUnit.MILLISECONDS)
+        )
+
+        val tempDir = File.createTempFile("test_cancel_dl", "").also { it.delete(); it.mkdirs() }
+        val targetFile = File(tempDir, "cancelled.epub")
+        val tempFile = File(tempDir, "cancelled.epub.downloading")
+
+        try {
+            var caught: Throwable? = null
+            val job = launch(Dispatchers.Default) {
+                try {
+                    client.downloadEpubFile(server.url("/slow.epub").toString(), targetFile)
+                } catch (e: Throwable) {
+                    caught = e
+                    throw e
+                }
+            }
+            delay(100L)
+            job.cancel()
+            job.join()
+
+            assertTrue(caught is CancellationException)
+            assertTrue(!targetFile.exists())
+            assertTrue(!tempFile.exists())
+        } finally {
+            targetFile.delete()
+            tempFile.delete()
             tempDir.delete()
         }
     }
