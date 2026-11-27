@@ -14,12 +14,14 @@ import com.jdluu.leafline.sync.KoreaderSyncApi
 import com.jdluu.leafline.sync.KoreaderSyncConfigStore
 import com.jdluu.leafline.di.appContainer
 import com.jdluu.leafline.library.BookIdentity
+import com.jdluu.leafline.library.LibraryBook
 import com.jdluu.leafline.reader.ui.SyncConflictState
 import com.jdluu.leafline.sync.ProgressSyncer
 import com.jdluu.leafline.sync.PullOutcome
 import com.jdluu.leafline.sync.PushOutcome
 import com.jdluu.leafline.sync.ReadingProgressMath
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.readium.r2.shared.publication.Locator
@@ -38,11 +40,12 @@ class ReaderSyncManager(
     private val scope: LifecycleCoroutineScope,
     private val libraryRepository: LibraryRepository,
     private val syncApi: KoreaderSyncApi,
-    private val currentBookProvider: () -> com.jdluu.leafline.library.LibraryBook?,
+    private val currentBookProvider: () -> LibraryBook?,
     private val currentLocatorProvider: () -> Locator?,
     private val goToLocator: (Locator) -> Unit,
     private val onConflictState: (SyncConflictState?) -> Unit,
     private val onSnackbar: (String) -> Unit = {},
+    private val onOpenNextBook: ((LibraryBook) -> Unit)? = null,
 ) {
     lateinit var progressSyncer: ProgressSyncer
         private set
@@ -110,7 +113,7 @@ class ReaderSyncManager(
         )
     }
 
-    fun pushProgressOnExit(onMarkFinishedPrompt: (com.jdluu.leafline.library.LibraryBook, Double) -> Unit) {
+    fun pushProgressOnExit(onMarkFinishedPrompt: (LibraryBook, Double) -> Unit) {
         val book = currentBookProvider() ?: return
         val locator = currentLocatorProvider() ?: return
         val locatorJson = locator.toJSON().toString()
@@ -157,20 +160,37 @@ class ReaderSyncManager(
         }
     }
 
-    fun showMarkFinishedDialog(book: com.jdluu.leafline.library.LibraryBook, progress: Double) {
+    fun showMarkFinishedDialog(book: LibraryBook, progress: Double) {
         scope.launch {
-            // Dialog must be shown on main thread; callers already are there.
-        }
-        AlertDialog.Builder(context)
-            .setTitle("Mark as finished?")
-            .setMessage("You're at ${progress.toInt()}% — looks like you've finished this book. Would you like to mark it as finished?")
-            .setPositiveButton("Mark finished") { _, _ ->
-                scope.launch {
-                    libraryRepository.setReadingStatus(book.stableId, ReadingStatus.FINISHED)
+            val nextBook = runCatching {
+                book.nextInSeries(libraryRepository.getAllBooks().first())
+            }.getOrNull()
+            val message = buildString {
+                append("You're at ${progress.toInt()}% — looks like you've finished this book.")
+                if (nextBook != null) {
+                    val seriesLabel = nextBook.formattedSeries()?.let { " ($it)" }.orEmpty()
+                    append("\n\nNext in series: ${nextBook.title}$seriesLabel")
                 }
             }
-            .setNegativeButton("Keep reading") { _, _ -> }
-            .show()
+            val builder = AlertDialog.Builder(context)
+                .setTitle("Mark as finished?")
+                .setMessage(message)
+                .setPositiveButton("Mark finished") { _, _ ->
+                    scope.launch {
+                        libraryRepository.setReadingStatus(book.stableId, ReadingStatus.FINISHED)
+                    }
+                }
+                .setNegativeButton("Keep reading") { _, _ -> }
+            if (nextBook != null && onOpenNextBook != null) {
+                builder.setNeutralButton("Finish & read next") { _, _ ->
+                    scope.launch {
+                        libraryRepository.setReadingStatus(book.stableId, ReadingStatus.FINISHED)
+                        onOpenNextBook.invoke(nextBook)
+                    }
+                }
+            }
+            builder.show()
+        }
     }
 
     companion object {

@@ -369,7 +369,11 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             currentLocatorProvider = { viewModel.uiState.value.currentLocation },
             goToLocator = goToLocator,
             onConflictState = { viewModel.setSyncConflict(it) },
-            onSnackbar = { msg -> lifecycleScope.launch { snackbarHostState.showSnackbar(msg) } }
+            onSnackbar = { msg -> lifecycleScope.launch { snackbarHostState.showSnackbar(msg) } },
+            onOpenNextBook = { nextBook ->
+                startActivity(newIntent(this@ReaderActivity, nextBook.filePath))
+                finish()
+            }
         )
         syncManager.initialize()
 
