@@ -247,7 +247,10 @@ private fun TocTabContent(
                 }
             }
         }
-        HorizontalDivider(modifier = Modifier.padding(horizontal = Padding.screen))
+        HorizontalDivider(
+            modifier = Modifier.padding(horizontal = Padding.screen),
+            color = MaterialTheme.colorScheme.outlineVariant
+        )
         Spacer(modifier = Modifier.height(4.dp))
 
         if (tocLinks.isEmpty()) {

@@ -144,64 +144,64 @@ fun BackupRestoreSheet(
                 )
             }
 
-                AnimatedVisibility(
-                    visible = statusMessage != null,
-                    enter = leaflineEnterTransition(reduceMotion),
-                    exit = leaflineExitTransition(reduceMotion)
-                ) {
-                    statusMessage?.let { msg ->
-                        Spacer(Modifier.height(Spacing.md))
-                        Card(
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer
-                            ),
-                            modifier = Modifier.fillMaxWidth()
+            AnimatedVisibility(
+                visible = statusMessage != null,
+                enter = leaflineEnterTransition(reduceMotion),
+                exit = leaflineExitTransition(reduceMotion)
+            ) {
+                statusMessage?.let { msg ->
+                    Spacer(Modifier.height(Spacing.md))
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(Spacing.md),
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(Spacing.md),
-                                horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
-                            ) {
-                                Icon(
-                                    imageVector = if (restoreSummary != null) Icons.Default.CheckCircle else Icons.Default.Info,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    modifier = Modifier.size(24.dp) // touch-target-ok: decorative feedback icon
+                            Icon(
+                                imageVector = if (restoreSummary != null) Icons.Default.CheckCircle else Icons.Default.Info,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.size(24.dp) // touch-target-ok: decorative feedback icon
+                            )
+                            Column {
+                                Text(
+                                    text = msg,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
                                 )
-                                Column {
+                                restoreSummary?.let { summary ->
+                                    Spacer(Modifier.height(4.dp))
                                     Text(
-                                        text = msg,
-                                        style = MaterialTheme.typography.bodyMedium,
+                                        text = buildString {
+                                            append("${summary.booksMatched} ${plural(summary.booksMatched, "book")} matched • ")
+                                            append("${summary.collectionsRestored} ${plural(summary.collectionsRestored, "collection")} restored • ")
+                                            append("${summary.bookmarksRestored} ${plural(summary.bookmarksRestored, "bookmark")} • ")
+                                            append("${summary.annotationsRestored} ${plural(summary.annotationsRestored, "highlight")}")
+
+                                            // Only mention sessions when the file
+                                            // actually carried some, so restoring an
+                                            // older backup does not show a bare "0 sessions".
+                                            if (summary.readingSessionsRestored > 0) {
+                                                append(" • ${summary.readingSessionsRestored} ${plural(summary.readingSessionsRestored, "reading session")} restored")
+                                            }
+                                        },
+                                        style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSecondaryContainer
                                     )
-                                    restoreSummary?.let { summary ->
-                                        Spacer(Modifier.height(4.dp))
-                                        Text(
-                                            text = buildString {
-                                                append("${summary.booksMatched} ${plural(summary.booksMatched, "book")} matched • ")
-                                                append("${summary.collectionsRestored} ${plural(summary.collectionsRestored, "collection")} restored • ")
-                                                append("${summary.bookmarksRestored} ${plural(summary.bookmarksRestored, "bookmark")} • ")
-                                                append("${summary.annotationsRestored} ${plural(summary.annotationsRestored, "highlight")}")
-
-                                                // Only mention sessions when the file
-                                                // actually carried some, so restoring an
-                                                // older backup does not show a bare "0 sessions".
-                                                if (summary.readingSessionsRestored > 0) {
-                                                    append(" • ${summary.readingSessionsRestored} ${plural(summary.readingSessionsRestored, "reading session")} restored")
-                                                }
-                                            },
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                                        )
-                                    }
                                 }
                             }
                         }
                     }
                 }
+            }
 
             Spacer(Modifier.height(Spacing.md))
-            HorizontalDivider()
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Spacer(Modifier.height(Spacing.md))
 
             // Export Section

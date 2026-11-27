@@ -269,8 +269,8 @@ internal fun BookDetailSheet(
             optimisticDescription?.takeIf { it.isNotBlank() }?.let { descriptionText ->
                 var descriptionExpanded by remember { mutableStateOf(false) }
                 Spacer(Modifier.height(Spacing.sm))
-                HorizontalDivider()
-                Spacer(Modifier.height(com.jdluu.leafline.theme.Padding.compact))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Spacer(Modifier.height(Spacing.sm))
                 Text("Description", style = MaterialTheme.typography.titleSmall)
                 Spacer(Modifier.height(Spacing.xs))
                 Text(
@@ -290,9 +290,9 @@ internal fun BookDetailSheet(
                 }
             }
 
-            Spacer(Modifier.height(20.dp))
-            HorizontalDivider()
-            Spacer(Modifier.height(com.jdluu.leafline.theme.Padding.compact))
+            Spacer(Modifier.height(Spacing.sm))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(Spacing.sm))
 
             // Metadata section
             Row(
@@ -308,7 +308,7 @@ internal fun BookDetailSheet(
                             contentDescription = null,
                             modifier = Modifier.size(16.dp) // touch-target-ok: button decorative icon
                         )
-                        Spacer(Modifier.width(4.dp))
+                        Spacer(Modifier.width(Spacing.xs))
                         Text("Edit")
                     }
                 }
@@ -339,8 +339,8 @@ internal fun BookDetailSheet(
             readingStats?.let { stats ->
                 if (stats.sessionCount > 0) {
                     Spacer(Modifier.height(Spacing.sm))
-                    HorizontalDivider()
-                    Spacer(Modifier.height(com.jdluu.leafline.theme.Padding.compact))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Spacer(Modifier.height(Spacing.sm))
                     Text("Reading activity", style = MaterialTheme.typography.titleSmall)
                     Spacer(Modifier.height(Spacing.xs))
                     MetadataRow("Time read", formatReadingDuration(stats.activeDurationMillis))
@@ -351,8 +351,8 @@ internal fun BookDetailSheet(
             }
 
             Spacer(Modifier.height(Spacing.sm))
-            HorizontalDivider()
-            Spacer(Modifier.height(com.jdluu.leafline.theme.Padding.compact))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(Spacing.sm))
 
             // File info section
             Text("File info", style = MaterialTheme.typography.titleSmall)
@@ -362,8 +362,8 @@ internal fun BookDetailSheet(
             book.koreaderHash?.let { MetadataRow("KOReader hash", it.take(12) + "…") }
 
             Spacer(Modifier.height(Spacing.sm))
-            HorizontalDivider()
-            Spacer(Modifier.height(com.jdluu.leafline.theme.Padding.compact))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(Spacing.sm))
 
             // Actions section
             Text("Actions", style = MaterialTheme.typography.titleSmall)
@@ -371,9 +371,12 @@ internal fun BookDetailSheet(
 
             // Reading status buttons
             Text("Mark as:", style = MaterialTheme.typography.labelMedium)
-            Row(
-                modifier = Modifier.padding(top = Spacing.xs),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+            FlowRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = Spacing.xs),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs)
             ) {
                 ReadingStatus.entries.forEach { status ->
                     FilterChip(
@@ -567,7 +570,7 @@ internal fun BookDetailSheet(
                 }
             }
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(Spacing.md))
 
             // Delete button
             TextButton(
@@ -575,7 +578,7 @@ internal fun BookDetailSheet(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
-                Spacer(Modifier.width(4.dp))
+                Spacer(Modifier.width(Spacing.xs))
                 Text("Delete from library", color = MaterialTheme.colorScheme.error)
             }
 

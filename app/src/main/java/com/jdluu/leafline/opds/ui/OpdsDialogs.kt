@@ -219,7 +219,7 @@ internal fun AddOpdsFeedDialog(
                     supportingText = if (isError) "URL must start with http:// or https://" else null
                 )
 
-                HorizontalDivider()
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
                 Text(
                     text = "Authentication",
