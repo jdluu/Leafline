@@ -1,27 +1,33 @@
 package com.jdluu.leafline.opds.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -31,6 +37,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.style.TextAlign
 import com.jdluu.leafline.library.LibraryBook
 import com.jdluu.leafline.opds.OpdsUiState
@@ -76,7 +83,11 @@ fun OpdsScreen(
     val breadcrumbs by viewModel.breadcrumbs.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
+    val searchHistory by viewModel.searchHistory.collectAsState()
+    val isLoadingNextPage by viewModel.isLoadingNextPage.collectAsState()
+    val paginationError by viewModel.paginationError.collectAsState()
     val downloadStatuses by viewModel.downloadStatuses.collectAsState()
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     var showAddFeedDialog by remember { mutableStateOf(false) }
     // Non-null when the dialog should open pre-filled, which is how the 401 screen turns
@@ -114,6 +125,7 @@ fun OpdsScreen(
                 isSearchActive = isSearchActive,
                 onSearchToggle = { setSearchActive(!isSearchActive) },
                 onSearchQueryChange = { query -> viewModel.search(query) },
+                onSearchSubmit = { viewModel.recordSearchQuery() },
                 onSearchClear = {
                     viewModel.clearSearch()
                     setSearchActive(false)
@@ -129,6 +141,54 @@ fun OpdsScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
+            if (isSearchActive && searchQuery.isBlank() && searchHistory.isNotEmpty() && selectedSource != null) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Padding.screen, vertical = Spacing.xs)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Recent searches",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        TextButton(onClick = { viewModel.clearSearchHistory() }) {
+                            Text("Clear all")
+                        }
+                    }
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+                    ) {
+                        searchHistory.forEach { recentQuery ->
+                            InputChip(
+                                selected = false,
+                                onClick = {
+                                    keyboardController?.hide()
+                                    viewModel.submitSearch(recentQuery)
+                                },
+                                label = { Text(recentQuery) },
+                                trailingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Remove $recentQuery from history",
+                                        modifier = Modifier.clickable {
+                                            viewModel.removeSearchHistory(recentQuery)
+                                        }
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
             if (breadcrumbs.size > 1) {
                 OpdsBreadcrumbBar(
                     breadcrumbs = breadcrumbs,
@@ -189,6 +249,9 @@ fun OpdsScreen(
                             viewModel = viewModel,
                             downloadStatuses = downloadStatuses,
                             gridState = gridState,
+                            isLoadingNextPage = isLoadingNextPage,
+                            paginationError = paginationError,
+                            onLoadMoreClick = { viewModel.loadNextPage() },
                             onSubfeedClick = { link ->
                                 viewModel.navigateSubfeed(link.title, link.href)
                             },

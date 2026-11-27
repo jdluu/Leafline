@@ -18,9 +18,15 @@ class SearchHistoryStore(
     companion object {
         const val PREF_KEY_RECENT_SEARCHES = "recent_search_queries"
         const val PREFS_NAME = "leafline_search_history"
+        const val OPDS_PREFS_NAME = "leafline_opds_search_history"
 
         fun create(context: Context): SearchHistoryStore {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            return SearchHistoryStore(prefs)
+        }
+
+        fun createOpds(context: Context): SearchHistoryStore {
+            val prefs = context.getSharedPreferences(OPDS_PREFS_NAME, Context.MODE_PRIVATE)
             return SearchHistoryStore(prefs)
         }
     }

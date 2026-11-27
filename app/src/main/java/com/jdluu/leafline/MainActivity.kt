@@ -347,7 +347,10 @@ fun LeaflineApp(activity: MainActivity) {
                     scope = activity.lifecycleScope
                 )
             },
-            libraryRepository = activity.appContainer.libraryRepository
+            libraryRepository = activity.appContainer.libraryRepository,
+            searchHistoryStore = remember {
+                com.jdluu.leafline.reader.search.SearchHistoryStore.createOpds(activity)
+            }
         )
     )
 
