@@ -55,7 +55,7 @@ reader-grade typographic control, and accessible-by-default surfaces.
 - Single maintainer, open-source repository (`jdluu/Leafline`), MIT licensed.
 - Distribution is sideloaded: Obtainium from GitHub releases, or a manual APK.
   There is no Play Store listing, so no store assets or review flow exist.
-- Release line is early pre-release (`0.y.z`, current `v0.4.20`). The `0.y.z`
+- Release line is early pre-release (`0.y.z`, current `v0.4.21`). The `0.y.z`
   line signals that the on-device Room schema is not yet stable.
 - The app ships to phones; tablets are not a stated target.
 - Development is on a Pixel-class device over ADB, plus an emulator for width
