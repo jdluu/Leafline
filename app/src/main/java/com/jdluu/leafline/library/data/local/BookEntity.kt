@@ -1,11 +1,19 @@
 package com.jdluu.leafline.library.data.local
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.jdluu.leafline.library.LibraryBook
 import com.jdluu.leafline.library.ReadingStatus
 
-@Entity(tableName = "books")
+@Entity(
+    tableName = "books",
+    indices = [
+        Index("fileHash"),
+        Index("lastReadAtEpochMillis"),
+        Index("readingStatus")
+    ]
+)
 data class BookEntity(
     @PrimaryKey val stableId: String,
     val title: String,

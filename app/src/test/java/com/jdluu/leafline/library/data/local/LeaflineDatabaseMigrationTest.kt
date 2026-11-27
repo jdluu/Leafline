@@ -352,7 +352,44 @@ class LeaflineDatabaseMigrationTest {
     }
 
     @Test
-    fun fullMigrationChain1To11_preservesDataAndPassesRoomSchemaValidation() = runTest {
+    fun migration11To12_createsBookIndexes() {
+        val db = createRawDatabase(11) { db ->
+            db.execSQL(
+                "CREATE TABLE books (" +
+                    "stableId TEXT NOT NULL PRIMARY KEY, " +
+                    "title TEXT NOT NULL, " +
+                    "fileHash TEXT NOT NULL, " +
+                    "lastReadAtEpochMillis INTEGER, " +
+                    "readingStatus TEXT NOT NULL DEFAULT 'unread')"
+            )
+            db.execSQL(
+                "INSERT INTO books (stableId, title, fileHash, lastReadAtEpochMillis, readingStatus) " +
+                    "VALUES ('book-1', 'Title', 'hash-1', 123456, 'reading')"
+            )
+        }
+
+        LeaflineDatabase.MIGRATION_11_12.migrate(db)
+
+        val indexCursor = db.query("PRAGMA index_list('books')")
+        val indexNames = mutableSetOf<String>()
+        while (indexCursor.moveToNext()) {
+            indexNames.add(indexCursor.getString(indexCursor.getColumnIndexOrThrow("name")))
+        }
+        indexCursor.close()
+
+        assertTrue(indexNames.contains("index_books_fileHash"))
+        assertTrue(indexNames.contains("index_books_lastReadAtEpochMillis"))
+        assertTrue(indexNames.contains("index_books_readingStatus"))
+
+        val cursor = db.query("SELECT stableId FROM books WHERE fileHash = 'hash-1'")
+        assertTrue(cursor.moveToFirst())
+        assertEquals("book-1", cursor.getString(0))
+        cursor.close()
+        db.close()
+    }
+
+    @Test
+    fun fullMigrationChain1To12_preservesDataAndPassesRoomSchemaValidation() = runTest {
         val db = createRawDatabase(1) { db ->
             db.execSQL(
                 "CREATE TABLE books (" +
@@ -379,11 +416,11 @@ class LeaflineDatabaseMigrationTest {
             )
         }
 
-        // Apply every migration in sequence from 1 up to 11
+        // Apply every migration in sequence from 1 up to 12
         LeaflineDatabase.ALL_MIGRATIONS.forEach { migration ->
             migration.migrate(db)
         }
-        db.version = 11
+        db.version = 12
         db.close()
 
         // Open with Room to verify that Room's internal schema validator accepts the migrated database!
@@ -406,6 +443,9 @@ class LeaflineDatabaseMigrationTest {
         assertNull(book.lastLocatorJson)
         assertNull(book.series)
         assertNull(book.seriesIndex)
+
+        val byHash = roomDb.bookDao().getBookByFileHash("hash-12345")
+        assertEquals("book-legacy", byHash?.stableId)
 
         // Verify setSeries updates the book
         roomDb.bookDao().setSeries("book-legacy", "The Foundation", 2.0f)
