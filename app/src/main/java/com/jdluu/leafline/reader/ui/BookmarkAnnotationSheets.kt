@@ -18,7 +18,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -65,6 +64,7 @@ import com.jdluu.leafline.reader.annotations.HighlightUndoCoordinator
 import com.jdluu.leafline.reader.annotations.confirmHighlightDismiss
 import com.jdluu.leafline.theme.HIGHLIGHT_TINTS
 import com.jdluu.leafline.theme.HighlightTint
+import com.jdluu.leafline.theme.LeaflinePillShape
 import com.jdluu.leafline.theme.LeaflineTextField
 import com.jdluu.leafline.theme.Padding
 import com.jdluu.leafline.theme.Spacing
@@ -531,7 +531,7 @@ internal fun HighlightTintPickerSheet(
                                     .size(16.dp) // touch-target-ok: decorative color swatch in leading icon
                                     .background(
                                         tint.swatchColor,
-                                        RoundedCornerShape(4.dp)
+                                        LeaflinePillShape
                                     )
                             )
                         }

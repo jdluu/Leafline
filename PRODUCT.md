@@ -55,7 +55,7 @@ reader-grade typographic control, and accessible-by-default surfaces.
 - Single maintainer, open-source repository (`jdluu/Leafline`), MIT licensed.
 - Distribution is sideloaded: Obtainium from GitHub releases, or a manual APK.
   There is no Play Store listing, so no store assets or review flow exist.
-- Release line is early pre-release (`0.y.z`, current `v0.4.0`). The `0.y.z`
+- Release line is early pre-release (`0.y.z`, current `v0.4.20`). The `0.y.z`
   line signals that the on-device Room schema is not yet stable.
 - The app ships to phones; tablets are not a stated target.
 - Development is on a Pixel-class device over ADB, plus an emulator for width
@@ -68,18 +68,19 @@ reader-grade typographic control, and accessible-by-default surfaces.
 
 Confirmed capabilities: EPUB 2/3 reading in paginated and scrolled modes;
 footnote and note previews; navigation history with a return capsule; on-device
-library with folders, collections, reading status, ratings, tags, sorting,
-grid and list layouts, and batch actions; OPDS 1.x/2.0 browsing and download of
+library with folders, collections, series grouping and continuation, reading
+status, ratings, tags, sorting, grid and list layouts, and batch actions; OPDS
+1.x/2.0 browsing with pagination, recent search history, and download of
 catalogs the reader adds (none are built in, and an empty catalog list is a
 supported state);
 KOReader-compatible progress sync with encrypted stored credentials;
-on-device reading statistics and a 7-day chart; multi-color
+on-device reading statistics, estimated time remaining, and a 7-day chart; multi-color
 highlights, notes, bookmarks, offline dictionary lookup, and full-text in-book
 search; notes and highlights export to Markdown, Obsidian vault ZIP, Readwise
-CSV, and Anki TSV; JSON backup and restore of library metadata, reading positions, and
-annotations; typography and accessibility presets, themes including sepia,
-margins, line height, per-book brightness, edge tap zones, volume-key page
-turning, and page-turn animation; text-to-speech with a sleep timer.
+CSV, and Anki TSV; JSON backup and restore of library metadata, reading positions,
+annotations, saved OPDS feeds, and non-secret preferences; typography and accessibility
+presets, themes including sepia, margins, line height, per-book brightness, edge tap
+zones, volume-key page turning, and page-turn animation; text-to-speech with a sleep timer.
 
 Technical constraints that bind any design work:
 

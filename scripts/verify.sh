@@ -25,6 +25,7 @@ EOF
 run_guards() {
     bash scripts/check_dynamic_type.sh
     bash scripts/check_touch_targets.sh
+    bash scripts/check_design_tokens.sh
     git diff --check
 }
 
