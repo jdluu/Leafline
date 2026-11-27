@@ -540,4 +540,58 @@ class OpdsViewModelTest {
         assertTrue(viewModel.feedSources.value.isEmpty())
         assertEquals(null, feedStore.loadSelectedFeedId())
     }
+
+    @Test
+    fun rapidNavigation_cancelsPreviousInFlightFeedRequest() = runTest(testDispatcher) {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val feedStore = OpdsFeedStore.fromContext(context, TestSecretCipher())
+        feedStore.addCustomFeed("Home Calibre", "https://calibre.test/opds")
+        val cancelledUrls = mutableListOf<String>()
+        val slowClient = object : OpdsClient() {
+            override suspend fun fetchFeed(url: String, authHeader: String?): Result<OpdsFeedResult> {
+                return try {
+                    if (url.endsWith("/first")) {
+                        kotlinx.coroutines.delay(1_000L)
+                    } else {
+                        kotlinx.coroutines.delay(50L)
+                    }
+                    Result.success(
+                        OpdsFeedResult(
+                            title = "Feed $url",
+                            feedUrl = url,
+                            books = emptyList(),
+                            navigationLinks = emptyList()
+                        )
+                    )
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    cancelledUrls += url
+                    throw e
+                }
+            }
+        }
+        val repo = FakeLibraryRepository()
+        val downloadManager = OpdsDownloadManager(
+            context = context,
+            opdsClient = slowClient,
+            importer = com.jdluu.leafline.ReadiumEpubImporter(context),
+            repository = repo,
+            scope = this
+        )
+        val viewModel = OpdsViewModel(
+            feedStore = feedStore,
+            opdsClient = slowClient,
+            downloadManager = downloadManager,
+            libraryRepository = repo
+        )
+        testScheduler.advanceUntilIdle()
+
+        viewModel.navigateSubfeed("Slow First", "https://calibre.test/first")
+        testScheduler.advanceTimeBy(20L)
+        viewModel.navigateSubfeed("Fast Second", "https://calibre.test/second")
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(listOf("https://calibre.test/first"), cancelledUrls)
+        val success = viewModel.uiState.value as OpdsUiState.Success
+        assertEquals("Feed https://calibre.test/second", success.feed.title)
+    }
 }
