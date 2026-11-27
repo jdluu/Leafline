@@ -8,6 +8,7 @@ import androidx.test.filters.LargeTest
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.BySelector
+import androidx.test.uiautomator.Direction
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
@@ -121,13 +122,19 @@ class AccessibilitySemanticsTest {
     }
 
     private fun scrollSheetDownSmall() {
-        uiDevice.swipe(
-            uiDevice.displayWidth / 2,
-            (uiDevice.displayHeight * 0.75).toInt(),
-            uiDevice.displayWidth / 2,
-            (uiDevice.displayHeight * 0.55).toInt(),
-            20
-        )
+        val scrollable = uiDevice.findObject(By.clazz("android.widget.ScrollView").scrollable(true))
+            ?: uiDevice.findObject(By.scrollable(true))
+        if (scrollable != null) {
+            scrollable.scroll(Direction.DOWN, 0.7f)
+        } else {
+            uiDevice.swipe(
+                uiDevice.displayWidth / 2,
+                (uiDevice.displayHeight * 0.75).toInt(),
+                uiDevice.displayWidth / 2,
+                (uiDevice.displayHeight * 0.45).toInt(),
+                60
+            )
+        }
         uiDevice.waitForIdle()
     }
 
@@ -244,13 +251,6 @@ class AccessibilitySemanticsTest {
         return result
     }
 
-    private fun scrollForward(): Boolean {
-        val scrollableNode = findAccessibilityNodeInAllWindows { it.isScrollable } ?: return false
-        val result = scrollableNode.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
-        uiDevice.waitForIdle()
-        return result
-    }
-
     @Test
     fun settingsScreen_koreaderSyncSwitch_hasSwitchRoleAndToggles() {
         launchMainActivity()
@@ -321,9 +321,7 @@ class AccessibilitySemanticsTest {
             marginNode = uiDevice.findObject(By.descContains("Page margin"))
             lineHeightNode = uiDevice.findObject(By.descContains("Line height"))
             if (marginNode != null && lineHeightNode != null) break
-            if (!scrollForward()) {
-                scrollSheetDownSmall()
-            }
+            scrollSheetDownSmall()
         }
 
         assertNotNull(
@@ -337,12 +335,10 @@ class AccessibilitySemanticsTest {
 
         // 2. Scroll gently inside the settings sheet to reveal Tap zones
         var leftZoneChip: UiObject2? = null
-        for (i in 0 until 8) {
+        for (i in 0 until 10) {
             leftZoneChip = uiDevice.findObject(By.desc("Left zone: Previous page"))
             if (leftZoneChip != null) break
-            if (!scrollForward()) {
-                scrollSheetDownSmall()
-            }
+            scrollSheetDownSmall()
         }
 
         assertNotNull(
@@ -360,12 +356,10 @@ class AccessibilitySemanticsTest {
 
         // 3. Scroll down further to reach Reduce motion
         var reduceMotionRow: UiObject2? = null
-        for (i in 0 until 8) {
+        for (i in 0 until 10) {
             reduceMotionRow = uiDevice.findObject(By.text("Reduce motion"))
             if (reduceMotionRow != null) break
-            if (!scrollForward()) {
-                scrollSheetDownSmall()
-            }
+            scrollSheetDownSmall()
         }
 
         checkNotNull(reduceMotionRow) { "Reduce motion row should exist. Dump:\n${dumpActiveWindow()}" }
