@@ -20,6 +20,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Explore
@@ -349,6 +352,12 @@ fun LeaflineApp(activity: MainActivity) {
     )
 
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    val libraryListState = rememberLazyListState()
+    val libraryGridState = rememberLazyGridState()
+    var librarySearchActive by rememberSaveable { mutableStateOf(false) }
+    val opdsGridState = rememberLazyGridState()
+    var opdsSearchActive by rememberSaveable { mutableStateOf(false) }
+    val settingsScrollState = rememberScrollState()
     val context = LocalContext.current
     val appearanceStore = remember { AppearanceStore.fromContext(context) }
     var appearance by remember { mutableStateOf(appearanceStore.load()) }
@@ -514,6 +523,10 @@ fun LeaflineApp(activity: MainActivity) {
                             folderRescanViewModel = folderRescanViewModel,
                             backupManager = activity.appContainer.backupManager,
                             notesExporter = activity.appContainer.notesExporter,
+                            listState = libraryListState,
+                            gridState = libraryGridState,
+                            searchActive = librarySearchActive,
+                            onSearchActiveChange = { librarySearchActive = it },
                             onImportEpub = { importEpubLauncher.launch(arrayOf(MainActivity.EPUB_MIME_TYPE)) },
                             onAddLibraryFolder = { addLibraryFolderLauncher.launch(null) },
                             onReselectFolder = { uri ->
@@ -524,6 +537,9 @@ fun LeaflineApp(activity: MainActivity) {
                         )
                         LeaflineTab.Explore -> OpdsScreen(
                             viewModel = opdsViewModel,
+                            gridState = opdsGridState,
+                            searchActive = opdsSearchActive,
+                            onSearchActiveChange = { opdsSearchActive = it },
                             onOpenBook = openReaderOrAsk
                         )
                         LeaflineTab.Settings -> SettingsTab(
@@ -532,7 +548,8 @@ fun LeaflineApp(activity: MainActivity) {
                                 appearance = selected
                                 appearanceStore.save(selected)
                             },
-                            notesExporter = activity.appContainer.notesExporter
+                            notesExporter = activity.appContainer.notesExporter,
+                            scrollState = settingsScrollState
                         )
                         null -> {}
                     }

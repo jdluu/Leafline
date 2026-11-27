@@ -19,8 +19,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
@@ -63,6 +65,7 @@ internal fun FeedContentView(
     feed: OpdsFeedResult,
     viewModel: OpdsViewModel,
     downloadStatuses: Map<String, DownloadStatus>,
+    gridState: LazyGridState = rememberLazyGridState(),
     onSubfeedClick: (OpdsNavigationLink) -> Unit,
     onBookClick: (OpdsBook) -> Unit,
     onDownloadClick: (OpdsBook) -> Unit
@@ -80,6 +83,7 @@ internal fun FeedContentView(
 
     LazyVerticalGrid(
         columns = GridCells.Fixed(columns),
+        state = gridState,
         contentPadding = PaddingValues(Spacing.sm),
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),

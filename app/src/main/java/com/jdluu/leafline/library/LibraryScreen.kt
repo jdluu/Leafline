@@ -8,12 +8,16 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.FloatingActionButton
@@ -26,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,6 +57,10 @@ fun LibraryScreen(
     folderRescanViewModel: FolderRescanViewModel? = null,
     backupManager: LibraryBackupManager? = null,
     notesExporter: NotesExporter? = null,
+    listState: LazyListState = rememberLazyListState(),
+    gridState: LazyGridState = rememberLazyGridState(),
+    searchActive: Boolean? = null,
+    onSearchActiveChange: ((Boolean) -> Unit)? = null,
     onImportEpub: () -> Unit,
     onAddLibraryFolder: () -> Unit = {},
     onReselectFolder: (String) -> Unit = {},
@@ -77,7 +86,9 @@ fun LibraryScreen(
     val allTags by viewModel.allTags.collectAsStateWithLifecycle()
     val selectedTag by viewModel.selectedTag.collectAsStateWithLifecycle()
     val continueReadingBooks by viewModel.continueReadingBooks.collectAsStateWithLifecycle()
-    var searchActive by remember { mutableStateOf(false) }
+    var localSearchActive by rememberSaveable { mutableStateOf(false) }
+    val isSearchActive = searchActive ?: localSearchActive
+    val setSearchActive: (Boolean) -> Unit = onSearchActiveChange ?: { localSearchActive = it }
     var showSortSheet by remember { mutableStateOf(false) }
     var showCollectionSheet by remember { mutableStateOf(false) }
     var showCreateDialog by remember { mutableStateOf(false) }
@@ -155,10 +166,10 @@ fun LibraryScreen(
                     progressFilter = progressFilter,
                     hasBackupManager = backupManager != null,
                     onToggleSearch = {
-                        if (searchActive) {
+                        if (isSearchActive) {
                             viewModel.setQuery("")
                         }
-                        searchActive = !searchActive
+                        setSearchActive(!isSearchActive)
                     },
                     onOpenSortSheet = { showSortSheet = true },
                     onToggleLayout = { viewModel.toggleLayout() },
@@ -182,12 +193,12 @@ fun LibraryScreen(
 
             if (!libraryIsEmpty) {
                 LibraryFilterBar(
-                    searchActive = searchActive,
+                    searchActive = isSearchActive,
                     query = query,
                     onQueryChange = viewModel::setQuery,
                     onCloseSearch = {
                         viewModel.setQuery("")
-                        searchActive = false
+                        setSearchActive(false)
                     },
                     collections = collections,
                     selectedCollection = selectedCollection,
@@ -213,19 +224,36 @@ fun LibraryScreen(
                 )
             }
 
+            val activeFilterCount = listOf(
+                query.isNotBlank(),
+                selectedCollection != null,
+                readingStatusFilter != null,
+                progressFilter != ProgressFilter.ALL,
+                selectedTag != null
+            ).count { it }
+
             if (books.isEmpty()) {
                 when {
                     !isLibraryLoaded -> LibraryLoadingState()
                     // Each filtered-empty state clears its own filter: once the last book is
                     // gone the filter bar hides, so without an action here the reader is left
                     // staring at a reason with no way out of it.
+                    activeFilterCount > 1 -> LeaflineEmptyState(
+                        title = "No books match these filters",
+                        body = "Try clearing filters to see your library",
+                        actionLabel = "Clear all filters",
+                        onAction = {
+                            viewModel.clearAllFilters()
+                            setSearchActive(false)
+                        }
+                    )
                     query.isNotBlank() -> LeaflineEmptyState(
                         title = "No books match",
                         body = "Try a different search term",
                         actionLabel = "Clear search",
                         onAction = {
                             viewModel.setQuery("")
-                            searchActive = false
+                            setSearchActive(false)
                         }
                     )
                     selectedCollection != null -> LeaflineEmptyState(
@@ -261,6 +289,7 @@ fun LibraryScreen(
                 }
             } else if (layout == LibraryLayout.LIST) {
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(start = Padding.screen, end = Padding.screen, top = Spacing.xs, bottom = 88.dp),
                     verticalArrangement = Arrangement.spacedBy(Padding.compact)
@@ -319,6 +348,7 @@ fun LibraryScreen(
             } else {
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(rememberLibraryGridColumns()),
+                    state = gridState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(start = Padding.screen, end = Padding.screen, top = Spacing.xs, bottom = 88.dp),
                     verticalArrangement = Arrangement.spacedBy(Padding.compact),
