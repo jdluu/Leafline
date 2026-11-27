@@ -42,6 +42,7 @@ class ReaderSyncManager(
     private val currentLocatorProvider: () -> Locator?,
     private val goToLocator: (Locator) -> Unit,
     private val onConflictState: (SyncConflictState?) -> Unit,
+    private val onSnackbar: (String) -> Unit = {},
 ) {
     lateinit var progressSyncer: ProgressSyncer
         private set
@@ -69,11 +70,7 @@ class ReaderSyncManager(
         val book = currentBookProvider() ?: return
         when (val outcome = progressSyncer.pull(BookRef(book))) {
             is PullOutcome.RemoteAhead -> presentRemoteProgress(outcome)
-            is PullOutcome.Failure -> Toast.makeText(
-                context,
-                "Progress sync failed: ${outcome.message}",
-                Toast.LENGTH_LONG
-            ).show()
+            is PullOutcome.Failure -> onSnackbar("Progress sync failed: ${outcome.message}")
             else -> Unit
         }
     }

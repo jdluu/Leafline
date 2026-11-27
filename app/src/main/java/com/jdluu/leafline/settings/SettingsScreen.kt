@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -46,7 +47,8 @@ import kotlinx.coroutines.launch
 fun SettingsTab(
     appearance: ThemeMode,
     onAppearanceChange: (ThemeMode) -> Unit,
-    notesExporter: NotesExporter? = null
+    notesExporter: NotesExporter? = null,
+    scrollState: ScrollState = rememberScrollState()
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
@@ -55,7 +57,7 @@ fun SettingsTab(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .padding(horizontal = Spacing.md)
         ) {
             Spacer(Modifier.height(Spacing.xs))

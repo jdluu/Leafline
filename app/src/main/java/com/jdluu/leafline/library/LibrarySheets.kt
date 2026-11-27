@@ -95,7 +95,10 @@ internal fun CollectionManagementSheet(
     onRename: (Collection) -> Unit,
     onDelete: (Collection) -> Unit
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ) {
         Column(modifier = Modifier.padding(Padding.screen)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -188,7 +191,10 @@ internal fun LibraryFoldersSheet(
     onRescanAll: () -> Unit = {},
     onRescanOne: (String) -> Unit = {}
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ) {
         Column(modifier = Modifier.padding(Padding.screen)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -418,7 +424,10 @@ internal fun BookCollectionPickerSheet(
 ) {
     var optimisticIds by remember(bookCollectionIds) { mutableStateOf(bookCollectionIds) }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ) {
         Column(modifier = Modifier.padding(Padding.screen)) {
             Text(
                 "Collections",

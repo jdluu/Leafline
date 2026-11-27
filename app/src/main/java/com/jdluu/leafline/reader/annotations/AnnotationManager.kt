@@ -8,7 +8,6 @@ import android.util.Log
 import android.view.ActionMode
 import android.view.Menu
 import android.view.MenuItem
-import android.widget.Toast
 import androidx.lifecycle.LifecycleCoroutineScope
 import com.jdluu.leafline.library.data.Annotation
 import com.jdluu.leafline.library.data.AnnotationRepository
@@ -74,15 +73,14 @@ class AnnotationManager(
     fun saveSelectionAsHighlight() {
         val stableId = bookStableIdProvider()
         if (stableId == null) {
-            Toast.makeText(context, "Highlights need an imported library book", Toast.LENGTH_SHORT)
-                .show()
+            onSnackbar("Highlights need an imported library book")
             return
         }
         scope.launch {
             try {
                 val selection = navigatorProvider()?.currentSelection()
                 if (selection == null) {
-                    Toast.makeText(context, "No text selected", Toast.LENGTH_SHORT).show()
+                    onSnackbar("No text selected")
                     return@launch
                 }
                 // Capture the locator, clear selection, then show the tint picker
@@ -92,7 +90,7 @@ class AnnotationManager(
             } catch (e: Exception) {
                 Log.w(TAG, "Could not prepare highlight", e)
                 runCatching { navigatorProvider()?.clearSelection() }
-                Toast.makeText(context, "Could not create highlight", Toast.LENGTH_SHORT).show()
+                onSnackbar("Could not create highlight")
             }
         }
     }
@@ -112,7 +110,7 @@ class AnnotationManager(
             } catch (e: Exception) {
                 Log.w(TAG, "Could not save highlight", e)
                 runCatching { navigatorProvider()?.clearSelection() }
-                Toast.makeText(context, "Could not save highlight", Toast.LENGTH_SHORT).show()
+                onSnackbar("Could not save highlight")
             }
         }
     }
@@ -186,7 +184,7 @@ class AnnotationManager(
     fun navigateTo(annotation: Annotation) {
         val locator = parseLocator(annotation.locatorJson)
         if (locator == null) {
-            Toast.makeText(context, "Could not open this highlight", Toast.LENGTH_SHORT).show()
+            onSnackbar("Could not open this highlight")
             return
         }
         navigatorProvider()?.go(locator, false)

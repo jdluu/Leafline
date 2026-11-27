@@ -426,6 +426,14 @@ class LibraryViewModel(
         _selectedTag.value = tag
     }
 
+    fun clearAllFilters() {
+        _query.value = ""
+        _selectedCollection.value = null
+        _readingStatusFilter.value = null
+        _progressFilter.value = ProgressFilter.ALL
+        _selectedTag.value = null
+    }
+
     fun setRating(stableId: String, rating: Int?) {
         viewModelScope.launch {
             repository.setRating(stableId, rating)

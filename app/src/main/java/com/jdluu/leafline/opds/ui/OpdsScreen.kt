@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Refresh
@@ -25,6 +27,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,6 +65,9 @@ internal fun credentialSeed(
 @Composable
 fun OpdsScreen(
     viewModel: OpdsViewModel,
+    gridState: LazyGridState = rememberLazyGridState(),
+    searchActive: Boolean? = null,
+    onSearchActiveChange: ((Boolean) -> Unit)? = null,
     onOpenBook: (LibraryBook) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -77,7 +83,9 @@ fun OpdsScreen(
     // "this catalog needs an account" into something the reader can finish.
     var addFeedSeed by remember { mutableStateOf<OpdsFeedSource?>(null) }
     var selectedBookForDetails by remember { mutableStateOf<OpdsBook?>(null) }
-    var isSearchActive by remember { mutableStateOf(false) }
+    var localSearchActive by rememberSaveable { mutableStateOf(false) }
+    val isSearchActive = searchActive ?: localSearchActive
+    val setSearchActive: (Boolean) -> Unit = onSearchActiveChange ?: { localSearchActive = it }
     // Non-null while the confirmation for removing a catalog's stored account is open.
     var removeCredentialsFor by remember { mutableStateOf<OpdsFeedSource?>(null) }
 
@@ -92,7 +100,7 @@ fun OpdsScreen(
                 selectedSource = selectedSource,
                 sources = feedSources,
                 onSelectSource = { source ->
-                    isSearchActive = false
+                    setSearchActive(false)
                     viewModel.selectSource(source)
                 },
                 onAddFeedClick = {
@@ -104,11 +112,11 @@ fun OpdsScreen(
                 onRemoveCredentials = { source -> removeCredentialsFor = source },
                 searchQuery = searchQuery,
                 isSearchActive = isSearchActive,
-                onSearchToggle = { isSearchActive = !isSearchActive },
+                onSearchToggle = { setSearchActive(!isSearchActive) },
                 onSearchQueryChange = { query -> viewModel.search(query) },
                 onSearchClear = {
                     viewModel.clearSearch()
-                    isSearchActive = false
+                    setSearchActive(false)
                 },
                 canNavigateBack = breadcrumbs.size > 1,
                 onNavigateBack = { viewModel.navigateBack() }
@@ -180,6 +188,7 @@ fun OpdsScreen(
                             feed = state.feed,
                             viewModel = viewModel,
                             downloadStatuses = downloadStatuses,
+                            gridState = gridState,
                             onSubfeedClick = { link ->
                                 viewModel.navigateSubfeed(link.title, link.href)
                             },

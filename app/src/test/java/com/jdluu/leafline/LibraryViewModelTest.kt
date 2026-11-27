@@ -17,6 +17,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -25,6 +26,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -665,6 +667,45 @@ class LibraryViewModelTest {
             assertEquals(5, repository.updatedCoverPaths.size)
             assertTrue("Expected bounded concurrency <= 3, was $maxConcurrent", maxConcurrent in 1..3)
         }
+
+    @Test
+    fun `clearAllFilters resets query collection status progress and tag filters`() =
+        runTest(dispatcher) {
+            val book = testBook(
+                stableId = "b1",
+                filePath = "/files/b1.epub",
+                fileHash = "h1",
+                readingStatus = ReadingStatus.READING,
+                tags = listOf("sci-fi")
+            )
+            val repository = FakeLibraryRepository(
+                books = MutableStateFlow(listOf(book)),
+                bookIdsByCollection = mapOf(7L to flowOf(listOf("b1")))
+            )
+            val viewModel = LibraryViewModel(repository = repository)
+            val collectJob = launch { viewModel.sortedBooks.collect {} }
+
+            viewModel.setQuery("nonexistent")
+            viewModel.selectCollection(7L)
+            viewModel.setReadingStatusFilter(ReadingStatus.FINISHED)
+            viewModel.setProgressFilter(ProgressFilter.IN_PROGRESS)
+            viewModel.selectTag("fantasy")
+            advanceUntilIdle()
+
+            assertTrue(viewModel.sortedBooks.value.isEmpty())
+
+            viewModel.clearAllFilters()
+            advanceUntilIdle()
+
+            assertEquals("", viewModel.query.value)
+            assertNull(viewModel.selectedCollection.value)
+            assertNull(viewModel.readingStatusFilter.value)
+            assertEquals(ProgressFilter.ALL, viewModel.progressFilter.value)
+            assertNull(viewModel.selectedTag.value)
+            assertEquals(listOf("b1"), viewModel.sortedBooks.value.map { it.stableId })
+
+            collectJob.cancel()
+        }
 }
 
 private fun testBook(
@@ -698,7 +739,8 @@ private class FakeLibraryRepository(
     private val books: Flow<List<LibraryBook>>,
     private val existingByHash: LibraryBook? = null,
     private val collectionsForBook: Map<String, Flow<List<Collection>>> = emptyMap(),
-    private val booksById: Map<String, LibraryBook> = emptyMap()
+    private val booksById: Map<String, LibraryBook> = emptyMap(),
+    private val bookIdsByCollection: Map<Long, Flow<List<String>>> = emptyMap()
 ) : LibraryRepository {
     val addedBooks = mutableListOf<LibraryBook>()
     val updatedBooks = mutableListOf<LibraryBook>()
@@ -719,7 +761,9 @@ private class FakeLibraryRepository(
         books.collect { emit(it) }
     }
 
-    override fun searchBooks(query: String): Flow<List<LibraryBook>> = books
+    override fun searchBooks(query: String): Flow<List<LibraryBook>> = books.map { list ->
+        if (query.isBlank()) list else list.filter { it.title.contains(query, ignoreCase = true) }
+    }
 
     override fun getAllCollections(): Flow<List<Collection>> = flowOf(emptyList())
 
@@ -730,6 +774,9 @@ private class FakeLibraryRepository(
 
     override fun getCollectionsForBook(bookStableId: String): Flow<List<Collection>> =
         collectionsForBook[bookStableId] ?: flowOf(emptyList())
+
+    override fun observeBookIdsForCollection(collectionId: Long): Flow<List<String>> =
+        bookIdsByCollection[collectionId] ?: flowOf(emptyList())
 
     override suspend fun getBookByStableId(stableId: String): LibraryBook? = booksById[stableId]
 

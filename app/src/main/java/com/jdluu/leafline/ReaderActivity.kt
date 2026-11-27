@@ -368,7 +368,8 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             currentBookProvider = { currentBook },
             currentLocatorProvider = { viewModel.uiState.value.currentLocation },
             goToLocator = goToLocator,
-            onConflictState = { viewModel.setSyncConflict(it) }
+            onConflictState = { viewModel.setSyncConflict(it) },
+            onSnackbar = { msg -> lifecycleScope.launch { snackbarHostState.showSnackbar(msg) } }
         )
         syncManager.initialize()
 
@@ -433,7 +434,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     onSkipNext = { ttsNavigator?.skipToNextUtterance() },
                     onError = { message ->
                         if (message != null) {
-                            Toast.makeText(this@ReaderActivity, message, Toast.LENGTH_SHORT).show()
+                            lifecycleScope.launch { snackbarHostState.showSnackbar(message) }
                         }
                     }
                 )
@@ -634,7 +635,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                             val target = viewModel.uiState.value.annotations.firstOrNull { it.id == annotationId }
                                 ?: return false
                             val message = target.note ?: annotationExcerpt(target)
-                            Toast.makeText(this@ReaderActivity, message, Toast.LENGTH_SHORT).show()
+                            lifecycleScope.launch { snackbarHostState.showSnackbar(message) }
                             return true
                         }
                     }
@@ -852,7 +853,8 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
     private fun onSearchResultClicked(result: BookSearchResult) {
         val locator = bookSearcher.locatorFor(result.id) ?: parseLocator(result.locatorJson)
         if (locator == null) {
-            Toast.makeText(this, "Could not open this result", Toast.LENGTH_SHORT).show()
+            viewModel.onSearchResultNavigated()
+            lifecycleScope.launch { snackbarHostState.showSnackbar("Could not open this result") }
             return
         }
         viewModel.uiState.value.currentLocation?.let { from ->
@@ -1231,7 +1233,7 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         try {
             startActivity(intent)
         } catch (e: ActivityNotFoundException) {
-            Toast.makeText(this, "No app available to open link", Toast.LENGTH_LONG).show()
+            lifecycleScope.launch { snackbarHostState.showSnackbar("No app available to open link") }
         }
     }
 
