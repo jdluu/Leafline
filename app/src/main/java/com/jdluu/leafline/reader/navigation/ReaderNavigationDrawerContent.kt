@@ -1,8 +1,5 @@
 package com.jdluu.leafline.reader.navigation
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -22,7 +19,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Bookmark
@@ -41,7 +37,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -85,6 +80,7 @@ import com.jdluu.leafline.reader.annotations.HighlightUndoCoordinator
 import com.jdluu.leafline.reader.annotations.confirmHighlightDismiss
 import com.jdluu.leafline.theme.HIGHLIGHT_TINTS
 import com.jdluu.leafline.theme.HighlightTint
+import com.jdluu.leafline.theme.LeaflineTextField
 import com.jdluu.leafline.theme.Padding
 import com.jdluu.leafline.theme.Spacing
 import kotlinx.coroutines.launch
@@ -490,21 +486,21 @@ private fun HighlightTabContent(
 
     Column(modifier = modifier.fillMaxSize()) {
         if (annotations.isNotEmpty()) {
-            OutlinedTextField(
+            LeaflineTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text("Search highlights or notes") },
-                singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Padding.screen, vertical = Spacing.xs),
+                placeholder = "Search highlights or notes",
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = { searchQuery = "" }) {
                             Icon(Icons.Default.Close, contentDescription = "Clear search")
                         }
                     }
-                }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Padding.screen, vertical = Spacing.xs)
             )
 
             Row(
@@ -729,18 +725,18 @@ private fun HighlightTabContent(
             onDismissRequest = { editDialogAnnotation = null },
             title = { Text("Edit note") },
             text = {
-                OutlinedTextField(
+                LeaflineTextField(
                     value = editNoteText,
                     onValueChange = { editNoteText = it },
+                    label = "Note",
+                    placeholder = "Add a note...",
+                    imeAction = ImeAction.Done,
+                    singleLine = false,
+                    maxLines = 5,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(Padding.screen)
-                        .focusRequester(focusRequester),
-                    singleLine = false,
-                    maxLines = 5,
-                    placeholder = { Text("Add a note...") },
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    label = { Text("Note") }
+                        .focusRequester(focusRequester)
                 )
             },
             confirmButton = {

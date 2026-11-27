@@ -16,7 +16,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,6 +25,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.jdluu.leafline.library.data.Collection
+import com.jdluu.leafline.theme.LeaflineTextField
 import com.jdluu.leafline.theme.Padding
 import com.jdluu.leafline.theme.Spacing
 
@@ -56,22 +56,22 @@ fun LibraryFilterBar(
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         if (searchActive) {
-            OutlinedTextField(
+            LeaflineTextField(
                 value = query,
                 onValueChange = onQueryChange,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Padding.screen, vertical = 4.dp)
-                    .semantics { contentDescription = "Search title or author" },
-                placeholder = { Text("Search title or author") },
-                singleLine = true,
+                placeholder = "Search title or author",
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
                 trailingIcon = {
                     IconButton(
                         onClick = onCloseSearch
                     ) {
                         Icon(Icons.Default.Close, contentDescription = "Close search")
                     }
-                }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Padding.screen, vertical = 4.dp)
+                    .semantics { contentDescription = "Search title or author" }
             )
         }
 

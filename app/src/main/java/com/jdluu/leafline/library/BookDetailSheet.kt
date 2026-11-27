@@ -43,7 +43,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -70,6 +69,7 @@ import com.jdluu.leafline.hardcover.HardcoverTrackingDecision
 import com.jdluu.leafline.library.data.Collection
 import com.jdluu.leafline.library.data.ReadingAggregate
 import com.jdluu.leafline.sync.ReadingProgressMath
+import com.jdluu.leafline.theme.LeaflineTextField
 import com.jdluu.leafline.theme.Spacing
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -469,11 +469,11 @@ internal fun BookDetailSheet(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                OutlinedTextField(
+                LeaflineTextField(
                     value = newTagInput,
                     onValueChange = { newTagInput = it },
-                    placeholder = { Text("Add a tag…") },
-                    singleLine = true,
+                    placeholder = "Add a tag…",
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(Modifier.width(Spacing.xs))
@@ -667,54 +667,46 @@ private fun EditBookMetadataDialog(
                         )
                     }
                 }
-                OutlinedTextField(
+                LeaflineTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Title *") },
-                    singleLine = true,
-                    isError = title.isBlank(),
-                    modifier = Modifier.fillMaxWidth()
+                    label = "Title *",
+                    isError = title.isBlank()
                 )
-                OutlinedTextField(
+                LeaflineTextField(
                     value = authors,
                     onValueChange = { authors = it },
-                    label = { Text("Authors (comma-separated)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    label = "Authors (comma-separated)"
                 )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
                 ) {
-                    OutlinedTextField(
+                    LeaflineTextField(
                         value = series,
                         onValueChange = { series = it },
-                        label = { Text("Series (optional)") },
-                        singleLine = true,
+                        label = "Series (optional)",
                         modifier = Modifier.weight(1f)
                     )
-                    OutlinedTextField(
+                    LeaflineTextField(
                         value = seriesIndex,
                         onValueChange = { seriesIndex = it },
-                        label = { Text("Volume #") },
-                        singleLine = true,
-                        modifier = Modifier.width(100.dp)
+                        label = "Volume #",
+                        modifier = Modifier.weight(0.45f)
                     )
                 }
-                OutlinedTextField(
+                LeaflineTextField(
                     value = publisher,
                     onValueChange = { publisher = it },
-                    label = { Text("Publisher (optional)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    label = "Publisher (optional)"
                 )
-                OutlinedTextField(
+                LeaflineTextField(
                     value = description,
                     onValueChange = { description = it },
-                    label = { Text("Description (optional)") },
+                    label = "Description (optional)",
+                    singleLine = false,
                     minLines = 3,
-                    maxLines = 6,
-                    modifier = Modifier.fillMaxWidth()
+                    maxLines = 6
                 )
             }
         },

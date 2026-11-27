@@ -28,7 +28,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -45,10 +44,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.jdluu.leafline.LibraryViewModel
 import com.jdluu.leafline.library.data.ReadingAggregate
+import com.jdluu.leafline.theme.LeaflineTextField
 import com.jdluu.leafline.theme.Spacing
 import java.time.LocalDate
 
@@ -487,13 +488,12 @@ private fun EditReadingGoalsDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                OutlinedTextField(
+                LeaflineTextField(
                     value = dailyMinutesText,
                     onValueChange = { dailyMinutesText = it.filter { ch -> ch.isDigit() } },
-                    label = { Text("Daily target (minutes)") },
-                    singleLine = true,
-                    isError = parsedDailyMinutes == null || parsedDailyMinutes <= 0,
-                    modifier = Modifier.fillMaxWidth()
+                    label = "Daily target (minutes)",
+                    keyboardType = KeyboardType.Number,
+                    isError = parsedDailyMinutes == null || parsedDailyMinutes <= 0
                 )
 
                 FlowRow(
@@ -513,13 +513,12 @@ private fun EditReadingGoalsDialog(
 
                 Spacer(Modifier.height(Spacing.xs))
 
-                OutlinedTextField(
+                LeaflineTextField(
                     value = booksTargetText,
                     onValueChange = { booksTargetText = it.filter { ch -> ch.isDigit() } },
-                    label = { Text("Books target") },
-                    singleLine = true,
-                    isError = parsedBooksTarget == null || parsedBooksTarget <= 0,
-                    modifier = Modifier.fillMaxWidth()
+                    label = "Books target",
+                    keyboardType = KeyboardType.Number,
+                    isError = parsedBooksTarget == null || parsedBooksTarget <= 0
                 )
 
                 FlowRow(
