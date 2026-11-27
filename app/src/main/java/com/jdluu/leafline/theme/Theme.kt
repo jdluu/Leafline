@@ -3,6 +3,7 @@ package com.jdluu.leafline.theme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.darkColorScheme
 
@@ -206,10 +207,13 @@ fun LeaflineTheme(
     darkSystem: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    MaterialTheme(
-        colorScheme = themeScheme(mode, darkSystem),
-        typography = LeaflineTypography,
-        shapes = LeaflineShapes,
-        content = content
-    )
+    val reduceMotion = observeReduceMotion()
+    CompositionLocalProvider(LocalReduceMotion provides reduceMotion) {
+        MaterialTheme(
+            colorScheme = themeScheme(mode, darkSystem),
+            typography = LeaflineTypography,
+            shapes = LeaflineShapes,
+            content = content
+        )
+    }
 }

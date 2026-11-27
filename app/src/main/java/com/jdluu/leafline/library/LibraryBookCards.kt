@@ -2,7 +2,6 @@ package com.jdluu.leafline.library
 
 import android.graphics.Bitmap
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -56,6 +55,8 @@ import com.jdluu.leafline.library.data.Collection
 import com.jdluu.leafline.sync.ReadingProgressMath
 import com.jdluu.leafline.theme.Padding
 import com.jdluu.leafline.theme.Spacing
+import com.jdluu.leafline.theme.leaflineTween
+import com.jdluu.leafline.theme.rememberReduceMotion
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -88,6 +89,7 @@ fun BookGridTile(
     onAddToCollection: (Long) -> Unit = {},
     onRemoveFromCollection: (Long) -> Unit = {}
 ) {
+    val reduceMotion = rememberReduceMotion()
     var showCollectionPicker by remember { mutableStateOf(false) }
     Card(
         border = if (selectionMode && isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
@@ -110,7 +112,7 @@ fun BookGridTile(
             ) {
                 Crossfade(
                     targetState = bitmap,
-                    animationSpec = tween(durationMillis = 200),
+                    animationSpec = leaflineTween(200, reduceMotion),
                     label = "gridCoverCrossfade"
                 ) { bmp ->
                     if (bmp != null) {
@@ -315,6 +317,7 @@ fun rememberCoverBitmap(path: String?): Bitmap? {
 
 @Composable
 internal fun ContinueReadingTile(book: LibraryBook, onClick: () -> Unit) {
+    val reduceMotion = rememberReduceMotion()
     val progressFraction = ReadingProgressMath.percentageFromLocator(book.lastLocatorJson)
         ?.div(ReadingProgressMath.FULL_PERCENT)
         ?.coerceIn(0.0, 1.0)
@@ -341,7 +344,7 @@ internal fun ContinueReadingTile(book: LibraryBook, onClick: () -> Unit) {
             ) {
                 Crossfade(
                     targetState = bitmap,
-                    animationSpec = tween(durationMillis = 200),
+                    animationSpec = leaflineTween(200, reduceMotion),
                     label = "continueReadingCoverCrossfade"
                 ) { bmp ->
                     if (bmp != null) {

@@ -77,6 +77,9 @@ import com.jdluu.leafline.reader.tts.TtsSleepState
 import com.jdluu.leafline.theme.DEFAULT_HIGHLIGHT_TINT
 import com.jdluu.leafline.theme.HighlightTint
 import com.jdluu.leafline.theme.Spacing
+import com.jdluu.leafline.theme.leaflineEnterTransition
+import com.jdluu.leafline.theme.leaflineExitTransition
+import com.jdluu.leafline.theme.rememberReduceMotion
 import kotlinx.coroutines.launch
 import org.readium.r2.shared.publication.Link
 
@@ -178,6 +181,7 @@ internal fun ReaderOverlay(
         onDismissToolbar()
     }
 
+    val reduceMotion = rememberReduceMotion()
     var sleepTimerSheetVisible by remember { mutableStateOf(false) }
     var selectedNavigationTab by remember { mutableStateOf(ReaderNavigationTab.CONTENTS) }
     val scope = rememberCoroutineScope()
@@ -235,8 +239,14 @@ internal fun ReaderOverlay(
         Box(modifier = Modifier.fillMaxSize()) {
             AnimatedVisibility(
                 visible = toolbarVisible,
-                enter = fadeIn(animationSpec = tween(durationMillis = 150)),
-                exit = fadeOut(animationSpec = tween(durationMillis = 150))
+                enter = leaflineEnterTransition(
+                    reduceMotion,
+                    fadeIn(animationSpec = tween(durationMillis = 150))
+                ),
+                exit = leaflineExitTransition(
+                    reduceMotion,
+                    fadeOut(animationSpec = tween(durationMillis = 150))
+                )
             ) {
                 // Tapping outside the toolbar dismisses it
                 Box(
@@ -253,14 +263,20 @@ internal fun ReaderOverlay(
 
             AnimatedVisibility(
                 visible = toolbarVisible,
-                enter = slideInVertically(
-                    initialOffsetY = { -it },
-                    animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing)
-                ) + fadeIn(animationSpec = tween(durationMillis = 200)),
-                exit = slideOutVertically(
-                    targetOffsetY = { -it },
-                    animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing)
-                ) + fadeOut(animationSpec = tween(durationMillis = 150)),
+                enter = leaflineEnterTransition(
+                    reduceMotion,
+                    slideInVertically(
+                        initialOffsetY = { -it },
+                        animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing)
+                    ) + fadeIn(animationSpec = tween(durationMillis = 200))
+                ),
+                exit = leaflineExitTransition(
+                    reduceMotion,
+                    slideOutVertically(
+                        targetOffsetY = { -it },
+                        animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing)
+                    ) + fadeOut(animationSpec = tween(durationMillis = 150))
+                ),
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.TopCenter)
@@ -420,8 +436,14 @@ internal fun ReaderOverlay(
 
             AnimatedVisibility(
                 visible = !toolbarVisible && currentSettings.showMinimalHud,
-                enter = fadeIn(animationSpec = tween(durationMillis = 200)),
-                exit = fadeOut(animationSpec = tween(durationMillis = 150)),
+                enter = leaflineEnterTransition(
+                    reduceMotion,
+                    fadeIn(animationSpec = tween(durationMillis = 200))
+                ),
+                exit = leaflineExitTransition(
+                    reduceMotion,
+                    fadeOut(animationSpec = tween(durationMillis = 150))
+                ),
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .navigationBarsPadding()
@@ -439,14 +461,20 @@ internal fun ReaderOverlay(
 
             AnimatedVisibility(
                 visible = toolbarVisible,
-                enter = slideInVertically(
-                    initialOffsetY = { it },
-                    animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing)
-                ) + fadeIn(animationSpec = tween(durationMillis = 200)),
-                exit = slideOutVertically(
-                    targetOffsetY = { it },
-                    animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing)
-                ) + fadeOut(animationSpec = tween(durationMillis = 150)),
+                enter = leaflineEnterTransition(
+                    reduceMotion,
+                    slideInVertically(
+                        initialOffsetY = { it },
+                        animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing)
+                    ) + fadeIn(animationSpec = tween(durationMillis = 200))
+                ),
+                exit = leaflineExitTransition(
+                    reduceMotion,
+                    slideOutVertically(
+                        targetOffsetY = { it },
+                        animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing)
+                    ) + fadeOut(animationSpec = tween(durationMillis = 150))
+                ),
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .navigationBarsPadding()

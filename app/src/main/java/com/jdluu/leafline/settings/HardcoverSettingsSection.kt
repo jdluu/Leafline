@@ -41,6 +41,9 @@ import com.jdluu.leafline.hardcover.HardcoverTrackingMode
 import com.jdluu.leafline.sync.SyncWorker
 import com.jdluu.leafline.theme.LeaflineTextField
 import com.jdluu.leafline.theme.Spacing
+import com.jdluu.leafline.theme.leaflineEnterTransition
+import com.jdluu.leafline.theme.leaflineExitTransition
+import com.jdluu.leafline.theme.rememberReduceMotion
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
@@ -60,6 +63,7 @@ internal fun HardcoverSection() {
     remember { context.appContainer.hardcoverConfigStore }
     var expanded by rememberSaveable { mutableStateOf(false) }
     val stored by HardcoverConfigStore.state.collectAsStateWithLifecycle()
+    val reduceMotion = rememberReduceMotion()
 
     Column(modifier = Modifier.fillMaxWidth()) {
         SettingsSectionHeading("Hardcover")
@@ -80,7 +84,11 @@ internal fun HardcoverSection() {
                 )
             }
         )
-        AnimatedVisibility(visible = expanded) {
+        AnimatedVisibility(
+            visible = expanded,
+            enter = leaflineEnterTransition(reduceMotion),
+            exit = leaflineExitTransition(reduceMotion)
+        ) {
             HardcoverForm(stored = stored)
         }
     }

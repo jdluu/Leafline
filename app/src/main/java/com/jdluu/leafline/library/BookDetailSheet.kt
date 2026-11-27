@@ -1,7 +1,6 @@
 package com.jdluu.leafline.library
 
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -71,6 +70,8 @@ import com.jdluu.leafline.library.data.ReadingAggregate
 import com.jdluu.leafline.sync.ReadingProgressMath
 import com.jdluu.leafline.theme.LeaflineTextField
 import com.jdluu.leafline.theme.Spacing
+import com.jdluu.leafline.theme.leaflineTween
+import com.jdluu.leafline.theme.rememberReduceMotion
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -174,6 +175,7 @@ internal fun BookDetailSheet(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Top
             ) {
+                val reduceMotion = rememberReduceMotion()
                 val bitmap = rememberCoverBitmap(book.coverPath)
                 Box(
                     modifier = Modifier
@@ -184,7 +186,7 @@ internal fun BookDetailSheet(
                 ) {
                     Crossfade(
                         targetState = bitmap,
-                        animationSpec = tween(durationMillis = 200),
+                        animationSpec = leaflineTween(200, reduceMotion),
                         label = "detailCoverCrossfade"
                     ) { bmp ->
                         if (bmp != null) {

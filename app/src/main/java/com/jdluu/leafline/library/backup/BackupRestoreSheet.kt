@@ -44,6 +44,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.jdluu.leafline.theme.Padding
 import com.jdluu.leafline.theme.Spacing
+import com.jdluu.leafline.theme.leaflineEnterTransition
+import com.jdluu.leafline.theme.leaflineExitTransition
+import com.jdluu.leafline.theme.rememberReduceMotion
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -105,6 +108,8 @@ fun BackupRestoreSheet(
         }
     }
 
+    val reduceMotion = rememberReduceMotion()
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         modifier = modifier
@@ -139,7 +144,11 @@ fun BackupRestoreSheet(
                 )
             }
 
-                AnimatedVisibility(visible = statusMessage != null) {
+                AnimatedVisibility(
+                    visible = statusMessage != null,
+                    enter = leaflineEnterTransition(reduceMotion),
+                    exit = leaflineExitTransition(reduceMotion)
+                ) {
                     statusMessage?.let { msg ->
                         Spacer(Modifier.height(Spacing.md))
                         Card(

@@ -2,7 +2,6 @@ package com.jdluu.leafline.library
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -51,6 +50,10 @@ import com.jdluu.leafline.LibraryViewModel
 import com.jdluu.leafline.library.data.ReadingAggregate
 import com.jdluu.leafline.theme.LeaflineTextField
 import com.jdluu.leafline.theme.Spacing
+import com.jdluu.leafline.theme.leaflineEnterTransition
+import com.jdluu.leafline.theme.leaflineExitTransition
+import com.jdluu.leafline.theme.leaflineTween
+import com.jdluu.leafline.theme.rememberReduceMotion
 import java.time.LocalDate
 
 @Composable
@@ -325,7 +328,13 @@ internal fun ReadingInsightsSheet(
 
             Spacer(Modifier.height(Spacing.md))
 
-            AnimatedVisibility(visible = selectedDayIndex != null) {
+            val reduceMotion = rememberReduceMotion()
+
+            AnimatedVisibility(
+                visible = selectedDayIndex != null,
+                enter = leaflineEnterTransition(reduceMotion),
+                exit = leaflineExitTransition(reduceMotion)
+            ) {
                 selectedDayIndex?.let { idx ->
                     if (idx in recentDailyStats.indices) {
                         val (selectedDate, selectedAgg) = recentDailyStats[idx]
@@ -378,7 +387,7 @@ internal fun ReadingInsightsSheet(
                     val targetRatio = (agg.activeMinutes.toFloat() / maxMinutes.toFloat()).coerceIn(0.06f, 1f)
                     val animatedRatio by animateFloatAsState(
                         targetValue = targetRatio,
-                        animationSpec = tween(durationMillis = 400),
+                        animationSpec = leaflineTween(400, reduceMotion),
                         label = "chartBarHeight"
                     )
                     val dayLabel = date.dayOfWeek.name.take(3)
