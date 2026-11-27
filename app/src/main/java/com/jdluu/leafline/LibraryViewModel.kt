@@ -585,6 +585,16 @@ class LibraryViewModel(
         readingGoalStore?.saveGoals(newGoals)
     }
 
+    fun reloadPreferences() {
+        sortStore?.let { store ->
+            val loadedSort = store.load()
+            _sort.value = loadedSort
+            _sortAscending.value = store.loadAscending(loadedSort.defaultAscending)
+        }
+        layoutStore?.let { _layout.value = it.load() }
+        readingGoalStore?.let { _readingGoals.value = it.loadGoals() }
+    }
+
     private companion object {
         const val MAX_CONCURRENT_COVER_EXTRACTIONS = 3
     }

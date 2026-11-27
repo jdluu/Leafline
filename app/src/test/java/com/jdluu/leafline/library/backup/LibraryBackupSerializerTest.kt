@@ -210,4 +210,106 @@ class LibraryBackupSerializerTest {
             identities.size
         )
     }
+
+    @Test
+    fun `version 4 preserves series koreaderHash and non-secret preferences`() {
+        val backup = LibraryBackup(
+            version = 4,
+            books = listOf(
+                BookBackup(
+                    stableId = "book-1",
+                    title = "Dune",
+                    authors = listOf("Frank Herbert"),
+                    series = "Dune Chronicles",
+                    seriesIndex = 1.5f,
+                    koreaderHash = "deadbeef1234"
+                )
+            ),
+            preferences = BackupPreferences(
+                appearanceMode = "DARK",
+                libraryLayout = "LIST",
+                librarySort = "TITLE",
+                librarySortAscending = false,
+                dailyGoalMinutes = 35,
+                booksGoalTarget = 24,
+                opdsFeeds = listOf(
+                    OpdsFeedBackup(
+                        id = "feed-1",
+                        title = "Local Calibre",
+                        url = "https://catalog.example.org/opds",
+                        description = "My catalog"
+                    )
+                ),
+                readerPreferences = ReaderPreferencesBackup(
+                    theme = "SEPIA",
+                    fontFamily = "Serif",
+                    fontSize = 1.3,
+                    lineHeight = 1.5,
+                    pageMargins = 1.0,
+                    publisherStyles = false,
+                    scroll = true,
+                    hyphens = false,
+                    columnCount = "TWO",
+                    tapZoneLeft = "NEXT_PAGE",
+                    tapZoneCenter = "TOGGLE_MENU",
+                    tapZoneRight = "PREVIOUS_PAGE",
+                    tapZoneLayout = "RIGHT_HANDED",
+                    pageTurnAnimation = "NONE",
+                    brightness = 0.6f,
+                    preSepiaTheme = "LIGHT",
+                    reduceMotion = true,
+                    previewFootnotes = false,
+                    keepScreenOn = false,
+                    orientation = "PORTRAIT",
+                    showMinimalHud = true,
+                    minimalHudMode = "TIME_REMAINING",
+                    hapticFeedback = true,
+                    volumeKeyNavigation = false,
+                    invertVolumeKeys = true
+                )
+            )
+        )
+
+        val json = LibraryBackupSerializer.serialize(backup)
+        val restored = LibraryBackupSerializer.deserialize(json)
+
+        assertEquals(4, restored.version)
+        val book = restored.books.single()
+        assertEquals("Dune Chronicles", book.series)
+        assertEquals(1.5f, book.seriesIndex!!, 0.001f)
+        assertEquals("deadbeef1234", book.koreaderHash)
+
+        val prefs = restored.preferences!!
+        assertEquals("DARK", prefs.appearanceMode)
+        assertEquals("LIST", prefs.libraryLayout)
+        assertEquals("TITLE", prefs.librarySort)
+        assertEquals(false, prefs.librarySortAscending)
+        assertEquals(35, prefs.dailyGoalMinutes)
+        assertEquals(24, prefs.booksGoalTarget)
+        assertEquals(1, prefs.opdsFeeds.size)
+        assertEquals("https://catalog.example.org/opds", prefs.opdsFeeds.single().url)
+
+        val reader = prefs.readerPreferences!!
+        assertEquals("SEPIA", reader.theme)
+        assertEquals("Serif", reader.fontFamily)
+        assertEquals(1.3, reader.fontSize!!, 0.001)
+        assertEquals("RIGHT_HANDED", reader.tapZoneLayout)
+        assertEquals("TIME_REMAINING", reader.minimalHudMode)
+        assertEquals(true, reader.invertVolumeKeys)
+    }
+
+    @Test
+    fun `version 3 file without preferences deserializes cleanly with null preferences`() {
+        val v3 = """
+            {"version":3,"exportedAt":1700000000000,"appVersion":"0.4.20",
+             "books":[{"stableId":"b","title":"T","authors":[]}],
+             "collections":[],"bookmarks":[],"annotations":[]}
+        """.trimIndent()
+
+        val restored = LibraryBackupSerializer.deserialize(v3)
+        assertEquals(3, restored.version)
+        assertEquals(null, restored.preferences)
+        assertEquals(null, restored.books.single().series)
+        assertEquals(null, restored.books.single().koreaderHash)
+    }
 }

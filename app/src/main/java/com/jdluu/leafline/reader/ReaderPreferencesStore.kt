@@ -32,6 +32,8 @@ class ReaderPreferencesStore(
     private val fontStore: com.jdluu.leafline.reader.font.FontStore? = null
 ) {
 
+    internal fun isCustomFont(name: String): Boolean = fontStore?.findByName(name) != null
+
     fun load(initialReduceMotion: Boolean = false): ReaderSettings {
         return ReaderSettings(
             epub = loadEpubPreferences(),

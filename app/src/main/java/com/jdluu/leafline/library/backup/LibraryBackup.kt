@@ -7,7 +7,10 @@ data class BookBackup(
     val tags: List<String> = emptyList(),
     val rating: Int? = null,
     val readingStatus: String? = null,
-    val lastLocatorJson: String? = null
+    val lastLocatorJson: String? = null,
+    val series: String? = null,
+    val seriesIndex: Float? = null,
+    val koreaderHash: String? = null
 )
 
 data class CollectionBackup(
@@ -54,8 +57,65 @@ data class AnnotationBackup(
     val createdAt: Long = System.currentTimeMillis()
 )
 
+/**
+ * Non-secret OPDS catalog metadata carried in a backup.
+ * Credentials (`username`, `password`, `authToken`) are deliberately excluded.
+ */
+data class OpdsFeedBackup(
+    val id: String,
+    val title: String,
+    val url: String,
+    val description: String? = null
+)
+
+/**
+ * Non-secret reader typography and interaction settings carried in a version 4 backup.
+ */
+data class ReaderPreferencesBackup(
+    val theme: String? = null,
+    val fontFamily: String? = null,
+    val fontSize: Double? = null,
+    val lineHeight: Double? = null,
+    val pageMargins: Double? = null,
+    val publisherStyles: Boolean? = null,
+    val scroll: Boolean? = null,
+    val hyphens: Boolean? = null,
+    val columnCount: String? = null,
+    val tapZoneLeft: String? = null,
+    val tapZoneCenter: String? = null,
+    val tapZoneRight: String? = null,
+    val tapZoneLayout: String? = null,
+    val pageTurnAnimation: String? = null,
+    val brightness: Float? = null,
+    val preSepiaTheme: String? = null,
+    val reduceMotion: Boolean? = null,
+    val previewFootnotes: Boolean? = null,
+    val keepScreenOn: Boolean? = null,
+    val orientation: String? = null,
+    val showMinimalHud: Boolean? = null,
+    val minimalHudMode: String? = null,
+    val hapticFeedback: Boolean? = null,
+    val volumeKeyNavigation: Boolean? = null,
+    val invertVolumeKeys: Boolean? = null
+)
+
+/**
+ * Non-secret app, library, catalog, and reader preferences carried in a version 4 backup.
+ * Sync credentials, OAuth tokens, and passwords are never included.
+ */
+data class BackupPreferences(
+    val appearanceMode: String? = null,
+    val libraryLayout: String? = null,
+    val librarySort: String? = null,
+    val librarySortAscending: Boolean? = null,
+    val dailyGoalMinutes: Int? = null,
+    val booksGoalTarget: Int? = null,
+    val opdsFeeds: List<OpdsFeedBackup> = emptyList(),
+    val readerPreferences: ReaderPreferencesBackup? = null
+)
+
 data class LibraryBackup(
-    val version: Int = 3,
+    val version: Int = 4,
     val exportedAt: Long = System.currentTimeMillis(),
     val appVersion: String = "1.0",
     val books: List<BookBackup> = emptyList(),
@@ -73,7 +133,12 @@ data class LibraryBackup(
      * Reading sessions, so statistics survive a move between devices. Added in version
      * 3; a version 1 or 2 file has none and restores as before.
      */
-    val readingSessions: List<ReadingSessionBackup> = emptyList()
+    val readingSessions: List<ReadingSessionBackup> = emptyList(),
+    /**
+     * Non-secret app/library/reader preferences and catalog definitions. Added in version 4;
+     * earlier files leave local preferences untouched.
+     */
+    val preferences: BackupPreferences? = null
 )
 
 data class BackupRestoreSummary(
@@ -84,5 +149,7 @@ data class BackupRestoreSummary(
     val annotationsRestored: Int = 0,
     val hardcoverChoicesRestored: Int = 0,
     val readingSessionsRestored: Int = 0,
-    val readingSessionsSkipped: Int = 0
+    val readingSessionsSkipped: Int = 0,
+    val preferencesRestored: Boolean = false,
+    val opdsFeedsRestored: Int = 0
 )

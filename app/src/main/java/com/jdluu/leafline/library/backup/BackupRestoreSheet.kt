@@ -58,6 +58,7 @@ import java.util.Locale
 fun BackupRestoreSheet(
     backupManager: LibraryBackupManager,
     onDismiss: () -> Unit,
+    onBackupRestored: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -99,6 +100,9 @@ fun BackupRestoreSheet(
                         backupManager.importBackup(inputStream)
                     }
                     restoreSummary = summary
+                    if (summary != null) {
+                        onBackupRestored()
+                    }
                     statusMessage = "Backup restored successfully."
                 } catch (e: Exception) {
                     statusMessage = "Restore failed: ${e.localizedMessage ?: "Unknown error"}"
@@ -185,11 +189,16 @@ fun BackupRestoreSheet(
                                             append("${summary.bookmarksRestored} ${plural(summary.bookmarksRestored, "bookmark")} • ")
                                             append("${summary.annotationsRestored} ${plural(summary.annotationsRestored, "highlight")}")
 
-                                            // Only mention sessions when the file
-                                            // actually carried some, so restoring an
-                                            // older backup does not show a bare "0 sessions".
+                                            // Only mention sessions/preferences when the file
+                                            // actually carried them, so older backups stay quiet.
                                             if (summary.readingSessionsRestored > 0) {
                                                 append(" • ${summary.readingSessionsRestored} ${plural(summary.readingSessionsRestored, "reading session")} restored")
+                                            }
+                                            if (summary.opdsFeedsRestored > 0) {
+                                                append(" • ${summary.opdsFeedsRestored} ${plural(summary.opdsFeedsRestored, "catalog")} added")
+                                            }
+                                            if (summary.preferencesRestored) {
+                                                append(" • settings restored")
                                             }
                                         },
                                         style = MaterialTheme.typography.bodySmall,
@@ -220,7 +229,7 @@ fun BackupRestoreSheet(
                     )
                     Spacer(Modifier.height(Spacing.xs))
                     Text(
-                        text = "Save collections, user tags, book ratings, reading progress, bookmarks, and notes to a portable JSON file.",
+                        text = "Save collections, tags, series, ratings, reading stats, bookmarks, notes, and app/reader settings (without passwords or tokens) to a portable JSON file.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

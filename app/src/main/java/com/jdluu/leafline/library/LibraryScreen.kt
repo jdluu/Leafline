@@ -64,6 +64,7 @@ fun LibraryScreen(
     onImportEpub: () -> Unit,
     onAddLibraryFolder: () -> Unit = {},
     onReselectFolder: (String) -> Unit = {},
+    onBackupRestored: () -> Unit = {},
     onOpenBook: (LibraryBook) -> Unit
 ) {
     val books by viewModel.sortedBooks.collectAsStateWithLifecycle()
@@ -453,7 +454,8 @@ fun LibraryScreen(
     if (showBackupSheet && backupManager != null) {
         BackupRestoreSheet(
             backupManager = backupManager,
-            onDismiss = { showBackupSheet = false }
+            onDismiss = { showBackupSheet = false },
+            onBackupRestored = onBackupRestored
         )
     }
 

@@ -533,6 +533,11 @@ fun LeaflineApp(activity: MainActivity) {
                                 pendingReplaceFolderUri = uri
                                 addLibraryFolderLauncher.launch(null)
                             },
+                            onBackupRestored = {
+                                appearance = appearanceStore.load()
+                                libraryViewModel.reloadPreferences()
+                                opdsViewModel.reloadFeeds()
+                            },
                             onOpenBook = openReaderOrAsk
                         )
                         LeaflineTab.Explore -> OpdsScreen(

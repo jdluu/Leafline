@@ -252,6 +252,16 @@ class OpdsViewModel(
         val normalizedTitle = book.title.trim().lowercase()
         return libraryBooks.value.any { it.title.trim().lowercase() == normalizedTitle }
     }
+
+    fun reloadFeeds() {
+        _feedSources.value = feedStore.loadFeeds()
+        if (_selectedSource.value == null) {
+            val first = _feedSources.value.firstOrNull()
+            if (first != null) {
+                selectSource(first)
+            }
+        }
+    }
 }
 
 class OpdsViewModelFactory(
