@@ -1,6 +1,7 @@
 package com.jdluu.leafline.library.data
 
 import kotlinx.coroutines.flow.Flow
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -20,6 +21,35 @@ interface ReadingSessionRepository {
         date: LocalDate,
         zoneId: ZoneId = ZoneId.systemDefault()
     ): ReadingAggregate
+
+    suspend fun getDailyAggregates(
+        startDate: LocalDate,
+        days: Int,
+        zoneId: ZoneId = ZoneId.systemDefault()
+    ): List<Pair<LocalDate, ReadingAggregate>> {
+        if (days <= 0) return emptyList()
+        val endDate = startDate.plusDays(days.toLong())
+        val startEpoch = startDate.atStartOfDay(zoneId).toInstant().toEpochMilli()
+        val endEpoch = endDate.atStartOfDay(zoneId).toInstant().toEpochMilli()
+        val byDate = getSessionsInTimeRange(startEpoch, endEpoch)
+            .groupBy { Instant.ofEpochMilli(it.startTimeEpochMillis).atZone(zoneId).toLocalDate() }
+        return (0 until days).map { offset ->
+            val date = startDate.plusDays(offset.toLong())
+            val sessions = byDate[date].orEmpty()
+            if (sessions.isEmpty()) {
+                date to ReadingAggregate.EMPTY
+            } else {
+                val totalDuration = sessions.sumOf { it.activeDurationMillis }
+                date to ReadingAggregate(
+                    sessionCount = sessions.size,
+                    activeDurationMillis = totalDuration,
+                    activeMinutes = totalDuration / 60_000L,
+                    booksOpened = sessions.mapTo(HashSet()) { it.bookId }.size
+                )
+            }
+        }
+    }
+
     suspend fun getWeeklyAggregate(
         date: LocalDate,
         zoneId: ZoneId = ZoneId.systemDefault()

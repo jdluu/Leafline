@@ -7,6 +7,11 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 
+data class CollectionBookCount(
+    val collectionId: Long,
+    val count: Int
+)
+
 @Dao
 interface CollectionDao {
 
@@ -51,11 +56,26 @@ interface CollectionDao {
     @Query("SELECT * FROM collections WHERE id IN (SELECT collectionId FROM book_collection_cross_ref WHERE bookStableId = :bookStableId)")
     suspend fun getCollectionsForBook(bookStableId: String): List<CollectionEntity>
 
+    @Query(
+        "SELECT c.* FROM collections c " +
+            "INNER JOIN book_collection_cross_ref bcc ON c.id = bcc.collectionId " +
+            "WHERE bcc.bookStableId = :bookStableId " +
+            "ORDER BY c.name ASC"
+    )
+    fun observeCollectionsForBook(bookStableId: String): Flow<List<CollectionEntity>>
+
     @Query("SELECT bookStableId FROM book_collection_cross_ref WHERE collectionId = :collectionId")
     fun getBookIdsForCollection(collectionId: Long): Flow<List<String>>
 
     @Query("SELECT COUNT(*) FROM book_collection_cross_ref WHERE collectionId = :collectionId")
     fun getBookCountForCollection(collectionId: Long): Flow<Int>
+
+    @Query(
+        "SELECT c.id AS collectionId, COUNT(bcc.bookStableId) AS count FROM collections c " +
+            "LEFT JOIN book_collection_cross_ref bcc ON c.id = bcc.collectionId " +
+            "GROUP BY c.id"
+    )
+    fun observeCollectionBookCounts(): Flow<List<CollectionBookCount>>
 
     @Query("SELECT DISTINCT c.id, c.name, c.createdAtEpochMillis FROM collections c " +
         "INNER JOIN book_collection_cross_ref bcc ON c.id = bcc.collectionId " +

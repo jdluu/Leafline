@@ -14,11 +14,14 @@ import com.jdluu.leafline.library.ProgressFilter
 import com.jdluu.leafline.library.cover.CoverLoader
 import com.jdluu.leafline.library.data.Collection
 import com.jdluu.leafline.library.data.LibraryRepository
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,8 +31,11 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import com.jdluu.leafline.library.data.ReadingAggregate
 import com.jdluu.leafline.library.data.ReadingSessionRepository
 import com.jdluu.leafline.library.ReadingGoalStore
@@ -43,10 +49,18 @@ class LibraryViewModel(
     private val readingSessionRepository: ReadingSessionRepository? = null,
     private val layoutStore: LibraryLayoutStore? = null,
     private val readingGoalStore: ReadingGoalStore? = null,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val onBooksDeleted: suspend (deleted: List<LibraryBook>, remaining: List<LibraryBook>) -> Unit = { _, _ -> }
 ) : ViewModel() {
 
-    val books: StateFlow<List<LibraryBook>> = repository.getAllBooks()
+    private val sharedAllBooks: SharedFlow<List<LibraryBook>> = repository.getAllBooks()
+        .shareIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            replay = 1
+        )
+
+    val books: StateFlow<List<LibraryBook>> = sharedAllBooks
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -61,7 +75,7 @@ class LibraryViewModel(
      * shows a loading surface while this is false and only presents the
      * empty state after the store has actually been read.
      */
-    val isLibraryLoaded: StateFlow<Boolean> = repository.getAllBooks()
+    val isLibraryLoaded: StateFlow<Boolean> = sharedAllBooks
         .map { true }
         .stateIn(
             scope = viewModelScope,
@@ -101,7 +115,7 @@ class LibraryViewModel(
     private val searchedBooks: Flow<List<LibraryBook>> = _query
         .debounce { query -> if (query.isBlank()) 0L else 200L }
         .flatMapLatest { query ->
-            if (query.isBlank()) repository.getAllBooks() else repository.searchBooks(query.trim())
+            if (query.isBlank()) sharedAllBooks else repository.searchBooks(query.trim())
         }
 
     /** Collections available in the library. */
@@ -113,19 +127,7 @@ class LibraryViewModel(
         )
 
     /** Map of collection ID to book count in that collection. */
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val collectionCounts: StateFlow<Map<Long, Int>> = repository.getAllCollections()
-        .flatMapLatest { list ->
-            if (list.isEmpty()) {
-                flowOf(emptyMap())
-            } else {
-                combine(list.map { col ->
-                    repository.observeBookIdsForCollection(col.id).map { col.id to it.size }
-                }) { pairs ->
-                    pairs.toMap()
-                }
-            }
-        }
+    val collectionCounts: StateFlow<Map<Long, Int>> = repository.observeCollectionCounts()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -157,7 +159,7 @@ class LibraryViewModel(
     val readingStatusFilter: StateFlow<ReadingStatus?> = _readingStatusFilter.asStateFlow()
 
     /** All distinct tags currently in the library, sorted alphabetically. */
-    val allTags: StateFlow<List<String>> = repository.getAllBooks()
+    val allTags: StateFlow<List<String>> = sharedAllBooks
         .map { list ->
             list.flatMap { it.tags }
                 .map { it.trim() }
@@ -172,7 +174,7 @@ class LibraryViewModel(
         )
 
     /** Map of lowercase tag name to count of books bearing that tag. */
-    val tagCounts: StateFlow<Map<String, Int>> = repository.getAllBooks()
+    val tagCounts: StateFlow<Map<String, Int>> = sharedAllBooks
         .map { list ->
             val counts = mutableMapOf<String, Int>()
             list.forEach { book ->
@@ -257,20 +259,30 @@ class LibraryViewModel(
             initialValue = emptyList()
         )
 
+    private val coverExtractionSemaphore = Semaphore(MAX_CONCURRENT_COVER_EXTRACTIONS)
+
     init {
-        // Cover loading on IO dispatcher to prevent main thread blocking
-        viewModelScope.launch(Dispatchers.IO) {
-            books.collect { list ->
-                for (book in list) {
-                    if (book.coverPath != null) continue
-                    if (!attemptedCoverIds.add(book.stableId)) continue
-                    val path = try {
-                        coverLoader?.loadCoverPath(book)
-                    } catch (e: Exception) {
-                        null
-                    }
-                    if (path != null) {
-                        repository.setCoverPath(book.stableId, path)
+        val loader = coverLoader
+        if (loader != null) {
+            // Cover loading on IO dispatcher to prevent main thread blocking
+            viewModelScope.launch(ioDispatcher) {
+                sharedAllBooks.collect { list ->
+                    val pending = list.filter { it.coverPath == null && attemptedCoverIds.add(it.stableId) }
+                    for (book in pending) {
+                        launch {
+                            coverExtractionSemaphore.withPermit {
+                                val path = try {
+                                    loader.loadCoverPath(book)
+                                } catch (e: CancellationException) {
+                                    throw e
+                                } catch (e: Exception) {
+                                    null
+                                }
+                                if (path != null) {
+                                    repository.setCoverPath(book.stableId, path)
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -551,14 +563,9 @@ class LibraryViewModel(
 
     suspend fun getRecentDailyAggregates(days: Int = 7): List<Pair<LocalDate, ReadingAggregate>> {
         val repo = readingSessionRepository ?: return emptyList()
-        val today = LocalDate.now()
-        val result = mutableListOf<Pair<LocalDate, ReadingAggregate>>()
-        for (i in (days - 1) downTo 0) {
-            val date = today.minusDays(i.toLong())
-            val aggregate = repo.getDailyAggregate(date)
-            result.add(date to aggregate)
-        }
-        return result
+        if (days <= 0) return emptyList()
+        val startDate = LocalDate.now().minusDays((days - 1).toLong())
+        return repo.getDailyAggregates(startDate = startDate, days = days)
     }
 
     fun updateReadingGoals(dailyMinutes: Int, booksTarget: Int) {
@@ -568,5 +575,9 @@ class LibraryViewModel(
         )
         _readingGoals.value = newGoals
         readingGoalStore?.saveGoals(newGoals)
+    }
+
+    private companion object {
+        const val MAX_CONCURRENT_COVER_EXTRACTIONS = 3
     }
 }
