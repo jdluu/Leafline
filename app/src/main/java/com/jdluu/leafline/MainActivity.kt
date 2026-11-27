@@ -8,13 +8,17 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.util.Log
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
@@ -22,20 +26,29 @@ import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -71,8 +84,13 @@ import com.jdluu.leafline.settings.HardcoverTrackingPrompt
 import com.jdluu.leafline.settings.SettingsTab
 import com.jdluu.leafline.theme.AppearanceStore
 import com.jdluu.leafline.theme.LeaflineTheme
+import com.jdluu.leafline.theme.LocalReduceMotion
+import com.jdluu.leafline.theme.Padding
+import com.jdluu.leafline.theme.Spacing
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -90,7 +108,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private var pendingToast: String? = null
+    private val snackbarMessages = Channel<String>(Channel.BUFFERED)
+    internal val snackbarFlow = snackbarMessages.receiveAsFlow()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -108,7 +127,6 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        handleToast()
         handleHardcoverRedirect(intent)
     }
 
@@ -127,7 +145,7 @@ class MainActivity : ComponentActivity() {
             val coordinator = applicationContext.appContainer.hardcoverOAuth
             try {
                 val config = coordinator.completeAuthorization(data.toString())
-                showToast(
+                showMessage(
                     if (config.userId != null) {
                         "Connected to Hardcover as user ${config.userId}. Turn on progress sync to start sending."
                     } else {
@@ -135,9 +153,9 @@ class MainActivity : ComponentActivity() {
                     }
                 )
             } catch (e: HardcoverOAuthException) {
-                showToast("Hardcover sign-in failed: ${e.message}")
+                showMessage("Hardcover sign-in failed: ${e.message}")
             } catch (e: Exception) {
-                showToast("Hardcover sign-in failed: ${e.message ?: "unknown error"}")
+                showMessage("Hardcover sign-in failed: ${e.message ?: "unknown error"}")
             } finally {
                 // Re-publish disk state into the reactive store so Settings updates without restart.
                 HardcoverConfigStore.config = applicationContext.appContainer.hardcoverConfigStore.load()
@@ -145,16 +163,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun handleToast() {
-        pendingToast?.let { message ->
-            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
-            pendingToast = null
-        }
-    }
-
-    fun showToast(message: String) {
-        pendingToast = message
-        handleToast()
+    fun showMessage(message: String) {
+        snackbarMessages.trySend(message)
     }
 
     fun saveLibraryFolder(uri: Uri, context: Context) {
@@ -164,17 +174,29 @@ class MainActivity : ComponentActivity() {
             Log.w(TAG, "Folder permission could not be persisted", e)
         }
         LibraryFolderStore.fromContext(context).add(uri.toString())
-        showToast("Library folder added")
+        showMessage("Library folder added")
     }
 
-    fun importLibraryFolder(uri: Uri, context: Context, onComplete: (List<LibraryBook>, Int) -> Unit) {
+    fun importLibraryFolder(
+        uri: Uri,
+        context: Context,
+        onProgress: (processed: Int, total: Int) -> Unit = { _, _ -> },
+        onComplete: (List<LibraryBook>, Int) -> Unit
+    ) {
         lifecycleScope.launch(Dispatchers.IO) {
             val occupied = seedOccupiedPaths(context)
             val imported = mutableListOf<LibraryBook>()
             var failures = 0
-            LocalEpubDocumentScanner.scanTree(contentResolver, uri).forEach { documentUri ->
+            val documents = LocalEpubDocumentScanner.scanTree(contentResolver, uri)
+            withContext(Dispatchers.Main) {
+                onProgress(0, documents.size)
+            }
+            documents.forEachIndexed { index, documentUri ->
                 val book = importEpub(documentUri, context, occupied) { failures++ }
                 if (book != null) imported += book
+                withContext(Dispatchers.Main) {
+                    onProgress(index + 1, documents.size)
+                }
             }
             withContext(Dispatchers.Main) {
                 onComplete(imported, failures)
@@ -216,13 +238,15 @@ class MainActivity : ComponentActivity() {
     suspend fun importMultipleEpub(
         contentUris: List<Uri>,
         context: Context,
+        onProgress: (processed: Int, total: Int) -> Unit = { _, _ -> },
         onResult: (LibraryBook) -> Unit,
         onError: (String) -> Unit
     ): Pair<Int, Int> {
         val occupied = withContext(Dispatchers.IO) { seedOccupiedPaths(context) }
         var successCount = 0
         var failureCount = 0
-        for (uri in contentUris) {
+        onProgress(0, contentUris.size)
+        contentUris.forEachIndexed { index, uri ->
             val result = importEpub(uri, context, occupied) { msg ->
                 Log.w(TAG, "Import failed for $uri: $msg")
                 failureCount++
@@ -232,6 +256,7 @@ class MainActivity : ComponentActivity() {
                 successCount++
                 onResult(result)
             }
+            onProgress(index + 1, contentUris.size)
         }
         return successCount to failureCount
     }
@@ -243,6 +268,12 @@ class MainActivity : ComponentActivity() {
             .associate { it.filePath to it.fileHash }
             .toMutableMap()
 }
+
+private data class ImportProgressState(
+    val label: String,
+    val processed: Int = 0,
+    val total: Int? = null
+)
 
 private fun getFileName(context: Context, uri: Uri): String? {
     var fileName: String? = null
@@ -321,27 +352,53 @@ fun LeaflineApp(activity: MainActivity) {
     val context = LocalContext.current
     val appearanceStore = remember { AppearanceStore.fromContext(context) }
     var appearance by remember { mutableStateOf(appearanceStore.load()) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    var importProgress by remember { mutableStateOf<ImportProgressState?>(null) }
+
+    LaunchedEffect(activity) {
+        activity.snackbarFlow.collect { message ->
+            snackbarHostState.showSnackbar(message)
+        }
+    }
 
     val importEpubLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenMultipleDocuments()
     ) { uris: List<Uri>? ->
         val uriList = uris?.takeIf { it.isNotEmpty() } ?: return@rememberLauncherForActivityResult
         activity.lifecycleScope.launch {
-            val imported = mutableListOf<LibraryBook>()
-            val (successCount, failureCount) = activity.importMultipleEpub(
-                contentUris = uriList,
-                context = context,
-                onResult = { imported.add(it) },
-                onError = { message -> activity.showToast(message) }
+            importProgress = ImportProgressState(
+                label = "Importing books…",
+                processed = 0,
+                total = uriList.size
             )
-            imported.forEach { libraryViewModel.addBook(it) }
-            if (successCount > 0) {
-                val msg = if (failureCount > 0) {
-                    "Imported $successCount book(s), $failureCount failed"
-                } else {
-                    "Imported $successCount book(s)"
+            try {
+                val imported = mutableListOf<LibraryBook>()
+                var lastError: String? = null
+                val (successCount, failureCount) = activity.importMultipleEpub(
+                    contentUris = uriList,
+                    context = context,
+                    onProgress = { processed, total ->
+                        importProgress = ImportProgressState(
+                            label = "Importing books…",
+                            processed = processed,
+                            total = total
+                        )
+                    },
+                    onResult = { imported.add(it) },
+                    onError = { message -> lastError = message }
+                )
+                imported.forEach { libraryViewModel.addBook(it) }
+                val msg = when {
+                    successCount > 0 && failureCount > 0 ->
+                        "Imported $successCount book(s), $failureCount failed"
+                    successCount > 0 -> "Imported $successCount book(s)"
+                    failureCount == 1 -> lastError ?: "Failed to import EPUB"
+                    failureCount > 1 -> "Failed to import $failureCount EPUB(s)"
+                    else -> null
                 }
-                activity.showToast(msg)
+                if (msg != null) activity.showMessage(msg)
+            } finally {
+                importProgress = null
             }
         }
     }
@@ -350,33 +407,6 @@ fun LeaflineApp(activity: MainActivity) {
 
     // A book the reader has not yet decided about, held while the prompt is open.
     var pendingTrackingBook by remember { mutableStateOf<LibraryBook?>(null) }
-
-    val launchReader: (LibraryBook) -> Unit = { book ->
-        activity.startActivity(ReaderActivity.newIntent(activity, book.filePath))
-        @Suppress("DEPRECATION")
-        activity.overridePendingTransition(android.R.anim.fade_in, 0)
-    }
-
-    /**
-     * Opens a book, asking first when Hardcover is on and the reader has chosen to be
-     * asked about this one. Any failure to read the setting opens the book rather than
-     * blocking reading behind a question about a background feature.
-     */
-    val openReaderOrAsk: (LibraryBook) -> Unit = { book ->
-        val shouldAsk = runCatching {
-            activity.appContainer.hardcoverConfigStore.load()?.enabled == true &&
-                activity.appContainer.hardcoverTracking.decide(
-                    book.stableId,
-                    BookIdentity.publicationOf(book.stableId)
-                ) == HardcoverTrackingDecision.Ask
-        }.getOrDefault(false)
-
-        if (shouldAsk) {
-            pendingTrackingBook = book
-        } else {
-            launchReader(book)
-        }
-    }
 
     val addLibraryFolderLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
@@ -390,14 +420,26 @@ fun LeaflineApp(activity: MainActivity) {
                 libraryFolderViewModel.remove(replaceUri)
             }
             activity.saveLibraryFolder(selectedUri, context)
-            activity.importLibraryFolder(selectedUri, context) { imported, failures ->
+            importProgress = ImportProgressState(label = "Scanning folder…")
+            activity.importLibraryFolder(
+                uri = selectedUri,
+                context = context,
+                onProgress = { processed, total ->
+                    importProgress = ImportProgressState(
+                        label = "Importing folder…",
+                        processed = processed,
+                        total = total.takeIf { it > 0 }
+                    )
+                }
+            ) { imported, failures ->
+                importProgress = null
                 imported.forEach(libraryViewModel::addBook)
                 val message = if (failures == 0) {
                     "Imported ${imported.size} EPUB(s)"
                 } else {
                     "Imported ${imported.size} EPUB(s), $failures failed"
                 }
-                activity.showToast(message)
+                activity.showMessage(message)
             }
         }
         // Reflect add, reselect, or a cancelled picker in the open folder sheet.
@@ -408,7 +450,36 @@ fun LeaflineApp(activity: MainActivity) {
             mode = appearance,
             darkSystem = isSystemInDarkTheme()
         ) {
+        val reduceMotion = LocalReduceMotion.current
+        val launchReader: (LibraryBook) -> Unit = { book ->
+            activity.startActivity(ReaderActivity.newIntent(activity, book.filePath))
+            @Suppress("DEPRECATION")
+            activity.overridePendingTransition(if (reduceMotion) 0 else android.R.anim.fade_in, 0)
+        }
+
+        /**
+         * Opens a book, asking first when Hardcover is on and the reader has chosen to be
+         * asked about this one. Any failure to read the setting opens the book rather than
+         * blocking reading behind a question about a background feature.
+         */
+        val openReaderOrAsk: (LibraryBook) -> Unit = { book ->
+            val shouldAsk = runCatching {
+                activity.appContainer.hardcoverConfigStore.load()?.enabled == true &&
+                    activity.appContainer.hardcoverTracking.decide(
+                        book.stableId,
+                        BookIdentity.publicationOf(book.stableId)
+                    ) == HardcoverTrackingDecision.Ask
+            }.getOrDefault(false)
+
+            if (shouldAsk) {
+                pendingTrackingBook = book
+            } else {
+                launchReader(book)
+            }
+        }
+
         Scaffold(
+            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
             bottomBar = {
                 NavigationBar {
                     LeaflineTab.entries.forEachIndexed { index, tab ->
@@ -431,59 +502,106 @@ fun LeaflineApp(activity: MainActivity) {
                 }
             }
         ) { padding ->
-            Surface(modifier = Modifier.fillMaxSize().padding(padding)) {
-                when (LeaflineTab.entries.getOrNull(selectedTab)) {
-                    LeaflineTab.Library -> LibraryScreen(
-                        viewModel = libraryViewModel,
-                        foldersViewModel = libraryFolderViewModel,
-                        folderRescanViewModel = folderRescanViewModel,
-                        backupManager = activity.appContainer.backupManager,
-                        notesExporter = activity.appContainer.notesExporter,
-                        onImportEpub = { importEpubLauncher.launch(arrayOf(MainActivity.EPUB_MIME_TYPE)) },
-                        onAddLibraryFolder = { addLibraryFolderLauncher.launch(null) },
-                        onReselectFolder = { uri ->
-                            pendingReplaceFolderUri = uri
-                            addLibraryFolderLauncher.launch(null)
-                        },
-                        onOpenBook = openReaderOrAsk
-                    )
-                    LeaflineTab.Explore -> OpdsScreen(
-                        viewModel = opdsViewModel,
-                        onOpenBook = openReaderOrAsk
-                    )
-                    LeaflineTab.Settings -> SettingsTab(
-                        appearance = appearance,
-                        onAppearanceChange = { selected ->
-                            appearance = selected
-                            appearanceStore.save(selected)
-                        },
-                        notesExporter = activity.appContainer.notesExporter
-                    )
-                    null -> {}
+            Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+                importProgress?.let { progress ->
+                    ImportProgressBanner(progress = progress)
                 }
+                Surface(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    when (LeaflineTab.entries.getOrNull(selectedTab)) {
+                        LeaflineTab.Library -> LibraryScreen(
+                            viewModel = libraryViewModel,
+                            foldersViewModel = libraryFolderViewModel,
+                            folderRescanViewModel = folderRescanViewModel,
+                            backupManager = activity.appContainer.backupManager,
+                            notesExporter = activity.appContainer.notesExporter,
+                            onImportEpub = { importEpubLauncher.launch(arrayOf(MainActivity.EPUB_MIME_TYPE)) },
+                            onAddLibraryFolder = { addLibraryFolderLauncher.launch(null) },
+                            onReselectFolder = { uri ->
+                                pendingReplaceFolderUri = uri
+                                addLibraryFolderLauncher.launch(null)
+                            },
+                            onOpenBook = openReaderOrAsk
+                        )
+                        LeaflineTab.Explore -> OpdsScreen(
+                            viewModel = opdsViewModel,
+                            onOpenBook = openReaderOrAsk
+                        )
+                        LeaflineTab.Settings -> SettingsTab(
+                            appearance = appearance,
+                            onAppearanceChange = { selected ->
+                                appearance = selected
+                                appearanceStore.save(selected)
+                            },
+                            notesExporter = activity.appContainer.notesExporter
+                        )
+                        null -> {}
+                    }
 
-                pendingTrackingBook?.let { book ->
-                    HardcoverTrackingPrompt(
-                        onAnswer = { tracked ->
-                            activity.appContainer.hardcoverTracking.remember(
-                                book.stableId,
-                                if (tracked) {
-                                    HardcoverBookPreference.TRACK
-                                } else {
-                                    HardcoverBookPreference.IGNORE
-                                }
-                            )
-                            pendingTrackingBook = null
-                            launchReader(book)
-                        },
-                        onDismiss = {
-                            // Dismissing is not an answer: nothing is remembered and
-                            // the book opens, so the question can be asked again.
-                            pendingTrackingBook = null
-                            launchReader(book)
-                        }
-                    )
+                    pendingTrackingBook?.let { book ->
+                        HardcoverTrackingPrompt(
+                            onAnswer = { tracked ->
+                                activity.appContainer.hardcoverTracking.remember(
+                                    book.stableId,
+                                    if (tracked) {
+                                        HardcoverBookPreference.TRACK
+                                    } else {
+                                        HardcoverBookPreference.IGNORE
+                                    }
+                                )
+                                pendingTrackingBook = null
+                                launchReader(book)
+                            },
+                            onDismiss = {
+                                // Dismissing is not an answer: nothing is remembered and
+                                // the book opens, so the question can be asked again.
+                                pendingTrackingBook = null
+                                launchReader(book)
+                            }
+                        )
+                    }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ImportProgressBanner(progress: ImportProgressState) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics { liveRegion = LiveRegionMode.Polite }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Padding.screen, vertical = Spacing.xs)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (progress.total != null && progress.total > 0) {
+                        "${progress.label} (${progress.processed} of ${progress.total})"
+                    } else {
+                        progress.label
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            Spacer(modifier = Modifier.height(Spacing.xs))
+            val total = progress.total
+            if (total != null && total > 0) {
+                LinearProgressIndicator(
+                    progress = { (progress.processed.toFloat() / total.toFloat()).coerceIn(0f, 1f) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
         }
     }
