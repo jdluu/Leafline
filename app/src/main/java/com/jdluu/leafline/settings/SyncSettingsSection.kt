@@ -53,6 +53,9 @@ import com.jdluu.leafline.theme.FormPanel
 import com.jdluu.leafline.theme.IconSize
 import com.jdluu.leafline.theme.LeaflineTextField
 import com.jdluu.leafline.theme.Spacing
+import com.jdluu.leafline.theme.leaflineEnterTransition
+import com.jdluu.leafline.theme.leaflineExitTransition
+import com.jdluu.leafline.theme.rememberReduceMotion
 import kotlinx.coroutines.launch
 
 /** Outcome of a save or connection test, shown beside an icon so it never relies on colour. */
@@ -66,6 +69,7 @@ internal fun SyncSection() {
     remember { context.appContainer.koreaderSyncConfigStore }
     var expanded by rememberSaveable { mutableStateOf(false) }
     val stored by KoreaderSyncConfigStore.state.collectAsStateWithLifecycle()
+    val reduceMotion = rememberReduceMotion()
 
     Column(modifier = Modifier.fillMaxWidth()) {
         SettingsSectionHeading("Progress sync")
@@ -85,7 +89,11 @@ internal fun SyncSection() {
                 )
             }
         )
-        AnimatedVisibility(visible = expanded) {
+        AnimatedVisibility(
+            visible = expanded,
+            enter = leaflineEnterTransition(reduceMotion),
+            exit = leaflineExitTransition(reduceMotion)
+        ) {
             KoreaderSyncForm(stored = stored)
         }
     }

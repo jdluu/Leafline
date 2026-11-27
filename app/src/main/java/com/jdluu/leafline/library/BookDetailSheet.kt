@@ -1,7 +1,6 @@
 package com.jdluu.leafline.library
 
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -43,7 +42,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -70,7 +68,10 @@ import com.jdluu.leafline.hardcover.HardcoverTrackingDecision
 import com.jdluu.leafline.library.data.Collection
 import com.jdluu.leafline.library.data.ReadingAggregate
 import com.jdluu.leafline.sync.ReadingProgressMath
+import com.jdluu.leafline.theme.LeaflineTextField
 import com.jdluu.leafline.theme.Spacing
+import com.jdluu.leafline.theme.leaflineTween
+import com.jdluu.leafline.theme.rememberReduceMotion
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -174,6 +175,7 @@ internal fun BookDetailSheet(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Top
             ) {
+                val reduceMotion = rememberReduceMotion()
                 val bitmap = rememberCoverBitmap(book.coverPath)
                 Box(
                     modifier = Modifier
@@ -184,7 +186,7 @@ internal fun BookDetailSheet(
                 ) {
                     Crossfade(
                         targetState = bitmap,
-                        animationSpec = tween(durationMillis = 200),
+                        animationSpec = leaflineTween(200, reduceMotion),
                         label = "detailCoverCrossfade"
                     ) { bmp ->
                         if (bmp != null) {
@@ -267,8 +269,8 @@ internal fun BookDetailSheet(
             optimisticDescription?.takeIf { it.isNotBlank() }?.let { descriptionText ->
                 var descriptionExpanded by remember { mutableStateOf(false) }
                 Spacer(Modifier.height(Spacing.sm))
-                HorizontalDivider()
-                Spacer(Modifier.height(com.jdluu.leafline.theme.Padding.compact))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Spacer(Modifier.height(Spacing.sm))
                 Text("Description", style = MaterialTheme.typography.titleSmall)
                 Spacer(Modifier.height(Spacing.xs))
                 Text(
@@ -288,9 +290,9 @@ internal fun BookDetailSheet(
                 }
             }
 
-            Spacer(Modifier.height(20.dp))
-            HorizontalDivider()
-            Spacer(Modifier.height(com.jdluu.leafline.theme.Padding.compact))
+            Spacer(Modifier.height(Spacing.sm))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(Spacing.sm))
 
             // Metadata section
             Row(
@@ -306,7 +308,7 @@ internal fun BookDetailSheet(
                             contentDescription = null,
                             modifier = Modifier.size(16.dp) // touch-target-ok: button decorative icon
                         )
-                        Spacer(Modifier.width(4.dp))
+                        Spacer(Modifier.width(Spacing.xs))
                         Text("Edit")
                     }
                 }
@@ -337,8 +339,8 @@ internal fun BookDetailSheet(
             readingStats?.let { stats ->
                 if (stats.sessionCount > 0) {
                     Spacer(Modifier.height(Spacing.sm))
-                    HorizontalDivider()
-                    Spacer(Modifier.height(com.jdluu.leafline.theme.Padding.compact))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Spacer(Modifier.height(Spacing.sm))
                     Text("Reading activity", style = MaterialTheme.typography.titleSmall)
                     Spacer(Modifier.height(Spacing.xs))
                     MetadataRow("Time read", formatReadingDuration(stats.activeDurationMillis))
@@ -349,8 +351,8 @@ internal fun BookDetailSheet(
             }
 
             Spacer(Modifier.height(Spacing.sm))
-            HorizontalDivider()
-            Spacer(Modifier.height(com.jdluu.leafline.theme.Padding.compact))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(Spacing.sm))
 
             // File info section
             Text("File info", style = MaterialTheme.typography.titleSmall)
@@ -360,8 +362,8 @@ internal fun BookDetailSheet(
             book.koreaderHash?.let { MetadataRow("KOReader hash", it.take(12) + "…") }
 
             Spacer(Modifier.height(Spacing.sm))
-            HorizontalDivider()
-            Spacer(Modifier.height(com.jdluu.leafline.theme.Padding.compact))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(Spacing.sm))
 
             // Actions section
             Text("Actions", style = MaterialTheme.typography.titleSmall)
@@ -369,9 +371,12 @@ internal fun BookDetailSheet(
 
             // Reading status buttons
             Text("Mark as:", style = MaterialTheme.typography.labelMedium)
-            Row(
-                modifier = Modifier.padding(top = Spacing.xs),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+            FlowRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = Spacing.xs),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs)
             ) {
                 ReadingStatus.entries.forEach { status ->
                     FilterChip(
@@ -469,11 +474,11 @@ internal fun BookDetailSheet(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                OutlinedTextField(
+                LeaflineTextField(
                     value = newTagInput,
                     onValueChange = { newTagInput = it },
-                    placeholder = { Text("Add a tag…") },
-                    singleLine = true,
+                    placeholder = "Add a tag…",
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(Modifier.width(Spacing.xs))
@@ -565,7 +570,7 @@ internal fun BookDetailSheet(
                 }
             }
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(Spacing.md))
 
             // Delete button
             TextButton(
@@ -573,7 +578,7 @@ internal fun BookDetailSheet(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
-                Spacer(Modifier.width(4.dp))
+                Spacer(Modifier.width(Spacing.xs))
                 Text("Delete from library", color = MaterialTheme.colorScheme.error)
             }
 
@@ -667,54 +672,46 @@ private fun EditBookMetadataDialog(
                         )
                     }
                 }
-                OutlinedTextField(
+                LeaflineTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Title *") },
-                    singleLine = true,
-                    isError = title.isBlank(),
-                    modifier = Modifier.fillMaxWidth()
+                    label = "Title *",
+                    isError = title.isBlank()
                 )
-                OutlinedTextField(
+                LeaflineTextField(
                     value = authors,
                     onValueChange = { authors = it },
-                    label = { Text("Authors (comma-separated)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    label = "Authors (comma-separated)"
                 )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
                 ) {
-                    OutlinedTextField(
+                    LeaflineTextField(
                         value = series,
                         onValueChange = { series = it },
-                        label = { Text("Series (optional)") },
-                        singleLine = true,
+                        label = "Series (optional)",
                         modifier = Modifier.weight(1f)
                     )
-                    OutlinedTextField(
+                    LeaflineTextField(
                         value = seriesIndex,
                         onValueChange = { seriesIndex = it },
-                        label = { Text("Volume #") },
-                        singleLine = true,
-                        modifier = Modifier.width(100.dp)
+                        label = "Volume #",
+                        modifier = Modifier.weight(0.45f)
                     )
                 }
-                OutlinedTextField(
+                LeaflineTextField(
                     value = publisher,
                     onValueChange = { publisher = it },
-                    label = { Text("Publisher (optional)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    label = "Publisher (optional)"
                 )
-                OutlinedTextField(
+                LeaflineTextField(
                     value = description,
                     onValueChange = { description = it },
-                    label = { Text("Description (optional)") },
+                    label = "Description (optional)",
+                    singleLine = false,
                     minLines = 3,
-                    maxLines = 6,
-                    modifier = Modifier.fillMaxWidth()
+                    maxLines = 6
                 )
             }
         },

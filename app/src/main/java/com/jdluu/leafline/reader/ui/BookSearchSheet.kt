@@ -20,7 +20,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -34,7 +33,6 @@ import androidx.compose.material3.InputChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -67,6 +65,7 @@ import com.jdluu.leafline.reader.search.BookSearchResult
 import com.jdluu.leafline.reader.search.BookSearchState
 import com.jdluu.leafline.reader.search.BookSearchStatus
 import com.jdluu.leafline.reader.search.SearchOptions
+import com.jdluu.leafline.theme.LeaflineTextField
 import com.jdluu.leafline.theme.Padding
 import com.jdluu.leafline.theme.Spacing
 import kotlinx.coroutines.delay
@@ -114,16 +113,22 @@ internal fun BookSearchSheet(
                 }
             }
 
-            OutlinedTextField(
+            LeaflineTextField(
                 value = query,
                 onValueChange = { query = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = Spacing.xs)
-                    .focusRequester(focusRequester)
-                    .semantics { contentDescription = "Search in book" },
-                singleLine = true,
-                placeholder = { Text("Find in this book") },
+                placeholder = "Find in this book",
+                imeAction = ImeAction.Search,
+                keyboardActions = KeyboardActions(
+                    onSearch = {
+                        keyboardController?.hide()
+                        val normalized = BookSearchQuery.normalize(query)
+                        if (normalized != null) {
+                            lastSubmittedQuery = normalized
+                            lastSubmittedOptions = options
+                            onSubmitSearch(normalized, options)
+                        }
+                    }
+                ),
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 trailingIcon = {
                     if (query.isNotEmpty()) {
@@ -136,18 +141,12 @@ internal fun BookSearchSheet(
                         }
                     }
                 },
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(
-                    onSearch = {
-                        keyboardController?.hide()
-                        val normalized = BookSearchQuery.normalize(query)
-                        if (normalized != null) {
-                            lastSubmittedQuery = normalized
-                            lastSubmittedOptions = options
-                            onSubmitSearch(normalized, options)
-                        }
-                    }
-                )
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = Spacing.xs)
+                    .focusRequester(focusRequester)
+                    .semantics { contentDescription = "Search in book" }
             )
             LaunchedEffect(Unit) { focusRequester.requestFocus() }
 

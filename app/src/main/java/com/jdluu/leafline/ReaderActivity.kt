@@ -16,7 +16,6 @@ import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.SnackbarDuration
@@ -88,6 +87,10 @@ import com.jdluu.leafline.theme.AppearanceStore
 import com.jdluu.leafline.theme.DEFAULT_HIGHLIGHT_TINT
 import com.jdluu.leafline.theme.HighlightTint
 import com.jdluu.leafline.theme.LeaflineTheme
+import com.jdluu.leafline.theme.leaflineTween
+import com.jdluu.leafline.theme.readAnimatorDurationScale
+import com.jdluu.leafline.theme.rememberReduceMotion
+import com.jdluu.leafline.theme.resolveReduceMotion
 import java.io.File
 import java.io.IOException
 import kotlin.math.roundToInt
@@ -744,7 +747,8 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         val container = findViewById<View>(R.id.navigator_container)
         val decorView = window.decorView
 
-        if (!animate || fromColor == targetColor) {
+        val reduceMotion = resolveReduceMotion(readAnimatorDurationScale(contentResolver))
+        if (!animate || reduceMotion || fromColor == targetColor) {
             decorView.setBackgroundColor(targetColor)
             container?.setBackgroundColor(targetColor)
             return
@@ -972,10 +976,11 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     mode = appearanceMode,
                     darkSystem = isSystemInDarkTheme()
                 ) {
+                    val reduceMotion = rememberReduceMotion()
                     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
                     Crossfade(
                         targetState = !uiState.isLoadingPublication && this@ReaderActivity::bookSearcher.isInitialized,
-                        animationSpec = tween(durationMillis = 300),
+                        animationSpec = leaflineTween(300, reduceMotion),
                         label = "reader_loading_crossfade"
                     ) { isReady ->
                         if (!isReady) {
@@ -983,7 +988,10 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                                 title = uiState.resolveLoadingTitle(currentBook?.title),
                                 onBack = {
                                     finish()
-                                    overridePendingTransition(0, android.R.anim.fade_out)
+                                    overridePendingTransition(
+                                        0,
+                                        if (reduceMotion) 0 else android.R.anim.fade_out
+                                    )
                                 }
                             )
                         } else {
@@ -1042,7 +1050,10 @@ class ReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                                 onDismissSyncConflict = { viewModel.setSyncConflict(null) },
                                 onBack = {
                                     finish()
-                                    overridePendingTransition(0, android.R.anim.fade_out)
+                                    overridePendingTransition(
+                                        0,
+                                        if (reduceMotion) 0 else android.R.anim.fade_out
+                                    )
                                 },
                                 onOpenToc = { scope.launch { drawerState.open() } },
                                 onOpenSettings = { viewModel.setSettingsSheetVisible(true) },

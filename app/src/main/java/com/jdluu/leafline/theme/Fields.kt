@@ -40,7 +40,11 @@ internal fun LeaflineTextField(
     trailingIcon: @Composable (() -> Unit)? = null,
     // Fields normally sit on a mist panel, where paper reads as an inset. On a paper
     // surface (a toolbar, say) callers pass the mist tone so the field stays visible.
-    containerColor: Color? = null
+    containerColor: Color? = null,
+    singleLine: Boolean = true,
+    minLines: Int = 1,
+    maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE,
+    leadingIcon: @Composable (() -> Unit)? = null
 ) {
     TextField(
         value = value,
@@ -48,13 +52,16 @@ internal fun LeaflineTextField(
         modifier = modifier.fillMaxWidth(),
         label = label?.let { { Text(it) } },
         placeholder = placeholder?.let { { Text(it) } },
-        singleLine = true,
+        singleLine = singleLine,
+        minLines = minLines,
+        maxLines = maxLines,
         shape = MaterialTheme.shapes.small,
         isError = isError,
         supportingText = supportingText?.let { { Text(it) } },
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = imeAction),
         keyboardActions = keyboardActions,
         visualTransformation = visualTransformation,
+        leadingIcon = leadingIcon,
         trailingIcon = trailingIcon,
         colors = TextFieldDefaults.colors(
             focusedContainerColor = containerColor ?: MaterialTheme.colorScheme.surface,

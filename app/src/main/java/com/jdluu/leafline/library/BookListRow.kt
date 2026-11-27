@@ -1,7 +1,6 @@
 package com.jdluu.leafline.library
 
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -46,6 +45,8 @@ import com.jdluu.leafline.library.data.Collection
 import com.jdluu.leafline.sync.ReadingProgressMath
 import com.jdluu.leafline.theme.Padding
 import com.jdluu.leafline.theme.Spacing
+import com.jdluu.leafline.theme.leaflineTween
+import com.jdluu.leafline.theme.rememberReduceMotion
 import kotlin.math.roundToInt
 
 /**
@@ -65,6 +66,7 @@ fun BookListRow(
     onRemoveFromCollection: (Long) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val reduceMotion = rememberReduceMotion()
     var showCollectionPicker by remember { mutableStateOf(false) }
     val percent = remember(book.lastLocatorJson) {
         ReadingProgressMath.percentageFromLocator(book.lastLocatorJson)?.roundToInt()
@@ -96,7 +98,7 @@ fun BookListRow(
             ) {
                 Crossfade(
                     targetState = bitmap,
-                    animationSpec = tween(durationMillis = 200),
+                    animationSpec = leaflineTween(200, reduceMotion),
                     label = "listCoverCrossfade"
                 ) { bmp ->
                     if (bmp != null) {

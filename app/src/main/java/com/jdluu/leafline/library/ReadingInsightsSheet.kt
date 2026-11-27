@@ -2,7 +2,6 @@ package com.jdluu.leafline.library
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -28,7 +27,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -45,11 +43,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.jdluu.leafline.LibraryViewModel
 import com.jdluu.leafline.library.data.ReadingAggregate
+import com.jdluu.leafline.theme.LeaflineTextField
 import com.jdluu.leafline.theme.Spacing
+import com.jdluu.leafline.theme.leaflineEnterTransition
+import com.jdluu.leafline.theme.leaflineExitTransition
+import com.jdluu.leafline.theme.leaflineTween
+import com.jdluu.leafline.theme.rememberReduceMotion
 import java.time.LocalDate
 
 @Composable
@@ -324,7 +328,13 @@ internal fun ReadingInsightsSheet(
 
             Spacer(Modifier.height(Spacing.md))
 
-            AnimatedVisibility(visible = selectedDayIndex != null) {
+            val reduceMotion = rememberReduceMotion()
+
+            AnimatedVisibility(
+                visible = selectedDayIndex != null,
+                enter = leaflineEnterTransition(reduceMotion),
+                exit = leaflineExitTransition(reduceMotion)
+            ) {
                 selectedDayIndex?.let { idx ->
                     if (idx in recentDailyStats.indices) {
                         val (selectedDate, selectedAgg) = recentDailyStats[idx]
@@ -377,7 +387,7 @@ internal fun ReadingInsightsSheet(
                     val targetRatio = (agg.activeMinutes.toFloat() / maxMinutes.toFloat()).coerceIn(0.06f, 1f)
                     val animatedRatio by animateFloatAsState(
                         targetValue = targetRatio,
-                        animationSpec = tween(durationMillis = 400),
+                        animationSpec = leaflineTween(400, reduceMotion),
                         label = "chartBarHeight"
                     )
                     val dayLabel = date.dayOfWeek.name.take(3)
@@ -487,13 +497,12 @@ private fun EditReadingGoalsDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                OutlinedTextField(
+                LeaflineTextField(
                     value = dailyMinutesText,
                     onValueChange = { dailyMinutesText = it.filter { ch -> ch.isDigit() } },
-                    label = { Text("Daily target (minutes)") },
-                    singleLine = true,
-                    isError = parsedDailyMinutes == null || parsedDailyMinutes <= 0,
-                    modifier = Modifier.fillMaxWidth()
+                    label = "Daily target (minutes)",
+                    keyboardType = KeyboardType.Number,
+                    isError = parsedDailyMinutes == null || parsedDailyMinutes <= 0
                 )
 
                 FlowRow(
@@ -513,13 +522,12 @@ private fun EditReadingGoalsDialog(
 
                 Spacer(Modifier.height(Spacing.xs))
 
-                OutlinedTextField(
+                LeaflineTextField(
                     value = booksTargetText,
                     onValueChange = { booksTargetText = it.filter { ch -> ch.isDigit() } },
-                    label = { Text("Books target") },
-                    singleLine = true,
-                    isError = parsedBooksTarget == null || parsedBooksTarget <= 0,
-                    modifier = Modifier.fillMaxWidth()
+                    label = "Books target",
+                    keyboardType = KeyboardType.Number,
+                    isError = parsedBooksTarget == null || parsedBooksTarget <= 0
                 )
 
                 FlowRow(

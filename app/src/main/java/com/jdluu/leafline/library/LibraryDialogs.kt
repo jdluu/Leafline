@@ -24,7 +24,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -37,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.jdluu.leafline.library.data.Collection
+import com.jdluu.leafline.theme.LeaflineTextField
 import com.jdluu.leafline.theme.Spacing
 
 @Composable
@@ -50,12 +50,10 @@ internal fun RenameCollectionDialog(
         onDismissRequest = onDismiss,
         title = { Text("Rename collection") },
         text = {
-            OutlinedTextField(
+            LeaflineTextField(
                 value = name,
                 onValueChange = onNameChange,
-                placeholder = { Text("Collection name") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                placeholder = "Collection name"
             )
         },
         confirmButton = {
@@ -78,12 +76,10 @@ internal fun CreateCollectionDialog(
         onDismissRequest = onDismiss,
         title = { Text("New collection") },
         text = {
-            OutlinedTextField(
+            LeaflineTextField(
                 value = name,
                 onValueChange = onNameChange,
-                placeholder = { Text("Collection name") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                placeholder = "Collection name"
             )
         },
         confirmButton = {
@@ -193,11 +189,10 @@ internal fun BatchTagDialog(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    OutlinedTextField(
+                    LeaflineTextField(
                         value = newTagInput,
                         onValueChange = { newTagInput = it.take(30) },
-                        placeholder = { Text("Add tag to all…") },
-                        singleLine = true,
+                        placeholder = "Add tag to all…",
                         modifier = Modifier.weight(1f)
                     )
                     Spacer(Modifier.width(Spacing.xs))

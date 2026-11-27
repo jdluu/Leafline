@@ -167,7 +167,7 @@ internal fun CollectionManagementSheet(
                                 )
                             }
                         }
-                        HorizontalDivider()
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     }
                 }
             }
@@ -340,7 +340,7 @@ internal fun LibraryFoldersSheet(
                                 )
                             }
                         }
-                        HorizontalDivider()
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     }
                 }
             }
@@ -538,7 +538,10 @@ internal fun LibrarySortSheet(
                     )
                 }
 
-                HorizontalDivider(modifier = Modifier.padding(vertical = Spacing.xs))
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = Spacing.xs),
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
 
                 Text(
                     "Progress filter",
