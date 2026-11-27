@@ -39,6 +39,7 @@ import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -82,7 +83,10 @@ internal fun BookmarkListSheet(
     onDeleteBookmark: (Bookmark) -> Unit,
     onDismiss: () -> Unit
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ) {
         Text(
             "Bookmarks",
             style = MaterialTheme.typography.titleMedium,
@@ -254,7 +258,10 @@ internal fun AnnotationListSheet(
         )
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ) {
         var searchQuery by remember { mutableStateOf("") }
         var selectedTint by remember { mutableStateOf<HighlightTint?>(null) }
 
@@ -499,7 +506,10 @@ internal fun HighlightTintPickerSheet(
     onDismiss: () -> Unit,
     onTintSelected: (HighlightTint) -> Unit
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ) {
         Column(modifier = Modifier.padding(Padding.screen)) {
             Text(
                 "Choose highlight color",
