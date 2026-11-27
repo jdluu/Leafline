@@ -17,7 +17,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         BookCollectionCrossRef::class,
         ReadingSessionEntity::class
     ],
-    version = 11,
+    version = 12,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -151,6 +151,23 @@ abstract class LeaflineDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_books_fileHash` " +
+                        "ON `books` (`fileHash`)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_books_lastReadAtEpochMillis` " +
+                        "ON `books` (`lastReadAtEpochMillis`)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_books_readingStatus` " +
+                        "ON `books` (`readingStatus`)"
+                )
+            }
+        }
+
         val ALL_MIGRATIONS = arrayOf(
             MIGRATION_1_2,
             MIGRATION_2_3,
@@ -161,7 +178,8 @@ abstract class LeaflineDatabase : RoomDatabase() {
             MIGRATION_7_8,
             MIGRATION_8_9,
             MIGRATION_9_10,
-            MIGRATION_10_11
+            MIGRATION_10_11,
+            MIGRATION_11_12
         )
 
         fun build(context: Context): LeaflineDatabase {
