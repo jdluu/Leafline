@@ -153,7 +153,9 @@ class AccessibilitySemanticsTest {
             val text = node.text
             val actions = node.actionList?.mapNotNull { it.label }
             if (desc != null || text != null || !actions.isNullOrEmpty()) {
-                nodes.add("class=${node.className}, text=$text, desc=$desc, actions=$actions")
+                val rect = android.graphics.Rect()
+                node.getBoundsInScreen(rect)
+                nodes.add("class=${node.className}, text=$text, desc=$desc, bounds=$rect, visible=${node.isVisibleToUser}, actions=$actions")
             }
             for (i in 0 until node.childCount) {
                 walk(node.getChild(i))
@@ -169,7 +171,7 @@ class AccessibilitySemanticsTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         context.startActivity(
             Intent(context, MainActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         )
         val libraryLoaded = waitForAny(
             timeout,
@@ -253,48 +255,84 @@ class AccessibilitySemanticsTest {
 
     @Test
     fun settingsScreen_koreaderSyncSwitch_hasSwitchRoleAndToggles() {
-        launchMainActivity()
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val app = context.applicationContext as LeaflineApplication
+        val previousConfig = app.appContainer.koreaderSyncConfigStore.load()
+        val testConfig = com.jdluu.leafline.sync.KoreaderSyncConfig(
+            serverUrl = "http://server.local:6061",
+            username = "",
+            password = "",
+            enabled = false
+        )
+        app.appContainer.koreaderSyncConfigStore.save(testConfig)
+        com.jdluu.leafline.sync.KoreaderSyncConfigStore.config = testConfig
+        try {
+            launchMainActivity()
 
-        val settingsTab = checkNotNull(waitForAny(timeout, By.text("Settings"), By.desc("Settings"))) {
-            "Settings tab should be visible in bottom navigation"
-        }
-        settingsTab.click()
-        uiDevice.waitForIdle()
-
-        assertTrue("Settings screen should display KOReader Sync",
-            uiDevice.wait(Until.hasObject(By.text("KOReader Sync")), 5000L))
-
-        // Scroll down until "Enable progress sync" is in view
-        var syncRow: UiObject2? = null
-        for (i in 0 until 5) {
-            syncRow = uiDevice.findObject(By.text("Enable progress sync"))
-            if (syncRow != null) break
-            uiDevice.swipe(
-                uiDevice.displayWidth / 2,
-                (uiDevice.displayHeight * 0.75).toInt(),
-                uiDevice.displayWidth / 2,
-                (uiDevice.displayHeight * 0.25).toInt(),
-                15
-            )
+            val settingsTab = checkNotNull(waitForAny(timeout, By.text("Settings"), By.desc("Settings"))) {
+                "Settings tab should be visible in bottom navigation"
+            }
+            settingsTab.click()
             uiDevice.waitForIdle()
+
+            assertTrue("Settings screen should display Progress sync",
+                uiDevice.wait(Until.hasObject(By.text("Progress sync")), 5000L))
+
+            // Scroll once before expanding so the expanded form opens in the visible viewport.
+            scrollSheetDownSmall()
+
+            // Expand the collapsible KOReader-compatible server form if needed
+            var syncRow = uiDevice.findObject(By.text("Sync in the background"))
+            if (syncRow == null) {
+                val serverRow = waitForAny(5000L, By.text("KOReader-compatible server"))
+                checkNotNull(serverRow) { "KOReader-compatible server row should exist. Dump:\n${dumpActiveWindow()}" }
+                serverRow.click()
+                SystemClock.sleep(500)
+                uiDevice.waitForIdle()
+                syncRow = waitForAny(3000L, By.text("Sync in the background"))
+            }
+
+            // Scroll down until "Sync in the background" is in view if still below the fold
+            for (i in 0 until 5) {
+                if (syncRow != null) break
+                scrollSheetDownSmall()
+                syncRow = waitForAny(1500L, By.text("Sync in the background"))
+            }
+            checkNotNull(syncRow) { "Sync in the background row should exist. Dump:\n${dumpActiveWindow()}" }
+
+            // The toggleable row container exposes checkable state
+            val switchContainer = syncRow.parent ?: syncRow
+            assertTrue("Progress sync row should be checkable", switchContainer.isCheckable)
+
+            val beforeState = switchContainer.isChecked
+            switchContainer.click()
+            uiDevice.waitForIdle()
+
+            val toggled = waitForAny(
+                3000L,
+                By.text("Sync in the background")
+            )?.let { row ->
+                val container = row.parent ?: row
+                if (container.isChecked == !beforeState) container else null
+            } ?: run {
+                SystemClock.sleep(300)
+                val row = checkNotNull(uiDevice.findObject(By.text("Sync in the background")))
+                row.parent ?: row
+            }
+            assertEquals("Switch state should invert after click", !beforeState, toggled.isChecked)
+
+            // Restore original state
+            toggled.click()
+            uiDevice.waitForIdle()
+        } finally {
+            com.jdluu.leafline.sync.KoreaderSyncConfigStore.config = previousConfig
+            if (previousConfig == null) {
+                app.appContainer.koreaderSyncConfigStore.clear()
+            } else {
+                app.appContainer.koreaderSyncConfigStore.save(previousConfig)
+            }
+            com.jdluu.leafline.sync.SyncWorker.cancel(context)
         }
-        checkNotNull(syncRow) { "Enable progress sync row should exist" }
-
-        // The toggleable row container exposes checkable state
-        val switchContainer = syncRow.parent ?: syncRow
-        assertTrue("KOReader sync row should be checkable", switchContainer.isCheckable)
-
-        val beforeState = switchContainer.isChecked
-        switchContainer.click()
-        uiDevice.waitForIdle()
-
-        val afterRow = checkNotNull(uiDevice.findObject(By.text("Enable progress sync")))
-        val afterContainer = afterRow.parent ?: afterRow
-        assertEquals("Switch state should invert after click", !beforeState, afterContainer.isChecked)
-
-        // Restore original state
-        afterContainer.click()
-        uiDevice.waitForIdle()
     }
 
     @Test

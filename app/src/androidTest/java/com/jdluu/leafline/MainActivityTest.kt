@@ -76,8 +76,8 @@ class MainActivityTest {
         assertTrue("Settings title should be visible after tapping Settings tab",
             uiDevice.wait(Until.hasObject(By.text("Settings")), 5000L))
         // Real Settings-screen content proves the tab switch rendered.
-        assertTrue("KOReader Sync section should be visible on Settings tab",
-            uiDevice.wait(Until.hasObject(By.text("KOReader Sync")), 5000L))
+        assertTrue("Progress sync section should be visible on Settings tab",
+            uiDevice.wait(Until.hasObject(By.text("Progress sync")), 5000L))
     }
 
     @Test
@@ -93,18 +93,20 @@ class MainActivityTest {
             10000L,
             By.res("android:id/list"),
             By.res("android:id/content_picker_title"),
-            By.pkg("com.android.documentsui")
+            By.pkg("com.android.documentsui"),
+            By.pkg("com.google.android.documentsui")
         ) != null
         assertTrue("Documents UI should open after tapping Import EPUB", documentsUiShown)
 
-        uiDevice.pressBack()
-        uiDevice.waitForIdle()
-
-        val backOnLibrary = waitForAny(
-            5000L,
-            By.text("Leafline"),
-            *importControlSelector()
-        ) != null
+        var backOnLibrary = false
+        for (attempt in 0 until 2) {
+            uiDevice.pressBack()
+            uiDevice.waitForIdle()
+            if (waitForAny(3000L, By.text("Leafline"), *importControlSelector()) != null) {
+                backOnLibrary = true
+                break
+            }
+        }
         assertTrue("Should return to Library tab after cancel", backOnLibrary)
     }
 }

@@ -28,21 +28,24 @@ offline dictionary lookup, and full-text search with match case, whole word, reg
 and per-chapter filtering.
 
 **Your library.** Grid and list layouts, multi-select batch actions, collections,
-reading-status filters, 1–5 star ratings, custom tags, and sorting by recency,
-title, author, or rating.
+series grouping with next-book continuation, reading-status filters, 1–5 star
+ratings, custom tags, and sorting by recency, title, author, or rating.
 
 **Reading time.** On-device tracking with daily and weekly insights, a 7-day
-activity chart, and an optional daily goal. The numbers inform; nothing nags.
+activity chart, estimated time remaining, and an optional daily goal. The numbers
+inform; nothing nags.
 
 **Everything leaves cleanly.** Export annotations to Markdown, an Obsidian vault
-ZIP, Readwise CSV, or Anki TSV. Back up and restore the whole library as JSON, including where you were in each book.
+ZIP, Readwise CSV, or Anki TSV. Back up and restore the whole library as JSON,
+including series metadata, reading positions, and non-secret app/reader settings.
 
 **Reading aloud.** On-device text-to-speech with adjustable speed, sentence skip,
 and a sleep timer (5–60 minutes or end of chapter) that fades the audio out.
 
 **Finding books.** Browse the OPDS catalogs you add — your own Calibre-web or
-Kavita — and download straight into the library. No catalog ships with the app,
-so the list starts empty until you add one.
+Kavita — with catalog pagination, recent search history, and direct download into
+the library. No catalog ships with the app, so the list starts empty until you add
+one.
 
 **Optional Hardcover sync.** If you track reading on Hardcover, Leafline can send
 a book's status and page progress there — on its own, or alongside a KOReader
