@@ -27,6 +27,9 @@ object LibraryBackupSerializer {
             book.rating?.let { bookObj.put("rating", it) }
             book.readingStatus?.let { bookObj.put("readingStatus", it) }
             book.lastLocatorJson?.let { bookObj.put("lastLocatorJson", it) }
+            book.series?.let { bookObj.put("series", it) }
+            book.seriesIndex?.let { bookObj.put("seriesIndex", it.toDouble()) }
+            book.koreaderHash?.let { bookObj.put("koreaderHash", it) }
 
             booksArray.put(bookObj)
         }
@@ -89,7 +92,67 @@ object LibraryBackupSerializer {
         }
         root.put("annotations", annotationsArray)
 
+        backup.preferences?.let { prefs ->
+            root.put("preferences", serializePreferences(prefs))
+        }
+
         return root.toString(2)
+    }
+
+    private fun serializePreferences(prefs: BackupPreferences): JSONObject {
+        val obj = JSONObject()
+        prefs.appearanceMode?.let { obj.put("appearanceMode", it) }
+        prefs.libraryLayout?.let { obj.put("libraryLayout", it) }
+        prefs.librarySort?.let { obj.put("librarySort", it) }
+        prefs.librarySortAscending?.let { obj.put("librarySortAscending", it) }
+        prefs.dailyGoalMinutes?.let { obj.put("dailyGoalMinutes", it) }
+        prefs.booksGoalTarget?.let { obj.put("booksGoalTarget", it) }
+        if (prefs.opdsFeeds.isNotEmpty()) {
+            val feedsArray = JSONArray()
+            prefs.opdsFeeds.forEach { feed ->
+                val feedObj = JSONObject()
+                feedObj.put("id", feed.id)
+                feedObj.put("title", feed.title)
+                feedObj.put("url", feed.url)
+                feed.description?.let { feedObj.put("description", it) }
+                feedsArray.put(feedObj)
+            }
+            obj.put("opdsFeeds", feedsArray)
+        }
+        prefs.readerPreferences?.let { reader ->
+            obj.put("readerPreferences", serializeReaderPreferences(reader))
+        }
+        return obj
+    }
+
+    private fun serializeReaderPreferences(reader: ReaderPreferencesBackup): JSONObject {
+        val obj = JSONObject()
+        reader.theme?.let { obj.put("theme", it) }
+        reader.fontFamily?.let { obj.put("fontFamily", it) }
+        reader.fontSize?.let { obj.put("fontSize", it) }
+        reader.lineHeight?.let { obj.put("lineHeight", it) }
+        reader.pageMargins?.let { obj.put("pageMargins", it) }
+        reader.publisherStyles?.let { obj.put("publisherStyles", it) }
+        reader.scroll?.let { obj.put("scroll", it) }
+        reader.hyphens?.let { obj.put("hyphens", it) }
+        reader.columnCount?.let { obj.put("columnCount", it) }
+        reader.tapZoneLeft?.let { obj.put("tapZoneLeft", it) }
+        reader.tapZoneCenter?.let { obj.put("tapZoneCenter", it) }
+        reader.tapZoneRight?.let { obj.put("tapZoneRight", it) }
+        reader.tapZoneLayout?.let { obj.put("tapZoneLayout", it) }
+        reader.pageTurnAnimation?.let { obj.put("pageTurnAnimation", it) }
+        reader.brightness?.let { obj.put("brightness", it.toDouble()) }
+        reader.preSepiaTheme?.let { obj.put("preSepiaTheme", it) }
+        reader.reduceMotion?.let { obj.put("reduceMotion", it) }
+        reader.previewFootnotes?.let { obj.put("previewFootnotes", it) }
+        reader.keepScreenOn?.let { obj.put("keepScreenOn", it) }
+        reader.orientation?.let { obj.put("orientation", it) }
+        reader.showMinimalHud?.let { obj.put("showMinimalHud", it) }
+        reader.minimalHudMode?.let { obj.put("minimalHudMode", it) }
+        reader.hapticFeedback?.let { obj.put("hapticFeedback", it) }
+        reader.volumeKeyNavigation?.let { obj.put("volumeKeyNavigation", it) }
+        reader.invertVolumeKeys?.let { obj.put("invertVolumeKeys", it) }
+        return obj
     }
 
     fun deserialize(jsonString: String): LibraryBackup {
@@ -119,9 +182,12 @@ object LibraryBackupSerializer {
                         tags.add(tagsArray.getString(j))
                     }
                 }
-                val rating = if (obj.has("rating")) obj.optInt("rating") else null
-                val readingStatus = if (obj.has("readingStatus")) obj.optString("readingStatus") else null
-                val lastLocatorJson = if (obj.has("lastLocatorJson")) obj.optString("lastLocatorJson") else null
+                val rating = obj.optNullableInt("rating")
+                val readingStatus = obj.optNullableString("readingStatus")
+                val lastLocatorJson = obj.optNullableString("lastLocatorJson")
+                val series = obj.optNullableString("series")
+                val seriesIndex = obj.optNullableDouble("seriesIndex")?.toFloat()
+                val koreaderHash = obj.optNullableString("koreaderHash")
 
                 if (stableId.isNotBlank() && title.isNotBlank()) {
                     books.add(
@@ -132,7 +198,10 @@ object LibraryBackupSerializer {
                             tags = tags,
                             rating = rating,
                             readingStatus = readingStatus,
-                            lastLocatorJson = lastLocatorJson
+                            lastLocatorJson = lastLocatorJson,
+                            series = series,
+                            seriesIndex = seriesIndex,
+                            koreaderHash = koreaderHash
                         )
                     )
                 }
@@ -165,7 +234,7 @@ object LibraryBackupSerializer {
                 val obj = bookmarksArray.optJSONObject(i) ?: continue
                 val bookStableId = obj.optString("bookStableId")
                 val locatorJson = obj.optString("locatorJson")
-                val label = if (obj.has("label")) obj.optString("label") else null
+                val label = obj.optNullableString("label")
                 val createdAt = obj.optLong("createdAt", System.currentTimeMillis())
 
                 if (bookStableId.isNotBlank() && locatorJson.isNotBlank()) {
@@ -189,7 +258,7 @@ object LibraryBackupSerializer {
                 val bookStableId = obj.optString("bookStableId")
                 val locatorJson = obj.optString("locatorJson")
                 val colorHex = obj.optString("colorHex", "#FFE082")
-                val note = if (obj.has("note")) obj.optString("note") else null
+                val note = obj.optNullableString("note")
                 val createdAt = obj.optLong("createdAt", System.currentTimeMillis())
 
                 if (bookStableId.isNotBlank() && locatorJson.isNotBlank()) {
@@ -206,6 +275,8 @@ object LibraryBackupSerializer {
             }
         }
 
+        val preferences = root.optJSONObject("preferences")?.let(::deserializePreferences)
+
         return LibraryBackup(
             readingSessions = root.optJSONArray("readingSessions")?.let { array ->
                 (0 until array.length()).mapNotNull { index ->
@@ -217,10 +288,10 @@ object LibraryBackupSerializer {
                         startTimeEpochMillis = obj.optLong("startTimeEpochMillis"),
                         endTimeEpochMillis = obj.optLong("endTimeEpochMillis"),
                         activeDurationMillis = obj.optLong("activeDurationMillis"),
-                        startProgression = if (obj.has("startProgression")) obj.optDouble("startProgression") else null,
-                        endProgression = if (obj.has("endProgression")) obj.optDouble("endProgression") else null,
-                        startLocatorJson = if (obj.has("startLocatorJson")) obj.optString("startLocatorJson") else null,
-                        endLocatorJson = if (obj.has("endLocatorJson")) obj.optString("endLocatorJson") else null
+                        startProgression = obj.optNullableDouble("startProgression"),
+                        endProgression = obj.optNullableDouble("endProgression"),
+                        startLocatorJson = obj.optNullableString("startLocatorJson"),
+                        endLocatorJson = obj.optNullableString("endLocatorJson")
                     )
                 }
             }.orEmpty(),
@@ -233,7 +304,81 @@ object LibraryBackupSerializer {
             books = books,
             collections = collections,
             bookmarks = bookmarks,
-            annotations = annotations
+            annotations = annotations,
+            preferences = preferences
         )
     }
+
+    private fun deserializePreferences(obj: JSONObject): BackupPreferences {
+        val opdsFeeds = obj.optJSONArray("opdsFeeds")?.let { array ->
+            (0 until array.length()).mapNotNull { index ->
+                val feedObj = array.optJSONObject(index) ?: return@mapNotNull null
+                val title = feedObj.optNullableString("title") ?: return@mapNotNull null
+                val url = feedObj.optNullableString("url") ?: return@mapNotNull null
+                val id = feedObj.optNullableString("id") ?: url
+                OpdsFeedBackup(
+                    id = id,
+                    title = title,
+                    url = url,
+                    description = feedObj.optNullableString("description")
+                )
+            }
+        }.orEmpty()
+
+        return BackupPreferences(
+            appearanceMode = obj.optNullableString("appearanceMode"),
+            libraryLayout = obj.optNullableString("libraryLayout"),
+            librarySort = obj.optNullableString("librarySort"),
+            librarySortAscending = obj.optNullableBoolean("librarySortAscending"),
+            dailyGoalMinutes = obj.optNullableInt("dailyGoalMinutes"),
+            booksGoalTarget = obj.optNullableInt("booksGoalTarget"),
+            opdsFeeds = opdsFeeds,
+            readerPreferences = obj.optJSONObject("readerPreferences")?.let(::deserializeReaderPreferences)
+        )
+    }
+
+    private fun deserializeReaderPreferences(obj: JSONObject): ReaderPreferencesBackup {
+        return ReaderPreferencesBackup(
+            theme = obj.optNullableString("theme"),
+            fontFamily = obj.optNullableString("fontFamily"),
+            fontSize = obj.optNullableDouble("fontSize"),
+            lineHeight = obj.optNullableDouble("lineHeight"),
+            pageMargins = obj.optNullableDouble("pageMargins"),
+            publisherStyles = obj.optNullableBoolean("publisherStyles"),
+            scroll = obj.optNullableBoolean("scroll"),
+            hyphens = obj.optNullableBoolean("hyphens"),
+            columnCount = obj.optNullableString("columnCount"),
+            tapZoneLeft = obj.optNullableString("tapZoneLeft"),
+            tapZoneCenter = obj.optNullableString("tapZoneCenter"),
+            tapZoneRight = obj.optNullableString("tapZoneRight"),
+            tapZoneLayout = obj.optNullableString("tapZoneLayout"),
+            pageTurnAnimation = obj.optNullableString("pageTurnAnimation"),
+            brightness = obj.optNullableDouble("brightness")?.toFloat(),
+            preSepiaTheme = obj.optNullableString("preSepiaTheme"),
+            reduceMotion = obj.optNullableBoolean("reduceMotion"),
+            previewFootnotes = obj.optNullableBoolean("previewFootnotes"),
+            keepScreenOn = obj.optNullableBoolean("keepScreenOn"),
+            orientation = obj.optNullableString("orientation"),
+            showMinimalHud = obj.optNullableBoolean("showMinimalHud"),
+            minimalHudMode = obj.optNullableString("minimalHudMode"),
+            hapticFeedback = obj.optNullableBoolean("hapticFeedback"),
+            volumeKeyNavigation = obj.optNullableBoolean("volumeKeyNavigation"),
+            invertVolumeKeys = obj.optNullableBoolean("invertVolumeKeys")
+        )
+    }
+
+    private fun JSONObject.optNullableString(key: String): String? =
+        if (has(key) && !isNull(key)) optString(key) else null
+
+    private fun JSONObject.optNullableInt(key: String): Int? =
+        if (has(key) && !isNull(key)) optInt(key) else null
+
+    private fun JSONObject.optNullableDouble(key: String): Double? {
+        if (!has(key) || isNull(key)) return null
+        val value = optDouble(key, Double.NaN)
+        return if (value.isNaN()) null else value
+    }
+
+    private fun JSONObject.optNullableBoolean(key: String): Boolean? =
+        if (has(key) && !isNull(key)) optBoolean(key) else null
 }

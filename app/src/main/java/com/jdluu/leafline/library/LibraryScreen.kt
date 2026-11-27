@@ -64,6 +64,7 @@ fun LibraryScreen(
     onImportEpub: () -> Unit,
     onAddLibraryFolder: () -> Unit = {},
     onReselectFolder: (String) -> Unit = {},
+    onBackupRestored: () -> Unit = {},
     onOpenBook: (LibraryBook) -> Unit
 ) {
     val books by viewModel.sortedBooks.collectAsStateWithLifecycle()
@@ -453,7 +454,8 @@ fun LibraryScreen(
     if (showBackupSheet && backupManager != null) {
         BackupRestoreSheet(
             backupManager = backupManager,
-            onDismiss = { showBackupSheet = false }
+            onDismiss = { showBackupSheet = false },
+            onBackupRestored = onBackupRestored
         )
     }
 
@@ -500,6 +502,7 @@ fun LibraryScreen(
 
     detailSheetBook?.let { book ->
         val currentBook = books.find { it.stableId == book.stableId } ?: book
+        val nextBook = remember(currentBook, allBooks) { currentBook.nextInSeries(allBooks) }
         BookDetailSheet(
             book = currentBook,
             collections = collections,
@@ -508,6 +511,12 @@ fun LibraryScreen(
                 .collectionIdsForBook(book.stableId)
                 .collectAsStateWithLifecycle(emptySet())
                 .value,
+            nextInSeries = nextBook,
+            onSelectBook = { next -> detailSheetBook = next },
+            onOpenNextInSeries = { next ->
+                detailSheetBook = null
+                onOpenBook(next)
+            },
             onDismiss = { detailSheetBook = null },
             onDelete = {
                 detailSheetBook = null

@@ -17,6 +17,9 @@ import com.jdluu.leafline.hardcover.HardcoverTrackingResolver
 import com.jdluu.leafline.hardcover.HardcoverTrackingStorage
 import com.jdluu.leafline.hardcover.HardcoverConfigStorage
 import com.jdluu.leafline.hardcover.HardcoverSyncer
+import com.jdluu.leafline.library.LibraryLayoutStore
+import com.jdluu.leafline.library.LibrarySortStore
+import com.jdluu.leafline.library.ReadingGoalStore
 import com.jdluu.leafline.library.data.AnnotationRepository
 import com.jdluu.leafline.library.data.AnnotationRepositoryImpl
 import com.jdluu.leafline.library.data.BookmarkRepository
@@ -33,11 +36,13 @@ import com.jdluu.leafline.library.cover.EpubCoverLoader
 import com.jdluu.leafline.opds.OpdsClient
 import com.jdluu.leafline.opds.OpdsCoverLoader
 import com.jdluu.leafline.opds.OpdsFeedStore
+import com.jdluu.leafline.reader.ReaderPreferencesStore
 import com.jdluu.leafline.storage.KoreaderSyncConfigStorage
 import com.jdluu.leafline.sync.KoreaderSyncApi
 import com.jdluu.leafline.sync.KoreaderSyncClient
 import com.jdluu.leafline.sync.KoreaderSyncConfigPersistence
 import com.jdluu.leafline.sync.KoreaderSyncConfigStore
+import com.jdluu.leafline.theme.AppearanceStore
 import java.util.concurrent.TimeUnit
 import okhttp3.OkHttpClient
 
@@ -112,7 +117,13 @@ class AppContainer(private val context: Context) {
             annotationDao = database.annotationDao(),
             readingSessionDao = database.readingSessionDao(),
             appVersion = appVersionName(),
-            hardcoverTracking = hardcoverTracking
+            hardcoverTracking = hardcoverTracking,
+            appearanceStore = AppearanceStore.fromContext(context),
+            libraryLayoutStore = LibraryLayoutStore.fromContext(context),
+            librarySortStore = LibrarySortStore.fromContext(context),
+            readingGoalStore = ReadingGoalStore.fromContext(context),
+            readerPreferencesStore = ReaderPreferencesStore.fromContext(context),
+            opdsFeedStore = opdsFeedStore
         )
     }
 

@@ -594,4 +594,183 @@ class OpdsViewModelTest {
         val success = viewModel.uiState.value as OpdsUiState.Success
         assertEquals("Feed https://calibre.test/second", success.feed.title)
     }
+
+    @Test
+    fun loadNextPage_appendsDeduplicatedBooks_andGuardsConcurrentRequests() = runTest(testDispatcher) {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val feedStore = OpdsFeedStore.fromContext(context, TestSecretCipher())
+        feedStore.addCustomFeed("Paged Calibre", "https://calibre.test/page1")
+        var page2FetchCount = 0
+        val pagedClient = object : OpdsClient() {
+            override suspend fun fetchFeed(url: String, authHeader: String?): Result<OpdsFeedResult> {
+                return when (url) {
+                    "https://calibre.test/page1" -> Result.success(
+                        OpdsFeedResult(
+                            title = "Page 1",
+                            feedUrl = url,
+                            books = listOf(
+                                OpdsBook(id = "b1", title = "Book One"),
+                                OpdsBook(id = "b2", title = "Book Two")
+                            ),
+                            nextPageUrl = "https://calibre.test/page2"
+                        )
+                    )
+                    "https://calibre.test/page2" -> {
+                        page2FetchCount++
+                        kotlinx.coroutines.delay(100L)
+                        Result.success(
+                            OpdsFeedResult(
+                                title = "Page 2",
+                                feedUrl = url,
+                                books = listOf(
+                                    OpdsBook(id = "b2", title = "Book Two Duplicate"),
+                                    OpdsBook(id = "b3", title = "Book Three")
+                                ),
+                                nextPageUrl = null
+                            )
+                        )
+                    }
+                    else -> Result.failure(IllegalArgumentException("Unexpected url $url"))
+                }
+            }
+        }
+        val repo = FakeLibraryRepository()
+        val downloadManager = OpdsDownloadManager(
+            context = context,
+            opdsClient = pagedClient,
+            importer = com.jdluu.leafline.ReadiumEpubImporter(context),
+            repository = repo,
+            scope = this
+        )
+        val viewModel = OpdsViewModel(
+            feedStore = feedStore,
+            opdsClient = pagedClient,
+            downloadManager = downloadManager,
+            libraryRepository = repo
+        )
+        testScheduler.advanceUntilIdle()
+
+        // Trigger two rapid loadNextPage calls; only the first should execute
+        viewModel.loadNextPage()
+        assertTrue(viewModel.isLoadingNextPage.value)
+        viewModel.loadNextPage()
+        testScheduler.advanceUntilIdle()
+
+        assertFalse(viewModel.isLoadingNextPage.value)
+        assertEquals(1, page2FetchCount)
+        val success = viewModel.uiState.value as OpdsUiState.Success
+        assertEquals(listOf("b1", "b2", "b3"), success.feed.books.map { it.id })
+        assertEquals(null, success.feed.nextPageUrl)
+    }
+
+    @Test
+    fun loadNextPage_failurePreservesLoadedBooks_andRetrySucceeds() = runTest(testDispatcher) {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val feedStore = OpdsFeedStore.fromContext(context, TestSecretCipher())
+        feedStore.addCustomFeed("Paged Calibre", "https://calibre.test/page1")
+        var failNext = true
+        val flakyClient = object : OpdsClient() {
+            override suspend fun fetchFeed(url: String, authHeader: String?): Result<OpdsFeedResult> {
+                return when (url) {
+                    "https://calibre.test/page1" -> Result.success(
+                        OpdsFeedResult(
+                            title = "Page 1",
+                            feedUrl = url,
+                            books = listOf(OpdsBook(id = "b1", title = "Book One")),
+                            nextPageUrl = "https://calibre.test/page2"
+                        )
+                    )
+                    "https://calibre.test/page2" -> if (failNext) {
+                        Result.failure(RuntimeException("Timeout"))
+                    } else {
+                        Result.success(
+                            OpdsFeedResult(
+                                title = "Page 2",
+                                feedUrl = url,
+                                books = listOf(OpdsBook(id = "b2", title = "Book Two")),
+                                nextPageUrl = null
+                            )
+                        )
+                    }
+                    else -> Result.failure(IllegalArgumentException("Unexpected url $url"))
+                }
+            }
+        }
+        val repo = FakeLibraryRepository()
+        val downloadManager = OpdsDownloadManager(
+            context = context,
+            opdsClient = flakyClient,
+            importer = com.jdluu.leafline.ReadiumEpubImporter(context),
+            repository = repo,
+            scope = this
+        )
+        val viewModel = OpdsViewModel(
+            feedStore = feedStore,
+            opdsClient = flakyClient,
+            downloadManager = downloadManager,
+            libraryRepository = repo
+        )
+        testScheduler.advanceUntilIdle()
+
+        viewModel.loadNextPage()
+        testScheduler.advanceUntilIdle()
+
+        assertEquals("Timeout", viewModel.paginationError.value)
+        assertEquals(1, (viewModel.uiState.value as OpdsUiState.Success).feed.books.size)
+
+        failNext = false
+        viewModel.loadNextPage()
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(null, viewModel.paginationError.value)
+        assertEquals(listOf("b1", "b2"), (viewModel.uiState.value as OpdsUiState.Success).feed.books.map { it.id })
+    }
+
+    @Test
+    fun searchHistory_recordsSubmittedQueriesAndSupportsRemoveAndClear() = runTest(testDispatcher) {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val historyPrefs = context.getSharedPreferences("opds_history_vm_test", android.content.Context.MODE_PRIVATE)
+        historyPrefs.edit().clear().commit()
+        val historyStore = com.jdluu.leafline.reader.search.SearchHistoryStore(historyPrefs)
+
+        val feedStore = OpdsFeedStore.fromContext(context, TestSecretCipher())
+        feedStore.addCustomFeed("Home Calibre", "https://calibre.test/opds")
+        val opdsClient = FakeOpdsClient()
+        val repo = FakeLibraryRepository()
+        val downloadManager = OpdsDownloadManager(
+            context = context,
+            opdsClient = opdsClient,
+            importer = com.jdluu.leafline.ReadiumEpubImporter(context),
+            repository = repo,
+            scope = this
+        )
+        val viewModel = OpdsViewModel(
+            feedStore = feedStore,
+            opdsClient = opdsClient,
+            downloadManager = downloadManager,
+            libraryRepository = repo,
+            searchHistoryStore = historyStore
+        )
+        testScheduler.advanceUntilIdle()
+
+        // Typing partial query should not pollute search history until submitted
+        viewModel.search("wh")
+        testScheduler.advanceUntilIdle()
+        assertTrue(viewModel.searchHistory.value.isEmpty())
+
+        viewModel.search("whale")
+        viewModel.recordSearchQuery()
+        assertEquals(listOf("whale"), viewModel.searchHistory.value)
+
+        viewModel.submitSearch("dickens")
+        testScheduler.advanceUntilIdle()
+        assertEquals("dickens", opdsClient.lastSearchQuery)
+        assertEquals(listOf("dickens", "whale"), viewModel.searchHistory.value)
+
+        viewModel.removeSearchHistory("whale")
+        assertEquals(listOf("dickens"), viewModel.searchHistory.value)
+
+        viewModel.clearSearchHistory()
+        assertTrue(viewModel.searchHistory.value.isEmpty())
+    }
 }

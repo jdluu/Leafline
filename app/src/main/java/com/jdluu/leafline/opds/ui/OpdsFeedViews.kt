@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -66,6 +67,9 @@ internal fun FeedContentView(
     viewModel: OpdsViewModel,
     downloadStatuses: Map<String, DownloadStatus>,
     gridState: LazyGridState = rememberLazyGridState(),
+    isLoadingNextPage: Boolean = false,
+    paginationError: String? = null,
+    onLoadMoreClick: () -> Unit = {},
     onSubfeedClick: (OpdsNavigationLink) -> Unit,
     onBookClick: (OpdsBook) -> Unit,
     onDownloadClick: (OpdsBook) -> Unit
@@ -175,6 +179,53 @@ internal fun FeedContentView(
                         onClick = { onBookClick(book) },
                         onDownloadClick = { onDownloadClick(book) }
                     )
+                }
+            }
+        }
+
+        // Pagination footer
+        if (!feed.nextPageUrl.isNullOrBlank()) {
+            item(span = { GridItemSpan(columns) }) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = Spacing.sm),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+                ) {
+                    if (!paginationError.isNullOrBlank()) {
+                        Text(
+                            text = paginationError,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                    if (isLoadingNextPage) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                            modifier = Modifier.padding(vertical = Spacing.sm)
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp) // touch-target-ok: progress indicator
+                            )
+                            Text(
+                                text = "Loading more books…",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    } else {
+                        OutlinedButton(
+                            onClick = onLoadMoreClick,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 48.dp)
+                        ) {
+                            Text(if (paginationError != null) "Retry loading more" else "Load more books")
+                        }
+                    }
                 }
             }
         }

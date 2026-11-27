@@ -63,6 +63,7 @@ internal fun OpdsTopBar(
     isSearchActive: Boolean,
     onSearchToggle: () -> Unit,
     onSearchQueryChange: (String) -> Unit,
+    onSearchSubmit: () -> Unit = {},
     onSearchClear: () -> Unit,
     canNavigateBack: Boolean,
     onNavigateBack: () -> Unit
@@ -98,7 +99,10 @@ internal fun OpdsTopBar(
                     onValueChange = onSearchQueryChange,
                     placeholder = "Search catalog…",
                     imeAction = ImeAction.Search,
-                    keyboardActions = KeyboardActions(onSearch = { keyboardController?.hide() }),
+                    keyboardActions = KeyboardActions(onSearch = {
+                        onSearchSubmit()
+                        keyboardController?.hide()
+                    }),
                     containerColor = MaterialTheme.colorScheme.surfaceVariant,
                     modifier = Modifier.fillMaxWidth()
                 )

@@ -33,6 +33,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -42,6 +43,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -84,6 +86,9 @@ internal fun BookDetailSheet(
     collections: List<Collection>,
     bookCollectionIds: Set<Long>,
     availableTags: List<String> = emptyList(),
+    nextInSeries: LibraryBook? = null,
+    onSelectBook: ((LibraryBook) -> Unit)? = null,
+    onOpenNextInSeries: ((LibraryBook) -> Unit)? = null,
     onDismiss: () -> Unit,
     onDelete: () -> Unit,
     onSetReadingStatus: (ReadingStatus) -> Unit,
@@ -97,17 +102,17 @@ internal fun BookDetailSheet(
     onExportNotes: (() -> Unit)? = null,
     onGetReadingStats: suspend () -> ReadingAggregate = { ReadingAggregate.EMPTY }
 ) {
-    var optimisticStatus by remember(book.readingStatus) { mutableStateOf(book.readingStatus) }
-    var optimisticRating by remember(book.rating) { mutableStateOf(book.rating) }
-    var optimisticTags by remember(book.tags) { mutableStateOf(book.tags) }
-    var optimisticCollectionIds by remember(bookCollectionIds) { mutableStateOf(bookCollectionIds) }
-    var optimisticTitle by remember(book.title) { mutableStateOf(book.title) }
-    var optimisticAuthors by remember(book.authors) { mutableStateOf(book.authors) }
-    var optimisticSeries by remember(book.series) { mutableStateOf(book.series) }
-    var optimisticSeriesIndex by remember(book.seriesIndex) { mutableStateOf(book.seriesIndex) }
-    var optimisticPublisher by remember(book.publisher) { mutableStateOf(book.publisher) }
-    var optimisticDescription by remember(book.description) { mutableStateOf(book.description) }
-    var showEditMetadataDialog by remember { mutableStateOf(false) }
+    var optimisticStatus by remember(book.stableId, book.readingStatus) { mutableStateOf(book.readingStatus) }
+    var optimisticRating by remember(book.stableId, book.rating) { mutableStateOf(book.rating) }
+    var optimisticTags by remember(book.stableId, book.tags) { mutableStateOf(book.tags) }
+    var optimisticCollectionIds by remember(book.stableId, bookCollectionIds) { mutableStateOf(bookCollectionIds) }
+    var optimisticTitle by remember(book.stableId, book.title) { mutableStateOf(book.title) }
+    var optimisticAuthors by remember(book.stableId, book.authors) { mutableStateOf(book.authors) }
+    var optimisticSeries by remember(book.stableId, book.series) { mutableStateOf(book.series) }
+    var optimisticSeriesIndex by remember(book.stableId, book.seriesIndex) { mutableStateOf(book.seriesIndex) }
+    var optimisticPublisher by remember(book.stableId, book.publisher) { mutableStateOf(book.publisher) }
+    var optimisticDescription by remember(book.stableId, book.description) { mutableStateOf(book.description) }
+    var showEditMetadataDialog by remember(book.stableId) { mutableStateOf(false) }
 
     // Hardcover tracking for this one book. Read straight from the container rather
     // than threading two more parameters through this sheet: it is a single switch, and
@@ -270,8 +275,59 @@ internal fun BookDetailSheet(
                 }
             }
 
+            if (nextInSeries != null) {
+                Spacer(Modifier.height(Spacing.sm))
+                Surface(
+                    onClick = { onSelectBook?.invoke(nextInSeries) },
+                    enabled = onSelectBook != null,
+                    shape = MaterialTheme.shapes.medium,
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Next in series",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = nextInSeries.title,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            nextInSeries.formattedSeries()?.let { label ->
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                        if (onOpenNextInSeries != null) {
+                            FilledTonalButton(
+                                onClick = { onOpenNextInSeries(nextInSeries) },
+                                modifier = Modifier.heightIn(min = 48.dp)
+                            ) {
+                                Text("Read")
+                            }
+                        }
+                    }
+                }
+            }
+
             optimisticDescription?.takeIf { it.isNotBlank() }?.let { descriptionText ->
-                var descriptionExpanded by remember { mutableStateOf(false) }
+                var descriptionExpanded by remember(book.stableId) { mutableStateOf(false) }
                 Spacer(Modifier.height(Spacing.sm))
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 Spacer(Modifier.height(Spacing.sm))
@@ -348,6 +404,13 @@ internal fun BookDetailSheet(
                     Text("Reading activity", style = MaterialTheme.typography.titleSmall)
                     Spacer(Modifier.height(Spacing.xs))
                     MetadataRow("Time read", formatReadingDuration(stats.activeDurationMillis))
+                    val estimatedRemaining = ReadingProgressMath.estimatedRemainingTimeLabel(
+                        currentPercent = ReadingProgressMath.percentageFromLocator(book.lastLocatorJson),
+                        activeDurationMillis = stats.activeDurationMillis
+                    )
+                    if (estimatedRemaining != null) {
+                        MetadataRow("Time left", estimatedRemaining)
+                    }
                     MetadataRow("Sessions", "${stats.sessionCount}")
                     val avgMillis = stats.activeDurationMillis / stats.sessionCount
                     MetadataRow("Average session", formatReadingDuration(avgMillis))

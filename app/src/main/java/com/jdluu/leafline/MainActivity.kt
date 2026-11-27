@@ -347,7 +347,10 @@ fun LeaflineApp(activity: MainActivity) {
                     scope = activity.lifecycleScope
                 )
             },
-            libraryRepository = activity.appContainer.libraryRepository
+            libraryRepository = activity.appContainer.libraryRepository,
+            searchHistoryStore = remember {
+                com.jdluu.leafline.reader.search.SearchHistoryStore.createOpds(activity)
+            }
         )
     )
 
@@ -532,6 +535,11 @@ fun LeaflineApp(activity: MainActivity) {
                             onReselectFolder = { uri ->
                                 pendingReplaceFolderUri = uri
                                 addLibraryFolderLauncher.launch(null)
+                            },
+                            onBackupRestored = {
+                                appearance = appearanceStore.load()
+                                libraryViewModel.reloadPreferences()
+                                opdsViewModel.reloadFeeds()
                             },
                             onOpenBook = openReaderOrAsk
                         )

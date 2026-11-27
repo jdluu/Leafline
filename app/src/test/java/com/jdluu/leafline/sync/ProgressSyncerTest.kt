@@ -108,6 +108,22 @@ class ReadingProgressMathTest {
         val locator = """{"locations":{"totalProgression":0.426}}"""
         assertEquals("43% read", ReadingProgressMath.progressLabel(locator))
     }
+
+    @Test
+    fun `estimatedRemainingTimeLabel returns null when progress or duration invalid`() {
+        assertNull(ReadingProgressMath.estimatedRemainingTimeLabel(null, 300_000L))
+        assertNull(ReadingProgressMath.estimatedRemainingTimeLabel(0.0, 300_000L))
+        assertNull(ReadingProgressMath.estimatedRemainingTimeLabel(100.0, 300_000L))
+        assertNull(ReadingProgressMath.estimatedRemainingTimeLabel(25.0, 59_999L))
+    }
+
+    @Test
+    fun `estimatedRemainingTimeLabel formats under minute, minutes, exact hours, and hours with minutes`() {
+        assertEquals("< 1 min left", ReadingProgressMath.estimatedRemainingTimeLabel(99.0, 60_000L))
+        assertEquals("~20 min left", ReadingProgressMath.estimatedRemainingTimeLabel(50.0, 20 * 60_000L))
+        assertEquals("~1h left", ReadingProgressMath.estimatedRemainingTimeLabel(50.0, 60 * 60_000L))
+        assertEquals("~1h 30m left", ReadingProgressMath.estimatedRemainingTimeLabel(25.0, 30 * 60_000L))
+    }
 }
 
 class ProgressSyncerTest {

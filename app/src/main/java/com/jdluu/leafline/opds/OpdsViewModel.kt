@@ -10,6 +10,7 @@ import com.jdluu.leafline.opds.model.DownloadStatus
 import com.jdluu.leafline.opds.model.OpdsBook
 import com.jdluu.leafline.opds.model.OpdsFeedResult
 import com.jdluu.leafline.opds.model.OpdsFeedSource
+import com.jdluu.leafline.reader.search.SearchHistoryStore
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -30,7 +31,8 @@ class OpdsViewModel(
     private val feedStore: OpdsFeedStore,
     private val opdsClient: OpdsClient,
     private val downloadManager: OpdsDownloadManager,
-    private val libraryRepository: LibraryRepository
+    private val libraryRepository: LibraryRepository,
+    private val searchHistoryStore: SearchHistoryStore? = null
 ) : ViewModel() {
 
     private val _feedSources = MutableStateFlow<List<OpdsFeedSource>>(feedStore.loadFeeds())
@@ -60,8 +62,18 @@ class OpdsViewModel(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
+    val searchHistory: StateFlow<List<String>> =
+        searchHistoryStore?.history ?: MutableStateFlow<List<String>>(emptyList()).asStateFlow()
+
+    private val _isLoadingNextPage = MutableStateFlow(false)
+    val isLoadingNextPage: StateFlow<Boolean> = _isLoadingNextPage.asStateFlow()
+
+    private val _paginationError = MutableStateFlow<String?>(null)
+    val paginationError: StateFlow<String?> = _paginationError.asStateFlow()
+
     private var activeSearchTemplate: String? = null
     private var feedLoadJob: Job? = null
+    private var nextPageJob: Job? = null
 
     val downloadStatuses: StateFlow<Map<String, DownloadStatus>> = downloadManager.downloadStatuses
 
@@ -129,6 +141,7 @@ class OpdsViewModel(
             return
         }
 
+        cancelNextPageLoad()
         feedLoadJob?.cancel()
         feedLoadJob = viewModelScope.launch {
             _uiState.value = OpdsUiState.Loading("Searching...")
@@ -142,6 +155,33 @@ class OpdsViewModel(
                 }
             )
         }
+    }
+
+    /** Records a submitted query in recent search history without triggering duplicate typing entries. */
+    fun recordSearchQuery(query: String = _searchQuery.value) {
+        val trimmed = query.trim()
+        if (trimmed.isNotBlank()) {
+            searchHistoryStore?.recordQuery(trimmed)
+        }
+    }
+
+    /** Records [query] in recent searches and runs the catalog search. */
+    fun submitSearch(query: String) {
+        val trimmed = query.trim()
+        if (trimmed.isBlank()) {
+            clearSearch()
+            return
+        }
+        searchHistoryStore?.recordQuery(trimmed)
+        search(trimmed)
+    }
+
+    fun removeSearchHistory(query: String) {
+        searchHistoryStore?.removeQuery(query)
+    }
+
+    fun clearSearchHistory() {
+        searchHistoryStore?.clear()
     }
 
     fun clearSearch() {
@@ -161,7 +201,49 @@ class OpdsViewModel(
         loadFeedUrl(currentUrl)
     }
 
+    fun loadNextPage() {
+        if (_isLoadingNextPage.value) return
+        val currentSuccess = _uiState.value as? OpdsUiState.Success ?: return
+        val nextUrl = currentSuccess.feed.nextPageUrl?.takeIf { it.isNotBlank() } ?: return
+
+        _isLoadingNextPage.value = true
+        _paginationError.value = null
+        nextPageJob = viewModelScope.launch {
+            try {
+                val result = opdsClient.fetchFeed(nextUrl, currentAuthHeader)
+                result.fold(
+                    onSuccess = { nextFeed ->
+                        val latest = _uiState.value as? OpdsUiState.Success ?: return@fold
+                        val existingIds = latest.feed.books.map { it.id }.toSet()
+                        val uniqueNewBooks = nextFeed.books.filter { it.id !in existingIds }
+                        val updatedNextUrl = nextFeed.nextPageUrl
+                            ?.takeIf { it.isNotBlank() && it != nextUrl }
+                        _uiState.value = OpdsUiState.Success(
+                            latest.feed.copy(
+                                books = latest.feed.books + uniqueNewBooks,
+                                nextPageUrl = updatedNextUrl
+                            )
+                        )
+                    },
+                    onFailure = { error ->
+                        _paginationError.value = error.message ?: "Failed to load more books"
+                    }
+                )
+            } finally {
+                _isLoadingNextPage.value = false
+            }
+        }
+    }
+
+    private fun cancelNextPageLoad() {
+        nextPageJob?.cancel()
+        nextPageJob = null
+        _isLoadingNextPage.value = false
+        _paginationError.value = null
+    }
+
     private fun loadFeedUrl(url: String) {
+        cancelNextPageLoad()
         feedLoadJob?.cancel()
         feedLoadJob = viewModelScope.launch {
             _uiState.value = OpdsUiState.Loading()
@@ -241,6 +323,7 @@ class OpdsViewModel(
         }
         // The last catalog is gone, so the screen goes back to the empty state instead of
         // holding a source that no longer exists.
+        cancelNextPageLoad()
         _selectedSource.value = null
         _breadcrumbs.value = emptyList()
         _searchQuery.value = ""
@@ -252,13 +335,24 @@ class OpdsViewModel(
         val normalizedTitle = book.title.trim().lowercase()
         return libraryBooks.value.any { it.title.trim().lowercase() == normalizedTitle }
     }
+
+    fun reloadFeeds() {
+        _feedSources.value = feedStore.loadFeeds()
+        if (_selectedSource.value == null) {
+            val first = _feedSources.value.firstOrNull()
+            if (first != null) {
+                selectSource(first)
+            }
+        }
+    }
 }
 
 class OpdsViewModelFactory(
     private val feedStore: OpdsFeedStore,
     private val opdsClient: OpdsClient,
     private val downloadManager: OpdsDownloadManager,
-    private val libraryRepository: LibraryRepository
+    private val libraryRepository: LibraryRepository,
+    private val searchHistoryStore: SearchHistoryStore? = null
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -266,7 +360,8 @@ class OpdsViewModelFactory(
             feedStore = feedStore,
             opdsClient = opdsClient,
             downloadManager = downloadManager,
-            libraryRepository = libraryRepository
+            libraryRepository = libraryRepository,
+            searchHistoryStore = searchHistoryStore
         ) as T
     }
 }
